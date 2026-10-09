@@ -89,13 +89,8 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       if (dock && getComputedStyle(dock).visibility === "hidden") return;
       const bounds = owner!.getBoundingClientRect();
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const navigation = root!.closest(".editor-frame-canvas")?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().bottom || bounds.top;
-      const yielded = root!.closest(".editor-frame")?.getAttribute("data-title-yielded") === "true";
-      const projected = parseFloat(dock?.style.getPropertyValue("--editor-writing-top") || "");
-      const heading = Number.isFinite(projected) ? projected : yielded ? bounds.top
-        : root!.querySelector(".writing-document-heading")?.getBoundingClientRect().bottom || bounds.top;
       const publishedTop = parseFloat(dock?.style.getPropertyValue("--editor-usable-top") || "") || bounds.top;
-      const rawTop = Math.max(bounds.top, viewport!.offsetTop, navigation, heading, publishedTop);
+      const rawTop = Math.max(bounds.top, viewport!.offsetTop, publishedTop);
       // Protect the actual toolbar boundary, including native app panning,
       // rather than deriving its location from a viewport height difference.
       const bottom = writingBottom(lineMargin());

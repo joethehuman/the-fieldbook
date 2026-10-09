@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ListTree, SlidersHorizontal, X } from "lucide-react";
 import { MarkdownDownloadButton } from "./markdown-download";
@@ -8,8 +8,10 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
+import { blurWritingInput, captureWritingCursor, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
+import { EditorAppDockContext } from "./editor-app-header";
+import { useMobileEditorViewport } from "./use-mobile-editor-viewport";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
 export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
@@ -60,18 +62,20 @@ export function EditorFrame({
 }) {
   const phone = useEditorCardsLayout();
   const dock = useMobileWritingDock();
+  const dockHost = useContext(EditorAppDockContext);
   const frame = useRef<HTMLElement>(null);
   const controls = useRef<HTMLDivElement>(null);
   const [writingActionsHost, setWritingActionsHost] = useState<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const overlayLayer = useRef<HTMLDivElement>(null);
   const [overlayHost, setOverlayHost] = useState<HTMLElement | null>(null);
-  useLayoutEffect(() => { setOverlayHost(frame.current?.closest<HTMLElement>(".app") || null); }, []);
+  useLayoutEffect(() => { setOverlayHost(frame.current?.closest<HTMLElement>(".main-shell") || null); }, []);
   const hasNavigation = !!navigation;
   const [panels, setPanels] = useState({ outline: false, details: false });
   const panelState = useRef(panels);
   panelState.current = panels;
   const measureDock = useRef<(() => void) | null>(null);
+  useMobileEditorViewport(frame, dock, measureDock);
   const lastWritingCursor = useRef<WritingCursor | null>(null);
   const panelReturn = useRef<WritingCursor | null>(null);
   const preparedPanel = useRef<"outline" | "details" | null>(null);
@@ -140,195 +144,76 @@ export function EditorFrame({
     const owner = frame.current?.closest<HTMLElement>(".main-content");
     const app = frame.current?.closest<HTMLElement>(".app");
     const header = app?.querySelector<HTMLElement>(".topbar");
-    const shell = header?.parentElement;
+    const shell = frame.current?.closest<HTMLElement>(".main-shell");
     let active = true;
     let request = 0;
     let releaseRequest = 0;
-    let layoutWidth = document.documentElement.clientWidth;
-    let layoutHeight = document.documentElement.clientHeight;
-    let headerShift = 0;
-    let keyboard = false;
-    let lastDockTop: number | null = null;
-    let lastDockBottom: number | null = null;
-    let lastAppTop: number | null = null;
     let lastBand = "";
     let lastPosition: string | null = null;
     let fade: Animation | undefined;
-    let observedHeading: HTMLElement | null = null;
     const setStyle = (target: HTMLElement | null | undefined, name: string, value: string) => {
       if (target && target.style.getPropertyValue(name) !== value) target.style.setProperty(name, value);
     };
-    // Apple can overlay an address pill and an input accessory row above the
-    // keyboard without subtracting both from the reported visual viewport.
+    // Keep the native accessory allowance in the writing/popup band once.
     const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent)
       || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
     const measure = () => {
       if (!active || !element.isConnected) return;
       const viewport = window.visualViewport;
-      const previousHeaderShift = headerShift;
-      const appBounds = app?.getBoundingClientRect();
-      const shellBounds = shell?.getBoundingClientRect();
-      const portalTop = shellBounds?.top || 0;
-      const rawTop = viewport?.offsetTop || 0;
-      const height = viewport?.height || (dock ? document.documentElement.clientHeight : window.innerHeight);
-      let visibleTop = rawTop;
+      const rootBounds = shell?.getBoundingClientRect();
+      const bottom = dock && rootBounds ? rootBounds.bottom : (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
+      const keyboard = dock && shell?.dataset.editorKeyboard === "true";
       if (dock) {
-        const width = document.documentElement.clientWidth;
-        if (width !== layoutWidth) {
-          // Keep the known short side through rotation while input is open.
-          const rotatedHeight = keyboard ? Math.min(layoutWidth, layoutHeight) : 0;
-          layoutWidth = width;
-          layoutHeight = Math.max(document.documentElement.clientHeight, height, rotatedHeight);
-        }
-        const active = document.activeElement;
-        const editing = active instanceof HTMLElement && (active.isContentEditable || active.matches("input:not([type=button]):not([type=checkbox]), textarea"));
-        const occluded = layoutHeight - height;
-        keyboard = (viewport?.scale || 1) === 1 && (keyboard ? occluded > 80 : editing && occluded > 120);
-        // A blurred menu can see an intermediate keyboard-dismissal height.
-        // Retain the established unobscured baseline at this layout width so
-        // a quick return to writing still detects the reopened keyboard.
-        if (!keyboard && !editing) layoutHeight = Math.max(layoutHeight, document.documentElement.clientHeight, height);
-        if ((viewport?.scale || 1) === 1) {
-          // A restored full-height viewport can briefly retain its keyboard
-          // offset. Clamp against the unobscured baseline, not the app's
-          // independently panned bottom (nor our previous correction).
-          visibleTop = Math.min(rawTop, Math.max(0, layoutHeight - height));
-          // Only viewport chrome moves. The reference shell and focused canvas
-          // never receive an authored offset, so stale reads cannot accumulate
-          // corrections or provoke another native focus scroll of the editor.
-          headerShift = visibleTop - portalTop;
-          setStyle(header, "--editor-header-shift", `${headerShift}px`);
-        } else {
-          headerShift = 0;
-          header?.style.removeProperty("--editor-header-shift");
-          visibleTop = Math.max(0, Math.min(rawTop + height, appBounds?.bottom ?? rawTop + height) - height);
-        }
-      }
-      // Chrome follows the visible viewport, including while native panning
-      // leaves the unmodified writing shell above or below that viewport.
-      const bottom = (dock ? visibleTop : rawTop) + height;
-      let safeBottom = bottom;
-      let usableTop = Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0) + 8;
-      let usableBottom = bottom - 16;
-      let writingTop = usableTop;
-      if (dock) {
-        const keyboardVisible = keyboard ? "true" : "false";
-        if (element.dataset.keyboardVisible !== keyboardVisible) element.dataset.keyboardVisible = keyboardVisible;
-        // Work directly in visible coordinates, relative to the positioned app.
-        // This also compensates for native viewport panning of the app itself.
-        setStyle(element, "--editor-dock-bottom", `${bottom - portalTop}px`);
-        const centered = !viewport?.offsetLeft && Math.abs((viewport?.width || window.innerWidth) - (appBounds?.width || window.innerWidth)) < 1;
-        const center = centered ? "50%" : `${(viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) / 2 - (appBounds?.left || 0)}px`;
-        setStyle(element, "--editor-dock-center", center);
-        setStyle(overlayLayer.current, "--editor-panel-center", center);
-        setStyle(element, "--editor-dock-gap", "max(var(--space-3), env(safe-area-inset-bottom))");
+        element.dataset.keyboardVisible = String(keyboard);
         const position = keyboard ? "top" : "bottom";
         element.dataset.dockPosition = position;
-        const dockHeight = element.getBoundingClientRect().height;
-        const dockWidth = element.getBoundingClientRect().width;
-        setStyle(app, "--editor-header-dock-width", `${dockWidth}px`);
-        const search = header?.querySelector<HTMLElement>('[data-slot="search-root"]');
-        const metadata = header?.querySelector<HTMLElement>(".editor-save-status");
-        const headingActions = metadata?.parentElement;
-        const publish = headingActions?.querySelector<HTMLElement>(":scope > button");
-        const searchBounds = search?.getBoundingClientRect();
-        const publishBounds = publish?.getBoundingClientRect();
-        if (app) {
-          // Measure intrinsic metadata children even while the row is visually
-          // hidden. Metadata must fit in the right half-gap of the centered
-          // card; Search and Publish endpoints do not depend on its visibility.
-          const metadataWidth = metadata ? Array.from(metadata.children).reduce((width, child) => width + child.getBoundingClientRect().width, 0)
-            + (parseFloat(getComputedStyle(metadata).columnGap) || 0) : 0;
-          const statusGap = headingActions ? parseFloat(getComputedStyle(headingActions).columnGap) || 0 : 0;
-          const halfGap = searchBounds && publishBounds ? (publishBounds.left - searchBounds.right - dockWidth) / 2 : 0;
-          app.dataset.editorHeaderMetadata = keyboard && metadataWidth + statusGap > halfGap ? "hidden" : "visible";
-        }
-        const headerBounds = header?.getBoundingClientRect();
-        const headerBottom = headerBounds?.bottom ?? visibleTop;
-        // Metadata can change the flex endpoints on this very paint.
-        const finalSearchBounds = search?.getBoundingClientRect();
-        const finalPublishBounds = publish?.getBoundingClientRect();
-        if (keyboard && finalSearchBounds && finalPublishBounds) setStyle(element, "--editor-dock-center", `${(finalSearchBounds.right + finalPublishBounds.left) / 2 - (appBounds?.left || 0)}px`);
-        setStyle(element, "--editor-dock-anchor", keyboard
-          ? `${headerShift + (header?.offsetHeight || 0) / 2 + dockHeight / 2}px`
-          : "calc(var(--editor-dock-bottom) - var(--editor-dock-gap))");
         if (lastPosition !== null && lastPosition !== position && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
           fade?.cancel();
           fade = element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: "ease-out" });
         }
         lastPosition = position;
-        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-        const nativeGap = keyboard ? (appleTouch ? 8 : 3) * rem : 0;
-        const lane = element.getBoundingClientRect();
-        safeBottom = keyboard ? bottom - nativeGap : lane.top;
-        usableTop = Math.max(visibleTop, headerBottom) + 8;
-        usableBottom = safeBottom - 8;
+        const metadata = header?.querySelector<HTMLElement>(".editor-save-status");
+        const cell = header?.querySelector<HTMLElement>(".app-editor-dock-cell");
+        const metadataWidth = metadata ? Array.from(metadata.children).reduce((width, child) => width + child.getBoundingClientRect().width, 0)
+          + (parseFloat(getComputedStyle(metadata).columnGap) || 0) : 0;
+        const statusGap = metadata?.parentElement ? parseFloat(getComputedStyle(metadata.parentElement).columnGap) || 0 : 0;
+        const halfGap = ((cell?.getBoundingClientRect().width || 0) - element.getBoundingClientRect().width) / 2;
+        if (app) app.dataset.editorHeaderMetadata = keyboard && metadataWidth + statusGap > halfGap ? "hidden" : "visible";
+      }
+      const rect = element.getBoundingClientRect();
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const nativeGap = keyboard ? (appleTouch ? 8 : 3) * rem : 0;
+      const usableTop = (header?.getBoundingClientRect().bottom || rootBounds?.top || 0) + 8;
+      const usableBottom = (keyboard ? bottom - nativeGap : rect.top) - 8;
+      const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
+      const panelTop = dock ? usableTop : rect.bottom + 8;
+      const panelBottom = dock ? usableBottom : bottom - 16;
+      if (dock) {
+        setStyle(shell, "--editor-popup-available-height", `${Math.max(0, panelBottom - panelTop)}px`);
         setStyle(element, "--editor-usable-top", `${usableTop}px`);
         setStyle(element, "--editor-usable-bottom", `${usableBottom}px`);
+        setStyle(element, "--editor-writing-top", `${usableTop}px`);
         element.dataset.dockSettled = "true";
-        if (owner) {
-          // Clip at the header's actual edge without moving the page scroller.
-          // Sticky titles start at the same boundary, counting its padding once.
-          const bounds = owner.getBoundingClientRect();
-          const padding = parseFloat(getComputedStyle(owner).paddingTop) || 0;
-          setStyle(owner, "--editor-header-clip", `${Math.max(0, headerBottom - bounds.top)}px`);
-          setStyle(owner, "--phone-writing-heading-offset", `${Math.max(0, usableTop - bounds.top - owner.clientTop - padding)}px`);
-        }
-        const heading = canvas.current?.querySelector<HTMLElement>(".writing-document-heading") || null;
-        writingTop = usableTop;
-        if (heading && heading !== observedHeading) {
-          if (observedHeading) observer.unobserve(observedHeading);
-          observedHeading = heading;
-          observer.observe(heading);
-        }
-        if (heading && frame.current) {
-          const writing = canvas.current?.querySelector<HTMLElement>(".writing-content");
-          const lineHeight = writing ? parseFloat(getComputedStyle(writing).lineHeight) || rem : rem;
-          const glyph = readWritingCaretLine(canvas.current, true)?.height || lineHeight;
-          // offsetHeight is intrinsic even when the title has yielded into
-          // normal flow. Test the hypothetical pinned band with hysteresis.
-          const ownerStyle = owner ? getComputedStyle(owner) : null;
-          const pinnedTop = Math.max(usableTop, owner
-            ? owner.getBoundingClientRect().top + owner.clientTop + (parseFloat(ownerStyle!.paddingTop) || 0)
-              + (parseFloat(owner.style.getPropertyValue("--phone-writing-heading-offset")) || 0)
-            : usableTop);
-          const pinnedBottom = pinnedTop + heading.offsetHeight;
-          const room = usableBottom - pinnedBottom - lineHeight;
-          const yielded = frame.current.dataset.titleYielded === "true";
-          const yieldTitle = keyboard && room < glyph + (yielded ? 24 : 8);
-          frame.current.dataset.titleYielded = String(yieldTitle);
-          // A course title can still be scrolling toward its sticky anchor.
-          // That movable prefix must not prevent the caret scroll which would
-          // bring the lesson heading into its feasible pinned position.
-          writingTop = yieldTitle ? usableTop : Math.min(heading.getBoundingClientRect().bottom, pinnedBottom);
-        }
-        setStyle(element, "--editor-writing-top", `${writingTop}px`);
+        setStyle(owner, "--editor-dock-clearance", `${keyboard ? nativeGap + 16 : rect.height + 24}px`);
         const pending = openingPanel.current;
         if (pending) {
           const panel = overlayLayer.current?.querySelector<HTMLElement>('[data-open="true"]');
           const preferred = Math.min(360, panel?.scrollHeight || 360);
-          if (!keyboard && element.dataset.dockSettled !== "false" && usableBottom - usableTop >= preferred || pending.elapsed || performance.now() >= pending.deadline) cancelPanelOpening();
+          if (!keyboard && usableBottom - usableTop >= preferred || pending.elapsed || performance.now() >= pending.deadline) cancelPanelOpening();
         }
       }
-      const rect = element.getBoundingClientRect();
-      // Follow native viewport movement directly. Restarting a second animation
-      // on every keyboard/pan frame makes the surface chase its actual anchor.
-      const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
-      const panelTop = dock ? usableTop : rect.bottom + 8;
-      const panelBottom = dock ? usableBottom : bottom - 16;
-      if (dock) setStyle(owner, "--editor-dock-clearance", `${Math.max(80, bottom - safeBottom + rect.height + 12)}px`);
       setStyle(frame.current, "--editor-navigation-height", `${dock ? 0 : rect.height}px`);
-      setStyle(overlayLayer.current, "--editor-panel-top", `${panelTop - (dock ? portalTop : 0)}px`);
-      setStyle(overlayLayer.current, "--editor-panel-left", `${bounds.left - (dock ? appBounds?.left || 0 : 0)}px`);
-      setStyle(overlayLayer.current, "--editor-panel-right", `${dock && appBounds ? appBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
+      setStyle(overlayLayer.current, "--editor-panel-top", `${panelTop - (dock ? rootBounds?.top || 0 : 0)}px`);
+      setStyle(overlayLayer.current, "--editor-panel-left", `${bounds.left - (dock ? rootBounds?.left || 0 : 0)}px`);
+      setStyle(overlayLayer.current, "--editor-panel-right", `${dock && rootBounds ? rootBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
       setStyle(overlayLayer.current, "--editor-panel-max-width", `${bounds.width}px`);
       setStyle(overlayLayer.current, "--editor-panel-available-height", `${Math.max(dock ? 0 : 80, panelBottom - panelTop)}px`);
       if (dock) {
-        const active = document.activeElement;
-        const scroller = active instanceof HTMLElement && overlayLayer.current?.contains(active)
-          ? active.closest<HTMLElement>('[data-slot="scroll-region"]') : null;
-        if (scroller && active instanceof HTMLElement) {
-          const field = active.getBoundingClientRect();
+        const focused = document.activeElement;
+        const scroller = focused instanceof HTMLElement && overlayLayer.current?.contains(focused)
+          ? focused.closest<HTMLElement>('[data-slot="scroll-region"]') : null;
+        if (scroller && focused instanceof HTMLElement) {
+          const field = focused.getBoundingClientRect();
           const region = scroller.getBoundingClientRect();
           const lower = Math.min(region.bottom, panelBottom) - 8;
           const upper = Math.max(region.top, panelTop) + 8;
@@ -336,36 +221,24 @@ export function EditorFrame({
             : field.top < upper ? field.top - upper : 0;
           if (lower > upper && Math.abs(delta) >= 1) scroller.scrollTop += delta;
         }
+        const band = `${usableTop}:${usableBottom}:${rect.top}:${rect.bottom}`;
+        if (band !== lastBand) {
+          lastBand = band;
+          owner?.dispatchEvent(new Event("fieldbook:editor-dock-change"));
+        }
       }
-      // Native panning can move the writing area while the dock returns to
-      // the same screen position. Notify after that compensation as well.
-      const appTop = appBounds?.top || 0;
-      const band = `${usableTop}:${usableBottom}:${writingTop}:${element.dataset.dockPosition}:${element.dataset.dockSettled}:${frame.current?.dataset.titleYielded}`;
-      if (dock && (previousHeaderShift !== headerShift || lastDockTop !== rect.top || lastDockBottom !== rect.bottom || lastAppTop !== appTop || band !== lastBand)) {
-        lastDockTop = rect.top;
-        lastDockBottom = rect.bottom;
-        lastAppTop = appTop;
-        lastBand = band;
-        owner?.dispatchEvent(new Event("fieldbook:editor-dock-change"));
-      }
-    };
-    const tick = () => {
-      request = 0;
-      measure();
     };
     const schedule = () => {
       if (!active) return;
       if (!dock) { measure(); return; }
-      if (!request) request = requestAnimationFrame(tick);
+      if (!request) request = requestAnimationFrame(() => { request = 0; measure(); });
     };
     const remember = () => {
       const cursor = captureWritingCursor(canvas.current);
-      const active = document.activeElement;
+      const focused = document.activeElement;
       if (cursor) lastWritingCursor.current = cursor;
-      else if (active instanceof HTMLElement && (active.isContentEditable || active.matches("input, textarea")) && !active.closest(".writing-media-chooser, .writing-slash-menu")) lastWritingCursor.current = null;
+      else if (focused instanceof HTMLElement && (focused.isContentEditable || focused.matches("input, textarea")) && !focused.closest(".writing-media-chooser, .writing-slash-menu")) lastWritingCursor.current = null;
     };
-    // Snapshot the document only at a control handoff, not on every typed
-    // character. Tab can move into the dock without a pointer gesture.
     const rememberKeyboard = (event: KeyboardEvent) => { if (event.key === "Tab") remember(); };
     const released = () => {
       cancelAnimationFrame(releaseRequest);
@@ -380,16 +253,13 @@ export function EditorFrame({
     if (editor) observer.observe(editor);
     if (phone && header) observer.observe(header);
     const mutations = new MutationObserver(schedule);
-    if (dock && canvas.current) mutations.observe(canvas.current, { childList: true, subtree: true });
     if (dock && header) mutations.observe(header, { childList: true, characterData: true, subtree: true });
     owner?.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
-    window.visualViewport?.addEventListener("resize", schedule);
-    window.visualViewport?.addEventListener("scroll", schedule);
-    if (dock) {
-      window.addEventListener("scroll", schedule, { passive: true });
-      document.addEventListener("focusin", schedule);
-      document.addEventListener("focusout", schedule);
+    if (!dock) {
+      window.visualViewport?.addEventListener("resize", schedule);
+      window.visualViewport?.addEventListener("scroll", schedule);
+    } else {
       element.addEventListener("pointerdown", remember, true);
       canvas.current?.addEventListener("fieldbook:writing-handoff", remember);
       document.addEventListener("keydown", rememberKeyboard, true);
@@ -405,26 +275,20 @@ export function EditorFrame({
       observer.disconnect();
       mutations.disconnect();
       if (dock) {
-        header?.style.removeProperty("--editor-header-shift");
-        app?.style.removeProperty("--editor-header-dock-width");
         app?.removeAttribute("data-editor-header-metadata");
+        shell?.style.removeProperty("--editor-popup-available-height");
         if (owner && frame.current?.dataset.dock !== "true") {
           const navigationHeight = canvas.current?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().height || 0;
           owner.scrollTop += navigationHeight;
         }
         owner?.style.removeProperty("--editor-dock-clearance");
-        owner?.style.removeProperty("--editor-header-clip");
-        owner?.style.removeProperty("--phone-writing-heading-offset");
-        frame.current?.removeAttribute("data-title-yielded");
       }
       owner?.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
-      window.visualViewport?.removeEventListener("resize", schedule);
-      window.visualViewport?.removeEventListener("scroll", schedule);
-      if (dock) {
-        window.removeEventListener("scroll", schedule);
-        document.removeEventListener("focusin", schedule);
-        document.removeEventListener("focusout", schedule);
+      if (!dock) {
+        window.visualViewport?.removeEventListener("resize", schedule);
+        window.visualViewport?.removeEventListener("scroll", schedule);
+      } else {
         element.removeEventListener("pointerdown", remember, true);
         canvas.current?.removeEventListener("fieldbook:writing-handoff", remember);
         document.removeEventListener("keydown", rememberKeyboard, true);
@@ -432,7 +296,7 @@ export function EditorFrame({
         document.removeEventListener("pointerup", released);
       }
     };
-  }, [hasNavigation, phone, dock, overlayHost]);
+  }, [hasNavigation, phone, dock, overlayHost, dockHost]);
   useLayoutEffect(() => {
     if (!panels.outline && !panels.details) cancelPanelOpening();
     measureDock.current?.();
@@ -667,7 +531,7 @@ export function EditorFrame({
     <EditorWritingActionsContext.Provider value={writingActionsHost}>
     <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-dock={dock || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
       {!phone && panelControls}
-      {dock && overlayHost && createPortal(panelControls, overlayHost)}
+      {dock && dockHost && createPortal(panelControls, dockHost)}
       <div className="editor-frame-body">
         {!phone && panelSurfaces}
         <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!dock && (navigation || phone) && <div className="editor-canvas-navigation">{!phone && navigation}{phone && panelControls}</div>}{children}</div>
