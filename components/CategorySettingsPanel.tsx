@@ -1,12 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
-import {
-  ChevronRight,
-  GripVertical,
-  Plus,
-  Tag,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronRight, GripVertical, Plus, Tag } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import { defaultSettings } from "@/lib/settings";
 import { equalJson } from "@/lib/equal-json";
@@ -509,7 +504,7 @@ function CategoryList({
           },
         ]}
       />
-      <ul aria-label={`${labels[kind]} categories`} className="grid gap-3">
+      <ul aria-label={`${labels[kind]} categories`} className="grid">
         {visibleNames.map((name) => {
           const index = names.indexOf(name);
           const items = categoryItems(drafts, published, kind, name),
@@ -521,143 +516,144 @@ function CategoryList({
               return next;
             });
           return (
-            <Fragment key={name}>
-              <ReorderRow
-                data-category={name}
-                data-selected={selectedNames.includes(name)}
-                data-dragging={reorder.active === name}
-                data-sortable-preview
-                data-drop={
-                  reorder.destination?.id === name
-                    ? reorder.destination.side
-                    : undefined
-                }
-                data-moved={reorder.recentlyMoved === name}
-                onDragOver={(event) => reorder.over(event, name)}
-                onDrop={reorder.drop}
-                onDragEnd={reorder.cancel}
-                handle={
-                  kind === "course" ? (
+            <ReorderRow
+              key={name}
+              variant="flat"
+              data-category={name}
+              data-selected={selectedNames.includes(name)}
+              data-dragging={reorder.active === name}
+              data-sortable-preview
+              data-drop={
+                reorder.destination?.id === name
+                  ? reorder.destination.side
+                  : undefined
+              }
+              data-moved={reorder.recentlyMoved === name}
+              onDragOver={(event) => reorder.over(event, name)}
+              onDrop={reorder.drop}
+              onDragEnd={reorder.cancel}
+              handle={
+                kind === "course" ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    draggable={!reorderDisabled}
+                    disabled={reorderDisabled}
+                    aria-label={`Reorder ${name}`}
+                    title="Drag to reorder, or use the arrow keys"
+                    onDragStart={(event) => reorder.start(event, name)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "ArrowUp" ||
+                        event.key === "ArrowDown"
+                      ) {
+                        event.preventDefault();
+                        step(name, event.key === "ArrowUp" ? -1 : 1);
+                      }
+                    }}
+                  >
+                    <GripVertical aria-hidden="true" />
+                  </Button>
+                ) : null
+              }
+              selection={
+                <Checkbox
+                  aria-label={`Select category ${name}`}
+                  disabled={busy}
+                  checked={selectedNames.includes(name)}
+                  onCheckedChange={(checked) =>
+                    setSelectedCategories((current) =>
+                      checked === true
+                        ? [...new Set([...current, name])]
+                        : current.filter((entry) => entry !== name),
+                    )
+                  }
+                />
+              }
+              icon={<Tag size={16} />}
+              title={
+                <strong className="[overflow-wrap:anywhere]">{name}</strong>
+              }
+              detail={`${items.length} ${items.length === 1 ? (kind === "course" ? "course" : "update") : labels[kind].toLowerCase()}`}
+              compactActions
+              actions={
+                <>
+                  {items.length > 0 && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      draggable={!reorderDisabled}
-                      disabled={reorderDisabled}
-                      aria-label={`Reorder ${name}`}
-                      title="Drag to reorder, or use the arrow keys"
-                      onDragStart={(event) => reorder.start(event, name)}
-                      onKeyDown={(event) => {
-                        if (
-                          event.key === "ArrowUp" ||
-                          event.key === "ArrowDown"
-                        ) {
-                          event.preventDefault();
-                          step(name, event.key === "ArrowUp" ? -1 : 1);
-                        }
-                      }}
-                    >
-                      <GripVertical aria-hidden="true" />
-                    </Button>
-                  ) : null
-                }
-                selection={
-                  <Checkbox
-                    aria-label={`Select category ${name}`}
-                    disabled={busy}
-                    checked={selectedNames.includes(name)}
-                    onCheckedChange={(checked) =>
-                      setSelectedCategories((current) =>
-                        checked === true
-                          ? [...new Set([...current, name])]
-                          : current.filter((entry) => entry !== name),
-                      )
-                    }
-                  />
-                }
-                icon={<Tag size={16} />}
-                title={
-                  <strong className="[overflow-wrap:anywhere]">{name}</strong>
-                }
-                detail={`${items.length} ${items.length === 1 ? (kind === "course" ? "course" : "update") : labels[kind].toLowerCase()}`}
-                compactActions
-                actions={
-                  <>
-                    {items.length > 0 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        disabled={busy}
-                        aria-expanded={open}
-                        aria-label={`${open ? "Collapse" : "Expand"} ${name}`}
-                        onClick={toggle}
-                      >
-                        <ChevronRight
-                          className={open ? "rotate-90" : ""}
-                          aria-hidden="true"
-                        />
-                      </Button>
-                    )}
-                    <RowActions
-                      label={name}
                       disabled={busy}
-                      actions={[
-                        ...(kind === "course"
-                          ? [
-                              {
-                                label: "Move up",
-                                disabled: reorderDisabled || index === 0,
-                                onSelect: () => step(name, -1),
-                              },
-                              {
-                                label: "Move down",
-                                disabled:
-                                  reorderDisabled || index === names.length - 1,
-                                onSelect: () => step(name, 1),
-                              },
-                            ]
-                          : []),
-                        {
-                          label: "Rename",
-                          separator: kind === "course",
-                          onSelect: () => {
-                            setRename(name);
-                            setRenameName(name);
-                            setRenameError("");
-                          },
+                      aria-expanded={open}
+                      aria-label={`${open ? "Collapse" : "Expand"} ${name}`}
+                      onClick={toggle}
+                    >
+                      <ChevronRight
+                        className={open ? "rotate-90" : ""}
+                        aria-hidden="true"
+                      />
+                    </Button>
+                  )}
+                  <RowActions
+                    label={name}
+                    disabled={busy}
+                    actions={[
+                      ...(kind === "course"
+                        ? [
+                            {
+                              label: "Move up",
+                              disabled: reorderDisabled || index === 0,
+                              onSelect: () => step(name, -1),
+                            },
+                            {
+                              label: "Move down",
+                              disabled:
+                                reorderDisabled || index === names.length - 1,
+                              onSelect: () => step(name, 1),
+                            },
+                          ]
+                        : []),
+                      {
+                        label: "Rename",
+                        separator: kind === "course",
+                        onSelect: () => {
+                          setRename(name);
+                          setRenameName(name);
+                          setRenameError("");
                         },
-                        {
-                          label: "Move all items to…",
-                          disabled: !items.length,
-                          onSelect: () =>
-                            openTransfer(
-                              items.map((item) => item.id),
-                              [name],
-                            ),
-                        },
-                        {
-                          label: "Delete category",
-                          destructive: true,
-                          separator: true,
-                          onSelect: () => void remove([name]),
-                        },
-                      ]}
-                    />
-                  </>
-                }
-              />
+                      },
+                      {
+                        label: "Move all items to…",
+                        disabled: !items.length,
+                        onSelect: () =>
+                          openTransfer(
+                            items.map((item) => item.id),
+                            [name],
+                          ),
+                      },
+                      {
+                        label: "Delete category",
+                        destructive: true,
+                        separator: true,
+                        onSelect: () => void remove([name]),
+                      },
+                    ]}
+                  />
+                </>
+              }
+            >
               {open && items.length > 0 && (
-                <li className="min-w-0 ps-3 sm:ps-8">
+                <div className="mt-3 min-w-0 pb-3 ps-2 sm:ps-8">
                   <CategoryContentTable
                     name={name}
                     items={items}
                     busy={busy}
                     onMove={(ids) => openTransfer(ids, [name])}
                   />
-                </li>
+                </div>
               )}
-            </Fragment>
+            </ReorderRow>
           );
         })}
       </ul>
@@ -700,7 +696,8 @@ function CategoryList({
         <DialogContent
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            (transferTrigger.current?.isConnected
+            (transferTrigger.current?.isConnected &&
+            !transferTrigger.current.matches(":disabled")
               ? transferTrigger.current
               : listRoot.current
             )?.focus({ preventScroll: true });

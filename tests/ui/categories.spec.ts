@@ -374,6 +374,9 @@ test("large categories have bounded searchable tables, select-all and individual
     name: `Items in ${name}`,
     exact: true,
   });
+  await expect(
+    page.getByRole("list", { name: "Courses categories", exact: true }).locator(":scope > li"),
+  ).toHaveCount(before.settings!.contentCategories!.course.length);
   const viewport = section.getByRole("region", {
     name: `Scrollable items in ${name}`,
     exact: true,

@@ -310,6 +310,7 @@ test("collection size controls bulk visibility and keeps single-item actions", a
   page,
 }, info) => {
   await page.goto("/ui");
+  await page.waitForLoadState("networkidle");
   const example = page.getByRole("region", { name: "Bulk selection example" });
   await expect(
     example.getByRole("button", { name: "Bulk actions", exact: true }),

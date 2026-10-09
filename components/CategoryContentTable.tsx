@@ -38,6 +38,7 @@ export function CategorySelectionBar({
   onClear,
   summaryControl,
   actions,
+  className,
 }: {
   label: string;
   count: number;
@@ -48,12 +49,14 @@ export function CategorySelectionBar({
   onClear: () => void;
   summaryControl?: ReactNode;
   actions: RowAction[];
+  className?: string;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const pending = useRef<(() => void) | null>(null);
   return (
     <div role="group" aria-label={`${label} selection`}>
       <BulkSelectionBar
+        className={className}
         count={count}
         total={total}
         noun={noun}
@@ -132,10 +135,7 @@ export function CategoryContentTable({
   );
   const label = `Items in ${name}`;
   return (
-    <section
-      aria-label={label}
-      className="grid min-w-0 gap-3 rounded-lg border border-border bg-background p-3"
-    >
+    <section aria-label={label} className="grid min-w-0 gap-3">
       <CollectionControls
         search={
           <SearchField>
@@ -151,6 +151,7 @@ export function CategoryContentTable({
         }
       />
       <CategorySelectionBar
+        className="border-b-0"
         label={label}
         count={selectedIds.length}
         total={items.length}
@@ -169,11 +170,11 @@ export function CategoryContentTable({
       />
       <TableContainer
         aria-label={`Scrollable items in ${name}`}
-        className="max-h-[calc(2.5rem+5*(var(--control-height)+1rem+1px)+2px)] overflow-auto overscroll-contain [scrollbar-gutter:stable]"
+        className="max-h-[calc(2.5rem+5*(var(--control-height)+1rem+1px)+2px)] overflow-auto overscroll-contain rounded-none border-0 [scrollbar-gutter:stable]"
       >
         <DataTable layout="categoryItems" density="compact" aria-label={label}>
-          <TableHeader className="sticky top-0 z-20 bg-surface">
-            <TableRow className="h-10">
+          <TableHeader className="sticky top-0 z-20 bg-background">
+            <TableRow className="h-10 hover:bg-background focus-within:bg-background group-data-[pin-actions=true]/table:hover:bg-background group-data-[pin-actions=true]/table:focus-within:bg-background">
               <TableHead>
                 <div className="flex items-center justify-center">
                   <SelectRows
@@ -186,7 +187,7 @@ export function CategoryContentTable({
               </TableHead>
               <TableHead>Title</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>
+              <TableHead className="group-data-[pin-actions=true]/table:last:bg-background group-data-[pin-actions=true]/table:last:before:to-background">
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
