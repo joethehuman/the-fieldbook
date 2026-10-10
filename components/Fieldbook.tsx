@@ -59,6 +59,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { saveDocsNavigation } from "@/lib/docs-navigation-save";
+import { saveCategorySettings } from "@/lib/category-settings-save";
+import { assertCategoriesCanBeRemoved, assertContentCategory } from "@/lib/content-categories";
 import { equalJson } from "@/lib/equal-json";
 import { applyDemoBulk } from "@/lib/bulk-actions";
 import { sectionPaths, resolveSection, homePath } from "@/lib/navigation";
@@ -706,6 +708,27 @@ export default function Fieldbook() {
               setData(result.data);
               return result;
             }}
+            onSaveCategories={async (before, settings, moves) => {
+              let current = loadWorkspace();
+              if (!equalJson(current.settings, before.settings))
+                throw new Error("Settings changed in another session. Reload this page before saving.");
+              const result = await saveCategorySettings(before, settings, moves,
+                async (_, next) => {
+                  assertCategoriesCanBeRemoved(current.settings || {}, next.contentCategories!, [...current.content, ...(current.publishedContent || [])]);
+                  current = { ...current, settings: next };
+                  saveWorkspace(current);
+                  return current;
+                },
+                async (request) => {
+                  const result = applyDemoBulk(current, user, request);
+                  current = result.data;
+                  saveWorkspace(current);
+                  return result;
+                });
+              saveWorkspace(result.data);
+              setData(result.data);
+              return result;
+            }}
             onReviewDeadlines={async (token) => {
               const current = loadWorkspace();
               const review = reviewDeadlines(current);
@@ -715,6 +738,7 @@ export default function Fieldbook() {
             onSaveContent={async (content, intent, options) => {
               try {
                 const before = loadWorkspace();
+                assertContentCategory(content, before.settings || {});
                 const previous = before.content.find(
                   (item) => item.id === content.id,
                 );

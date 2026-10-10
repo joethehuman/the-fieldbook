@@ -1,5 +1,6 @@
 import { defaultBrandAccent } from "./brand-theme";
 import { accountMenuLinks, type ExternalLink } from "./external-links";
+import { categoryKey } from "./content-categories";
 
 export type PrivacyDocument = {
   mode: "hosted" | "external";
@@ -38,6 +39,7 @@ export type SiteSettings = {
   organizationTeamId?: string | null;
   docCategoryOrder?: string[];
   docSections?: import("./docs-navigation").DocSection[];
+  contentCategories?: import("./content-categories").ContentCategories;
   newUserStage?: "existing" | "newhire";
   dueDatesEnabled?: boolean;
   onboardingDays?: number;
@@ -103,6 +105,10 @@ export function publicSettings(
     ...visible,
     askAiEnabled: settings.askAi?.enabled === true,
     externalLinks: accountMenuLinks(settings.externalLinks),
+    contentCategories: settings.contentCategories ? {
+      course: settings.contentCategories.course.filter((name) => content.some((item) => item.kind === "course" && item.status === "published" && categoryKey(item.category) === categoryKey(name))),
+      brief: settings.contentCategories.brief.filter((name) => content.some((item) => item.kind === "brief" && item.status === "published" && categoryKey(item.category) === categoryKey(name))),
+    } : undefined,
     docCategoryOrder: settings.docCategoryOrder?.filter((name) =>
       docs.some((doc) => doc.category === name),
     ),

@@ -29,6 +29,7 @@ import { getContent, saveContent, document } from "./content";
 import { data as dataStore } from "./data";
 import { uploadMedia } from "./upload";
 import { installation } from "./installation";
+import { categoryLists } from "@/lib/content-categories";
 import { HttpError } from "./errors";
 
 type Context = {
@@ -278,6 +279,7 @@ const handlers: Handlers = {
       config.settings.docCategoryOrder || [],
       config.settings.docSections || [],
     );
+    const categories = categoryLists(drafts.map((item) => ({ id: item.id, kind: item.kind || "doc", category: item.category || "" })), config.settings);
     return {
       sections: sections.map((section) => ({
         id: section.id,
@@ -290,14 +292,9 @@ const handlers: Handlers = {
           .filter(Boolean)
           .join(" / "),
       })),
-      categories: [
-        ...new Set(
-          drafts
-            .filter((d) => d.kind !== "doc")
-            .map((d) => d.category)
-            .filter(Boolean),
-        ),
-      ].sort(),
+      categories: [...new Set(Object.values(categories).flat())].sort(),
+      courseCategories: categories.course,
+      updateCategories: categories.brief,
       ...(ctx.access.capabilities.includes("content:assign")
         ? {
             assignmentAudiences: {

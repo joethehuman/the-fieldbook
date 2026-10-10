@@ -4,6 +4,7 @@ import type { BulkHandler, BulkOperation } from "@/lib/bulk-actions";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
 import { ScrollRegion } from "./patterns/scroll-region";
+import { availableCategories } from "@/lib/content-categories";
 export function adminCommands({
   data,
   selected,
@@ -32,14 +33,8 @@ export function adminCommands({
     data.settings?.docCategoryOrder,
     data.settings?.docSections,
   );
-  const categories = [
-    ...new Set(
-      data.content
-        .filter((c) => c.kind === kind)
-        .map((c) => c.category.trim())
-        .filter(Boolean),
-    ),
-  ].sort((a, b) => a.localeCompare(b));
+  const categories = kind === "course" || kind === "brief"
+    ? availableCategories(data.content, kind, data.settings) : [];
   function command(
     operation: BulkOperation,
     label: string,
@@ -99,7 +94,7 @@ export function adminCommands({
               ),
               command(
                 kind === "doc" ? "section" : "category",
-                kind === "doc" ? "Move to section" : "Set category",
+                kind === "doc" ? "Move to section" : "Move to category…",
                 "Apply this change to drafts and published copies. Other unpublished edits and learning history are preserved.",
                 {
                   disabledReason: !homogeneous

@@ -1,4 +1,5 @@
 "use client";
+import { orderedCourseCategories } from "@/lib/content-categories";
 import { contentPath, curriculumPath } from "@/lib/navigation";
 import {
   learningSortOptions,
@@ -135,9 +136,7 @@ export default function Learning({
     view === "home" || view === "curricula" ? "all" : view,
     hideCompleted,
   );
-  const topics = Array.from(
-    new Set((view === "assigned" ? assigned : source).map((c) => c.category)),
-  );
+  const topics = orderedCourseCategories(view === "assigned" ? assigned : source, settings);
   const sequence = requiredSequence(courses, user, groups);
   const assignedCards = assignedLearningCards(
     sequence,

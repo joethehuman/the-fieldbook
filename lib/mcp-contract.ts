@@ -121,7 +121,7 @@ export const mcpContract = {
   ),
   get_authoring_options: tool(
     "content:read",
-    "Discover existing Docs section IDs and paths, content categories and supported Markdown/media/quiz formats. Select existing sections; creating or reordering hierarchy requires the manual settings screen.",
+    "Discover existing Docs section IDs and paths, separate courseCategories and updateCategories, and supported Markdown/media/quiz formats. Select existing managed categories and sections; category creation and ordering use Categories in Fieldbook settings.",
     {},
   ),
   list_media: tool(
@@ -288,6 +288,8 @@ export const mcpOutputSchemas = {
     .object({
       sections: z.array(scopeName),
       categories: z.array(z.string()),
+      courseCategories: z.array(z.string()),
+      updateCategories: z.array(z.string()),
       complete: z.literal(true),
     })
     .passthrough(),

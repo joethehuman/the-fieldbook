@@ -10,6 +10,8 @@ export function ReorderRow({
   title,
   detail,
   actions,
+  children,
+  variant = "card",
   className,
   ...props
 }: Omit<ComponentProps<"li">, "title"> & {
@@ -21,13 +23,18 @@ export function ReorderRow({
   title: ReactNode;
   detail?: ReactNode;
   actions: ReactNode;
+  /** A flat disclosure groups its header and children under one separator. */
+  variant?: "card" | "flat";
 }) {
   return (
     <li
       data-slot="reorder-row"
       className={cn(
-        "@container relative min-w-0 rounded-lg border border-border bg-card p-3 data-[dragging=true]:border-input data-[dragging=true]:bg-surface data-[dragging=true]:opacity-45 data-[selected=true]:bg-selected/40",
-        icon && "py-2",
+        "@container group/reorder relative min-w-0 bg-card data-[dragging=true]:border-input data-[dragging=true]:bg-surface data-[dragging=true]:opacity-45",
+        variant === "card"
+          ? "rounded-lg border border-border p-3 data-[selected=true]:bg-selected/40"
+          : "border-b border-border py-3 last:border-b-0",
+        variant === "card" && icon && "py-2",
         className,
       )}
       {...props}
@@ -36,6 +43,8 @@ export function ReorderRow({
         <div
           className={cn(
             "grid min-w-0 items-start gap-x-2",
+            variant === "flat" &&
+              "rounded-control group-data-[selected=true]/reorder:bg-selected/40",
             selection
               ? "grid-cols-[auto_auto_minmax(0,1fr)_auto]"
               : "grid-cols-[auto_minmax(0,1fr)_auto]",
@@ -98,6 +107,8 @@ export function ReorderRow({
         <div
           className={cn(
             "grid min-w-0 items-center gap-3",
+            variant === "flat" &&
+              "rounded-control group-data-[selected=true]/reorder:bg-selected/40",
             selection
               ? compactActions
                 ? "grid-cols-[auto_auto_minmax(0,1fr)] @min-[15rem]:grid-cols-[auto_auto_minmax(0,1fr)_auto]"
@@ -137,6 +148,7 @@ export function ReorderRow({
           </div>
         </div>
       )}
+      {children}
     </li>
   );
 }

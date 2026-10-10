@@ -194,7 +194,7 @@ test("existing categories, mixed types and one People menu", async ({
       .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await page
-    .getByRole("menuitem", { name: "Set category", exact: true })
+    .getByRole("menuitem", { name: "Move to category…", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
@@ -225,7 +225,7 @@ test("existing categories, mixed types and one People menu", async ({
     .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await expect(
-    page.getByRole("menuitem", { name: "Set category", exact: true }),
+    page.getByRole("menuitem", { name: "Move to category…", exact: true }),
   ).toBeDisabled();
   await expect(
     page.getByText(
@@ -361,6 +361,7 @@ test("collection size controls bulk visibility and keeps single-item actions", a
   page,
 }, info) => {
   await page.goto("/ui");
+  await page.waitForLoadState("networkidle");
   const example = page.getByRole("region", { name: "Bulk selection example" });
   await expect(
     example.getByRole("button", { name: "Bulk actions", exact: true }),
