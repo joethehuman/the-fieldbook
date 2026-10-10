@@ -97,7 +97,10 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "patchedDependencies": {
+      "lexical@0.48.0": "patches/lexical@0.48.0.patch"
+    }
   },
   "packageManager": "pnpm@10.17.1",
   "engines": {

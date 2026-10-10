@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import type { ElementNode, LexicalEditor, RangeSelection } from "lexical";
 import type { Content } from "../../lib/types";
 import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -3698,6 +3699,59 @@ for (const kind of ["doc", "brief", "course"] as const) {
   });
 }
 
+async function nativeWritingSelectionMatches(page: Page) {
+  return page.locator('.writing-content[contenteditable="true"]').evaluate(writer => {
+    const editor = (writer as HTMLElement & { __lexicalEditor: LexicalEditor }).__lexicalEditor;
+    const native = window.getSelection();
+    const selection = editor.getEditorState()._selection as RangeSelection | null;
+    if (!native?.rangeCount || !selection?.anchor || !selection.focus) return false;
+    return editor.getElementByKey(selection.anchor.key)?.contains(native.anchorNode)
+      && editor.getElementByKey(selection.focus.key)?.contains(native.focusNode)
+      && selection.anchor.offset === native.anchorOffset
+      && selection.focus.offset === native.focusOffset
+      && selection.isCollapsed() === native.isCollapsed;
+  });
+}
+
+test("native caret synchronizes after a repeated programmatic selection", async ({ page }, info) => {
+  const { writer } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+  // A no-op programmatic element selection can leave Lexical waiting for an
+  // acknowledgment that WebKit never sends. Its next genuine native caret
+  // event must still update editor state. Use the library's real select API;
+  // do not manufacture its internal event-suppression flag.
+  for (let index = 0; index < 2; index++) {
+    await writer.evaluate(writer => {
+      const editor = (writer as HTMLElement & { __lexicalEditor: LexicalEditor }).__lexicalEditor;
+      editor.update(() => {
+        const root = editor.getEditorState()._nodeMap.get("root") as ElementNode;
+        root.select(0, root.getChildrenSize());
+      }, { discrete: true });
+    });
+    await page.waitForTimeout(100); // Deliver actual selectionchange tasks, if any.
+  }
+  const paragraph = writer.locator("p").nth(5);
+  await paragraph.evaluate(paragraph => {
+    const text = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT).nextNode()!;
+    window.getSelection()!.setBaseAndExtent(text, 3, text, 3);
+  });
+  await expect.poll(() => nativeWritingSelectionMatches(page)).toBe(true);
+  expect(await page.evaluate(() => window.getSelection()!.isCollapsed)).toBe(true);
+  await page.keyboard.type("SYNC-");
+  await expect(paragraph).toHaveText("ParSYNC-agraph 6. Keep the writer and every saved word intact.");
+  await writer.dispatchEvent("touchstart", { bubbles: true });
+  for (const index of [12, 8, 23, 4, 5]) {
+    await writer.locator("p").nth(index).evaluate(paragraph => {
+      paragraph.dispatchEvent(new Event("touchmove", { bubbles: true }));
+      const text = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT).nextNode()!;
+      window.getSelection()!.setBaseAndExtent(text, 3, text, 3);
+    });
+    await expect.poll(() => nativeWritingSelectionMatches(page)).toBe(true);
+  }
+  await page.evaluate(() => window.dispatchEvent(new Event("touchend")));
+  await page.keyboard.type("DRAG-");
+  await expect(paragraph).toHaveText("ParDRAG-SYNC-agraph 6. Keep the writer and every saved word intact.");
+});
+
 test("a delayed native caret after a touch tap never reveals the previous paragraph", async ({ page }, info) => {
   const { writer, dock, commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
   const owner = page.locator(".main-content");
@@ -3755,6 +3809,7 @@ test("a delayed native caret after a touch tap never reveals the previous paragr
     expect(pending).toBeCloseTo(before, 0);
     expect(await owner.evaluate(element => element.scrollTop)).toBeCloseTo(before, 0);
     expect(await paragraph.evaluate(element => element.contains(window.getSelection()!.focusNode))).toBe(true);
+    await expect.poll(() => nativeWritingSelectionMatches(page)).toBe(true);
     await page.keyboard.type("tap-check ");
     await expect(paragraph).toContainText("tap-check ");
     await expectMobileWritingBand(page);
@@ -3787,6 +3842,7 @@ test("repeated native paragraph taps keep the new cursor and typing target", asy
     await page.waitForTimeout(600);
     await paragraph.tap({ position: { x: 8, y: 12 } });
     await expect.poll(() => paragraph.evaluate(element => element.contains(window.getSelection()!.focusNode))).toBe(true);
+    await expect.poll(() => nativeWritingSelectionMatches(page)).toBe(true);
     expect(await page.evaluate(() => window.getSelection()!.isCollapsed)).toBe(true);
     await paragraph.evaluate(async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); });
     expect(await page.locator(".main-content").evaluate(element => element.scrollTop)).toBeCloseTo(before, 0);
