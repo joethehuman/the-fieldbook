@@ -18,6 +18,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     let dragging = false;
     let moved = false;
     let manualGesture = false;
+    let awaitingCaret = false;
     let protecting = false;
     let returningSelection = false;
     let caretNode: Node | null = null;
@@ -122,7 +123,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       // correction. Later viewport events must never postpone an active edit.
       request = requestAnimationFrame(() => { request = 0; revealCaret(); });
     }
-    function renewProtection() { protecting = true; correctionsLeft = 2; }
+    function renewProtection() { awaitingCaret = false; protecting = true; correctionsLeft = 2; }
     function resize() {
       const changed = reserveSpace();
       if (changed && !manualGesture) { renewProtection(); schedule(); }
@@ -154,6 +155,9 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       // Focus and viewport movement own keyboard geometry. Text input is
       // followed by the rendered-text observer, without another layout read.
       if (event?.type !== "input") reserveSpace();
+      // Native focus can precede the caret chosen by a touch tap. Input itself
+      // is an explicit edit and may resume protection without a caret change.
+      if (event?.type === "focusin" && (dragging || awaitingCaret)) return;
       const active = document.activeElement;
       protecting = active instanceof HTMLElement && active.isContentEditable && root!.contains(active);
       if (protecting) {
@@ -174,31 +178,42 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       reserveSpace(); renewProtection(); revealCaret(); schedule();
     }
     function selectionMoved() {
+      if (dragging) return;
       const selection = window.getSelection();
       const active = document.activeElement;
       if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)
         || !selection?.rangeCount || !selection.isCollapsed && !returningSelection || !root!.contains(selection.focusNode)) {
         // A native selection can briefly disappear or expand while WebKit
         // updates it. Its return to the same caret must rearm protection.
-        caretNode = null; caretOffset = -1;
+        // A transient missing range must not make the pre-tap caret look new.
+        if (!awaitingCaret) { caretNode = null; caretOffset = -1; }
         cancelReveal();
         return;
       }
       if (selection.focusNode === caretNode && selection.focusOffset === caretOffset) return;
       caretNode = selection.focusNode; caretOffset = selection.focusOffset;
+      if (awaitingCaret) manualGesture = false;
       if (!manualGesture) { renewProtection(); schedule(); }
     }
-    function startDrag() { returningSelection = false; dragging = true; moved = false; manualGesture = false; cancelReveal(); }
+    function startDrag() {
+      const selection = window.getSelection();
+      caretNode = selection?.focusNode || null; caretOffset = selection?.focusOffset ?? -1;
+      returningSelection = false; dragging = true; moved = false; awaitingCaret = false;
+      manualGesture = true; protecting = false; correctionsLeft = 0; appliedScroll = null;
+      cancelReveal();
+    }
     function moveDrag() { moved = true; manualGesture = true; protecting = false; cancelReveal(); }
     function endDrag() {
       if (!dragging) return;
       dragging = false;
-      // A tap may place the same caret beside the floating dock. A scroll or
-      // native selection drag keeps ownership through the following momentum.
-      if (!moved) { renewProtection(); schedule(); }
+      // touchend is not a selection commit: iOS can still report the old caret
+      // for later paints. Wait for a changed native target, including one that
+      // already arrived during the gesture, rather than revealing the old row.
+      awaitingCaret = !moved;
+      if (awaitingCaret) selectionMoved();
     }
-    function cancelDrag() { dragging = false; manualGesture = true; protecting = false; cancelReveal(); }
-    function wheel() { returningSelection = false; manualGesture = true; protecting = false; cancelReveal(); }
+    function cancelDrag() { awaitingCaret = false; dragging = false; manualGesture = true; protecting = false; cancelReveal(); }
+    function wheel() { awaitingCaret = false; returningSelection = false; manualGesture = true; protecting = false; cancelReveal(); }
     function navigateCaret(event: KeyboardEvent) {
       if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(event.key)) return;
       const active = document.activeElement;

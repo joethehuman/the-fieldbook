@@ -3698,6 +3698,104 @@ for (const kind of ["doc", "brief", "course"] as const) {
   });
 }
 
+test("a delayed native caret after a touch tap never reveals the previous paragraph", async ({ page }, info) => {
+  const { writer, dock, commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+  const owner = page.locator(".main-content");
+  await animateCommandKeyboardClosing(page);
+  await commands.tap();
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "Close menu esc", exact: true }).tap();
+  await changeCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 812, appPan: 0 });
+  await expectKeyboardTopDock(page);
+  await expectMobileWritingBand(page);
+  const dockTop = (await dock.boundingBox())!.y;
+  // Exercise both native orders: selection committed before touchend, and
+  // selection still pointing to the old paragraph for several paints afterward.
+  for (const [index, delayed] of [[5, true], [18, false], [3, true], [22, false]] as const) {
+    if (index === 18) {
+      await animateCommandKeyboardClosing(page);
+      const details = dock.getByRole("button", { name: "Details", exact: true });
+      await details.tap();
+      await expect(page.getByRole("complementary", { name: "Content details", exact: true })).toBeVisible();
+      await details.tap();
+      await changeCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 812, appPan: 0 });
+      await expect(writer).toBeFocused();
+      await expectKeyboardTopDock(page);
+    }
+    const paragraph = writer.locator("p").nth(index);
+    await paragraph.evaluate((paragraph) => {
+      const owner = paragraph.closest<HTMLElement>(".main-content")!;
+      owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+      owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
+      owner.scrollTop += paragraph.getBoundingClientRect().top - 140;
+      window.dispatchEvent(new Event("touchend"));
+    });
+    await expect.poll(async () => (await paragraph.boundingBox())!.y).toBeCloseTo(140, 0);
+    const before = await owner.evaluate(element => element.scrollTop);
+    const pending = await paragraph.evaluate(async (paragraph, delayed) => {
+      const paint = async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); };
+      const place = () => {
+        const text = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT).nextNode()!;
+        const range = document.createRange(); range.setStart(text, 2); range.collapse(true);
+        const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+        document.dispatchEvent(new Event("selectionchange"));
+      };
+      paragraph.dispatchEvent(new Event("touchstart", { bubbles: true }));
+      if (!delayed) place();
+      window.dispatchEvent(new Event("touchend"));
+      // Native viewport/owner events can arrive before the new selection.
+      window.visualViewport!.dispatchEvent(new Event("scroll"));
+      paragraph.closest(".main-content")!.dispatchEvent(new Event("scroll"));
+      await paint();
+      const pending = paragraph.closest(".main-content")!.scrollTop;
+      if (delayed) { place(); await paint(); }
+      return pending;
+    }, delayed);
+    expect(pending).toBeCloseTo(before, 0);
+    expect(await owner.evaluate(element => element.scrollTop)).toBeCloseTo(before, 0);
+    expect(await paragraph.evaluate(element => element.contains(window.getSelection()!.focusNode))).toBe(true);
+    await page.keyboard.type("tap-check ");
+    await expect(paragraph).toContainText("tap-check ");
+    await expectMobileWritingBand(page);
+    expect((await dock.boundingBox())!.y).toBeCloseTo(dockTop, 0);
+  }
+});
+
+test("repeated native paragraph taps keep the new cursor and typing target", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  await writer.locator("p").first().tap();
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport, "height", { configurable: true, get: () => 490 });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await expectKeyboardTopDock(page);
+  for (const index of [20, 5, 17, 4, 21, 7]) {
+    const paragraph = writer.locator("p").nth(index);
+    const before = await paragraph.evaluate((paragraph) => {
+      const owner = paragraph.closest<HTMLElement>(".main-content")!;
+      owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+      owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
+      owner.scrollTop += paragraph.getBoundingClientRect().top - 140;
+      window.dispatchEvent(new Event("touchend"));
+      return owner.scrollTop;
+    });
+    // Scrolling puts every target at the same screen point. Keep these single
+    // taps outside the browser's double/triple-click word/paragraph selection.
+    await page.waitForTimeout(600);
+    await paragraph.tap({ position: { x: 8, y: 12 } });
+    await expect.poll(() => paragraph.evaluate(element => element.contains(window.getSelection()!.focusNode))).toBe(true);
+    expect(await page.evaluate(() => window.getSelection()!.isCollapsed)).toBe(true);
+    await paragraph.evaluate(async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); });
+    expect(await page.locator(".main-content").evaluate(element => element.scrollTop)).toBeCloseTo(before, 0);
+    await page.keyboard.type(`target-${index} `);
+    await expect(paragraph).toContainText(`target-${index} `);
+    await expectMobileWritingBand(page);
+  }
+});
+
 test("a later native owner scroll protects the caret without moving the dock", async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, info.project.name.startsWith("production"), "doc");
