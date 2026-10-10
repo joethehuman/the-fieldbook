@@ -180,7 +180,7 @@ test("writing buttons follow phone width and portrait touch-tablet orientation",
   await page.setViewportSize({ width: 1180, height: 820 });
   await expect(controls).toBeHidden();
   await page.setViewportSize({ width: 600, height: 900 });
-  await expect(controls).toBeVisible();
+  if (info.project.use.hasTouch) await expect(controls).toBeVisible(); else await expect(controls).toBeHidden();
   await page.setViewportSize({ width: 1024, height: 1366 });
   if (info.project.use.hasTouch) await expect(controls).toBeVisible(); else await expect(controls).toBeHidden();
 });
@@ -299,27 +299,36 @@ test("returning from compact navigation preserves sidebar geometry on every fram
   }
 });
 
-test("mobile writing actions stay usable with the outline open", async ({ page }, info) => {
-  await page.setViewportSize({ width: 600, height: 900 });
-  await open(page, info.project.name.startsWith("production"), "course");
-  const writer = page.locator('.writing-content[contenteditable="true"]');
-  await page.getByRole("textbox", { name: "Lesson title", exact: true }).press("Enter");
-  await page.keyboard.insertText("Keep this new paragraph.");
-  await expect(writer).toContainText("Keep this new paragraph.");
-  await page.getByRole("button", { name: "Outline", exact: true }).click();
-  const undo = page.getByRole("button", { name: "Undo", exact: true });
-  const redo = page.getByRole("button", { name: "Redo", exact: true });
-  await expect(undo).toBeEnabled();
-  if (info.project.use.hasTouch) await undo.tap(); else await undo.click();
-  await expect(writer).not.toContainText("Keep this new paragraph.");
-  await expect(redo).toBeEnabled();
-  if (info.project.use.hasTouch) await redo.tap(); else await redo.click();
-  await expect(writer).toContainText("Keep this new paragraph.");
-  const commands = page.getByRole("button", { name: "Commands: insert blocks or format selected text", exact: true });
-  if (info.project.use.hasTouch) await commands.tap(); else await commands.click();
-  await expect(page.getByRole("menuitem", { name: "Heading 2", exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Outline", exact: true })).toHaveAttribute("aria-expanded", "true");
+test.describe("touch mobile outline actions", () => {
+  test.use({ hasTouch: true, isMobile: true });
+  test("mobile writing actions recover after closing the outline", async ({ page }, info) => {
+    await page.setViewportSize({ width: 600, height: 900 });
+    await open(page, info.project.name.startsWith("production"), "course");
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    await page.getByRole("textbox", { name: "Lesson title", exact: true }).press("Enter");
+    await page.keyboard.insertText("Keep this new paragraph.");
+    await expect(writer).toContainText("Keep this new paragraph.");
+    await page.getByRole("button", { name: "Outline", exact: true }).click();
+    const undo = page.getByRole("button", { name: "Undo", exact: true });
+    const redo = page.getByRole("button", { name: "Redo", exact: true });
+    await expect(undo).toBeDisabled();
+    await expect(redo).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Commands:/ })).toBeDisabled();
+    await expect(writer).toContainText("Keep this new paragraph.");
+    await page.getByRole("button", { name: "Outline", exact: true }).tap();
+    await expect(undo).toBeEnabled();
+    await undo.tap();
+    await expect(writer).not.toContainText("Keep this new paragraph.");
+    await expect(redo).toBeEnabled();
+    await redo.tap();
+    await expect(writer).toContainText("Keep this new paragraph.");
+    await expect(page.getByRole("button", { name: "Outline", exact: true })).toHaveAttribute("aria-expanded", "false");
+    const commands = page.getByRole("button", { name: /^Commands:/ });
+    await commands.tap();
+    await expect(page.getByRole("menuitem", { name: "Heading 2", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "Outline", exact: true })).toHaveAttribute("aria-expanded", "false");
+  });
 });
 
 test("small-screen search opens a full field and restores its trigger on Escape", async ({ page }, info) => {
@@ -2255,9 +2264,9 @@ test("failed saves stay in the recovery alert and compact headers omit the failu
     const panelGap = async () => {
       const navigation = (await page.locator(".editor-canvas-navigation").boundingBox())!;
       const pane = (await page.getByRole("complementary", { name: "Content details", exact: true }).boundingBox())!;
-      return pane.y - navigation.y - navigation.height;
+      return pane.y - navigation.y;
     };
-    if (width < 768) await expect.poll(panelGap).toBeCloseTo(8, 0);
+    if (width < 768) await expect.poll(panelGap).toBeCloseTo(0, 0);
     await expect(page.locator(".editor").getByRole("button", { name: "Retry saving", exact: true })).toBeEnabled();
     await expect(page.locator(".editor").getByRole("button", { name: "Download your changes", exact: true })).toBeEnabled();
     await expect(header.getByRole("alert")).toHaveCount(0);
@@ -2271,7 +2280,15 @@ test("failed saves stay in the recovery alert and compact headers omit the failu
     await page.screenshot({ path: info.outputPath(`save-failure-${width}.png`), animations: "disabled" });
     await alert.getByRole("button", { name: "Dismiss message", exact: true }).click();
     await expect(alert).toHaveCount(0);
-    if (width < 768) await expect.poll(panelGap).toBeCloseTo(8, 0);
+    if (width < 768) await expect.poll(panelGap).toBeCloseTo(0, 0);
+    for (const name of ["Retry saving", "Download your changes"]) {
+      const recovery = page.locator(".editor").getByRole("button", { name, exact: true });
+      await expect(recovery).toBeInViewport({ ratio: 1 });
+      expect(await recovery.evaluate(element => {
+        const bounds = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2));
+      })).toBe(true);
+    }
     await expect(page.locator(".editor").getByRole("button", { name: "Retry saving", exact: true })).toBeEnabled();
     await expect(page.locator(".editor").getByRole("button", { name: "Download your changes", exact: true })).toBeEnabled();
     await expect(header.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();

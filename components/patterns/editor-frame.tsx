@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { blurWritingInput, captureWritingCursor, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
+import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { EditorAppDockContext } from "./editor-app-header";
 import { useMobileEditorViewport } from "./use-mobile-editor-viewport";
@@ -150,6 +150,7 @@ export function EditorFrame({
     let releaseRequest = 0;
     let lastBand = "";
     let lastPosition: string | null = null;
+    let lastCaret: { node: Node; offset: number; top: number } | null = null;
     let fade: Animation | undefined;
     const setStyle = (target: HTMLElement | null | undefined, name: string, value: string) => {
       if (target && target.style.getPropertyValue(name) !== value) target.style.setProperty(name, value);
@@ -226,6 +227,10 @@ export function EditorFrame({
           lastBand = band;
           owner?.dispatchEvent(new Event("fieldbook:editor-dock-change"));
         }
+        const selection = window.getSelection();
+        const line = canvas.current && readWritingCaretLine(canvas.current, true);
+        lastCaret = selection?.focusNode && canvas.current?.contains(selection.focusNode) && line
+          ? { node: selection.focusNode, offset: selection.focusOffset, top: line.top } : null;
       }
     };
     const schedule = () => {
@@ -277,9 +282,27 @@ export function EditorFrame({
       if (dock) {
         app?.removeAttribute("data-editor-header-metadata");
         shell?.style.removeProperty("--editor-popup-available-height");
-        if (owner && frame.current?.dataset.dock !== "true") {
+        if (owner && frame.current && frame.current.dataset.dock !== "true") {
           const navigationHeight = canvas.current?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().height || 0;
           owner.scrollTop += navigationHeight;
+          // Removing the mobile viewport and restoring desktop chrome can
+          // change or clamp scrolling. Preserve the last painted writing row
+          // after those layouts settle, without changing the native selection.
+          const caret = lastCaret;
+          if (caret) requestAnimationFrame(() => {
+            const selection = window.getSelection();
+            const focused = document.activeElement;
+            if (!frame.current?.isConnected || frame.current.dataset.dock === "true"
+              || selection?.focusNode !== caret.node || selection.focusOffset !== caret.offset
+              || !(focused instanceof HTMLElement) || !focused.isContentEditable
+              || !canvas.current?.contains(focused)) return;
+            const line = readWritingCaretLine(canvas.current, true);
+            const editor = frame.current.closest<HTMLElement>(".editor");
+            const scroller = editor?.dataset.scrollLayout === "workspace"
+              ? editor.querySelector<HTMLElement>(".writing-viewport") || canvas.current : owner;
+            if (line && Math.abs(line.top - caret.top) >= 1)
+              scroller.scrollBy({ top: line.top - caret.top, behavior: "instant" });
+          });
         }
         owner?.style.removeProperty("--editor-dock-clearance");
       }

@@ -438,7 +438,8 @@ test("page selection reflects partial and complete rows without selecting other 
     name: "Select page (10)",
     exact: true,
   });
-  await first.check();
+  await first.click();
+  await expect(first).toBeChecked();
   await expect(pageChoice).toHaveAttribute("data-state", "indeterminate");
   await pageChoice.click();
   await expect(pageChoice).toBeChecked();
