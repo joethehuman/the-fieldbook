@@ -438,6 +438,7 @@ function CategoryList({
   const [renameError, setRenameError] = useState("");
   const listRoot = useRef<HTMLDivElement>(null);
   const transferTrigger = useRef<HTMLElement | null>(null);
+  const renameFocus = useRef<string | null>(null);
   const { confirm } = useInteractionDialog();
   const names =
     kind === "brief"
@@ -490,6 +491,15 @@ function CategoryList({
         : null;
     setTransfer({ ids, names, deleting });
   }
+  function forgetCategories(removing: string[]) {
+    setSelectedCategories((current) =>
+      current.filter((name) => !removing.includes(name)),
+    );
+    setExpanded(
+      (current) =>
+        new Set([...current].filter((name) => !removing.includes(name))),
+    );
+  }
   async function remove(removing: string[]) {
     const items = [
       ...new Map(
@@ -515,11 +525,13 @@ function CategoryList({
           destructive: true,
         },
       )
-    )
+    ) {
+      forgetCategories(removing);
       onChange({
         ...categories,
         [kind]: categories[kind].filter((item) => !removing.includes(item)),
       });
+    }
   }
   const invalid = categoryItems(drafts, published, kind, undefined, categories);
   return (
@@ -683,6 +695,7 @@ function CategoryList({
                         label: "Rename",
                         separator: kind === "course",
                         onSelect: () => {
+                          renameFocus.current = name;
                           setRename(name);
                           setRenameName(name);
                           setRenameError("");
@@ -741,8 +754,8 @@ function CategoryList({
       {invalid.length > 0 && (
         <div className="grid gap-3">
           <p className="text-copy text-muted-foreground">
-            These items need an existing category. Select them and choose Move
-            to category…
+            These items need an existing category. Use an item’s menu or select
+            multiple items and choose Move to category…
           </p>
           <CategoryContentTable
             name="items needing a category"
@@ -778,7 +791,7 @@ function CategoryList({
           <DialogDescription>
             {transfer?.deleting
               ? `Move ${transfer.ids.length} ${transfer.ids.length === 1 ? "item" : "items"} from ${transfer.names.length === 1 ? `“${transfer.names[0]}”` : `${transfer.names.length} selected categories`} before permanently deleting ${transfer.names.length === 1 ? "the category" : "the categories"}.`
-              : `Choose a category for ${transfer?.ids.length || 0} selected items.`}{" "}
+              : `Choose a category for ${transfer?.ids.length || 0} selected ${transfer?.ids.length === 1 ? "item" : "items"}.`}{" "}
             Draft and published categories change together; other edits are
             preserved.
           </DialogDescription>
@@ -801,6 +814,7 @@ function CategoryList({
                     : nextNames,
                 });
                 onMove(transfer.ids, target);
+                if (transfer.deleting) forgetCategories(transfer.names);
                 setSelectedCategories([]);
                 setTransfer(null);
               } catch (failure) {
@@ -889,7 +903,23 @@ function CategoryList({
           if (!open) setRename(null);
         }}
       >
-        <DialogContent>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            const row = listRoot.current?.querySelector(
+              `[data-category="${CSS.escape(renameFocus.current || "")}"]`,
+            );
+            const action = row?.querySelector<HTMLButtonElement>(
+              'button[aria-label^="Actions for "]',
+            );
+            (
+              action ||
+              listRoot.current?.querySelector<HTMLInputElement>(
+                'input[type="search"]',
+              )
+            )?.focus({ preventScroll: true });
+          }}
+        >
           <DialogTitle>Rename category</DialogTitle>
           <DialogDescription>
             The new name applies to drafts and published content when you save
@@ -912,6 +942,18 @@ function CategoryList({
                   items.map((item) => item.id),
                   name,
                 );
+                setSelectedCategories((current) =>
+                  current.map((item) => (item === rename ? name : item)),
+                );
+                setExpanded(
+                  (current) =>
+                    new Set(
+                      [...current].map((item) =>
+                        item === rename ? name : item,
+                      ),
+                    ),
+                );
+                renameFocus.current = name;
                 setRename(null);
               } catch (failure) {
                 setRenameError((failure as Error).message);

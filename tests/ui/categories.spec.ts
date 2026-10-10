@@ -3,8 +3,19 @@ import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { categoryLists } from "../../lib/content-categories";
 
-async function fixture(page: Page, largeCategory = false, categoryCount = 0) {
+async function fixture(
+  page: Page,
+  largeCategory = false,
+  categoryCount = 0,
+  courseTitle?: string,
+) {
   const data = withPublishedSnapshots(freshWorkspace());
+  if (courseTitle) {
+    const source = data.content.find((item) => item.kind === "course")!;
+    source.title = courseTitle;
+    data.publishedContent!.find((item) => item.id === source.id)!.title =
+      courseTitle;
+  }
   if (largeCategory) {
     const source = data.content.find((item) => item.kind === "course")!;
     const published = data.publishedContent!.find(
@@ -257,9 +268,15 @@ test("rename and move selected Updates, with an empty category available as dest
   await page
     .getByRole("checkbox", { name: `Select ${item.title}`, exact: true })
     .check();
+  await expect(
+    page.getByRole("button", {
+      name: "Items in Renamed updates bulk actions",
+      exact: true,
+    }),
+  ).toBeDisabled();
   await page
     .getByRole("button", {
-      name: "Items in Renamed updates bulk actions",
+      name: `Actions for ${item.title}`,
       exact: true,
     })
     .click();
@@ -697,7 +714,7 @@ test("category discovery and selection stay pinned on long lists below pending s
   await page
     .getByRole("checkbox", { name: `Select category ${last}`, exact: true })
     .check();
-  await expect(bulk).toBeEnabled();
+  await expect(bulk).toBeDisabled();
   await search.fill(last);
   await expect(page.locator("[data-category]")).toHaveCount(1);
   await expect(controls).toHaveAttribute("data-content-scrolled", "false");
@@ -788,13 +805,31 @@ test("managed editor and bulk pickers include empty categories", async ({
       (entry: any) => entry.id === item.id,
     ).category,
   ).toBe(item.category);
-  await category.getByRole("button", { name: "Create category", exact: true }).click();
+  await category
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
   const create = page.getByRole("dialog");
-  await create.getByLabel("Category name", { exact: true }).fill("Editor-created category");
-  await create.getByRole("button", { name: "Create category", exact: true }).click();
-  await expect.poll(async () => (await saved(page)).content.find((entry: any) => entry.id === item.id).category).toBe("Editor-created category");
-  expect((await saved(page)).settings.contentCategories.brief).toContain("Editor-created category");
-  expect((await saved(page)).publishedContent.find((entry: any) => entry.id === item.id).category).toBe(item.category);
+  await create
+    .getByLabel("Category name", { exact: true })
+    .fill("Editor-created category");
+  await create
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await saved(page)).content.find((entry: any) => entry.id === item.id)
+          .category,
+    )
+    .toBe("Editor-created category");
+  expect((await saved(page)).settings.contentCategories.brief).toContain(
+    "Editor-created category",
+  );
+  expect(
+    (await saved(page)).publishedContent.find(
+      (entry: any) => entry.id === item.id,
+    ).category,
+  ).toBe(item.category);
   await page.goto("/#admin/content/updates");
   await page
     .getByRole("button", { name: `Actions for ${item.title}`, exact: true })
@@ -807,4 +842,357 @@ test("managed editor and bulk pickers include empty categories", async ({
   await expect(
     page.getByRole("option", { name: "Empty update category", exact: true }),
   ).toBeVisible();
+});
+
+test("bulk actions require two actual categories or items, including filtered select-all", async ({
+  page,
+}) => {
+  const before = await fixture(page);
+  for (const kind of ["course", "brief"] as const) {
+    await page
+      .getByRole("tab", {
+        name: kind === "course" ? "Courses" : "Updates",
+        exact: true,
+      })
+      .click();
+    const names = before.settings!.contentCategories![kind];
+    const first = names.find(
+      (name) =>
+        !names.some(
+          (other) =>
+            other !== name && other.toLowerCase().includes(name.toLowerCase()),
+        ),
+    )!;
+    const categoryBulk = page.getByRole("button", {
+      name: "Categories bulk actions",
+      exact: true,
+    });
+    const search = page.getByRole("searchbox", {
+      name: `Search ${kind === "course" ? "course" : "update"} categories`,
+      exact: true,
+    });
+    const header = page.getByRole("checkbox", {
+      name: "Select all matching categories",
+      exact: true,
+    });
+    await page
+      .getByRole("checkbox", {
+        name: `Select category ${first}`,
+        exact: true,
+      })
+      .check();
+    await expect(header).toHaveAttribute("aria-checked", "mixed");
+    await expect(categoryBulk).toBeDisabled();
+    await search.fill(first);
+    await expect(header).toBeChecked();
+    await expect(categoryBulk).toBeDisabled();
+    await header.uncheck();
+    await header.check();
+    await expect(categoryBulk).toBeDisabled();
+    await search.fill("");
+    const secondCategory = page.getByRole("checkbox", {
+      name: `Select category ${names.find((name) => name !== first)}`,
+      exact: true,
+    });
+    await secondCategory.check();
+    await expect(categoryBulk).toBeEnabled();
+    await secondCategory.uncheck();
+    await expect(categoryBulk).toBeDisabled();
+    await page
+      .getByRole("group", { name: "Categories selection", exact: true })
+      .getByRole("button", { name: "Clear selection", exact: true })
+      .click();
+
+    const itemCategory = names.find(
+      (name) =>
+        before.content.filter(
+          (item) => item.kind === kind && item.category === name,
+        ).length > 1,
+    )!;
+    await page
+      .getByRole("button", { name: `Expand ${itemCategory}`, exact: true })
+      .click();
+    const items = before.content.filter(
+      (item) => item.kind === kind && item.category === itemCategory,
+    );
+    const section = page.getByRole("region", {
+      name: `Items in ${itemCategory}`,
+      exact: true,
+    });
+    const itemBulk = section.getByRole("button", {
+      name: `Items in ${itemCategory} bulk actions`,
+      exact: true,
+    });
+    const itemSearch = section.getByRole("searchbox");
+    const itemHeader = section.getByRole("checkbox", {
+      name: `Select all matching items in ${itemCategory}`,
+      exact: true,
+    });
+    await section
+      .getByRole("checkbox", { name: `Select ${items[0].title}`, exact: true })
+      .check();
+    await expect(itemHeader).toHaveAttribute("aria-checked", "mixed");
+    await expect(itemBulk).toBeDisabled();
+    await itemSearch.fill(items[0].title);
+    await expect(itemHeader).toBeChecked();
+    await expect(itemBulk).toBeDisabled();
+    await itemHeader.uncheck();
+    await itemHeader.check();
+    await expect(itemBulk).toBeDisabled();
+    await itemSearch.fill("");
+    const secondItem = section.getByRole("checkbox", {
+      name: `Select ${items[1].title}`,
+      exact: true,
+    });
+    await secondItem.check();
+    await expect(itemBulk).toBeEnabled();
+    await secondItem.uncheck();
+    await expect(itemBulk).toBeDisabled();
+    await section
+      .getByRole("button", { name: "Clear selection", exact: true })
+      .click();
+    await expect(itemBulk).toBeDisabled();
+    await expect(itemHeader).not.toBeChecked();
+  }
+});
+
+test("renaming retains an expanded selected category and returns focus to its menu", async ({
+  page,
+}) => {
+  const before = await fixture(page);
+  const name = before.settings!.contentCategories!.course[0];
+  await page
+    .getByRole("button", { name: `Expand ${name}`, exact: true })
+    .click();
+  await page
+    .getByRole("checkbox", { name: `Select category ${name}`, exact: true })
+    .check();
+  await page
+    .getByRole("button", { name: `Actions for ${name}`, exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Category name", { exact: true })
+    .fill("Renamed courses");
+  await dialog
+    .getByRole("button", { name: "Rename category", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: "Actions for Renamed courses",
+      exact: true,
+    }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("region", { name: "Items in Renamed courses", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", {
+      name: "Select category Renamed courses",
+      exact: true,
+    }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("button", { name: "Categories bulk actions", exact: true }),
+  ).toBeDisabled();
+  await save(page);
+  await expect(
+    page.getByRole("button", { name: "Collapse Renamed courses", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  const after = await saved(page);
+  expect(after.progress).toEqual(before.progress);
+  await page.reload();
+  await expect(
+    page.getByRole("button", {
+      name: "Actions for Renamed courses",
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
+test("removing and recreating an empty category does not revive its old selection", async ({
+  page,
+}) => {
+  await fixture(page);
+  const name = "Empty course category";
+  await page
+    .getByRole("checkbox", { name: `Select category ${name}`, exact: true })
+    .check();
+  await page
+    .getByRole("button", { name: `Actions for ${name}`, exact: true })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Delete category", exact: true })
+    .click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Delete category", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Category name", { exact: true }).fill(name);
+  await dialog
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
+  await expect(
+    page.getByRole("checkbox", {
+      name: `Select category ${name}`,
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole("group", { name: "Categories selection", exact: true }),
+  ).not.toContainText("selected");
+});
+
+test("duplicate names, cancellation, and discard preserve the saved categories and content", async ({
+  page,
+}) => {
+  const before = await fixture(page);
+  await page
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Category name", { exact: true })
+    .fill(before.settings!.contentCategories!.course[0].toUpperCase());
+  await dialog
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toContainText("already exists");
+  await dialog
+    .getByLabel("Category name", { exact: true })
+    .fill("Temporary category");
+  await dialog
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
+  const navigation = page.getByRole("combobox", {
+    name: "Administration section",
+    exact: true,
+  });
+  if (await navigation.isVisible()) {
+    await navigation.click();
+    await page
+      .getByRole("option", { name: "Docs navigation", exact: true })
+      .click();
+  } else {
+    await page
+      .getByRole("tab", { name: "Docs navigation", exact: true })
+      .click();
+  }
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("Unsaved changes will be discarded");
+  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Categories", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: "Actions for Temporary category",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  const after = await saved(page);
+  expect(after.settings.contentCategories).toEqual(
+    before.settings!.contentCategories,
+  );
+  expect(after.content).toEqual(before.content);
+  expect(after.publishedContent).toEqual(before.publishedContent);
+  expect(after.progress).toEqual(before.progress);
+});
+
+test("long item titles wrap and selection remains visible after focus leaves the row", async ({
+  page,
+}, info) => {
+  const title =
+    "A practical guide to working through changes in ownership, making expectations clear, and preserving useful knowledge when your team grows and responsibilities change";
+  const data = await fixture(page, false, 0, title);
+  const course = data.content.find((item) => item.kind === "course")!;
+  await page
+    .getByRole("button", { name: `Expand ${course.category}`, exact: true })
+    .click();
+  const section = page.getByRole("region", {
+    name: `Items in ${course.category}`,
+    exact: true,
+  });
+  const row = section.getByRole("row").filter({
+    has: page.getByRole("checkbox", { name: `Select ${title}`, exact: true }),
+  });
+  await row.getByRole("checkbox").check();
+  await section.getByRole("searchbox").focus();
+  await expect(row).toHaveAttribute("data-selected", "true");
+  await row.hover();
+  expect(
+    await row.evaluate((element) => getComputedStyle(element).backgroundColor),
+  ).toBe(
+    await row
+      .locator("td")
+      .last()
+      .evaluate((element) => getComputedStyle(element).backgroundColor),
+  );
+  const titleCell = row.getByRole("cell", { name: title, exact: true });
+  expect(
+    await titleCell
+      .locator("span")
+      .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+  ).toBe(true);
+  const bounds = await row.boundingBox();
+  expect(bounds!.height).toBeGreaterThan(48);
+  await page.screenshot({
+    path: info.outputPath("category-long-title-selected.png"),
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("drag and menu reordering stage and save the same course category order", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop");
+  const before = await fixture(page);
+  const names = before.settings!.contentCategories!.course;
+  await page
+    .getByRole("button", { name: `Reorder ${names[2]}`, exact: true })
+    .dragTo(
+      page.locator("[data-category]").filter({
+        has: page.getByRole("button", {
+          name: `Actions for ${names[0]}`,
+          exact: true,
+        }),
+      }),
+      { targetPosition: { x: 120, y: 5 } },
+    );
+  await expect(page.locator("[data-category]").first()).toHaveAttribute(
+    "data-category",
+    names[2],
+  );
+  await page
+    .getByRole("button", { name: `Actions for ${names[2]}`, exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Move down", exact: true }).click();
+  await expect(page.locator("[data-category]").nth(1)).toHaveAttribute(
+    "data-category",
+    names[2],
+  );
+  expect((await saved(page)).settings.contentCategories.course).toEqual(names);
+  await save(page);
+  const after = await saved(page);
+  expect(after.settings.contentCategories.course).toEqual([
+    names[0],
+    names[2],
+    names[1],
+    ...names.slice(3),
+  ]);
+  expect(after.content).toEqual(before.content);
+  expect(after.progress).toEqual(before.progress);
 });

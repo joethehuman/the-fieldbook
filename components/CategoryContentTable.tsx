@@ -2,7 +2,11 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import type { Content } from "@/lib/types";
-import { BulkSelectionBar, SelectRows } from "./patterns/bulk-selection";
+import {
+  BulkSelectionBar,
+  SelectRows,
+  canBulkSelect,
+} from "./patterns/bulk-selection";
 import { CollectionControls } from "./patterns/collection-controls";
 import { DataTable } from "./patterns/data-table";
 import { RowActions, type RowAction } from "./patterns/row-actions";
@@ -71,7 +75,7 @@ export function CategorySelectionBar({
               ref={trigger}
               type="button"
               variant="outline"
-              disabled={busy || !count}
+              disabled={busy || !canBulkSelect(count)}
               aria-label={`${label} bulk actions`}
             >
               Bulk actions
@@ -99,7 +103,8 @@ export function CategorySelectionBar({
                       : undefined
                   }
                   onSelect={() => {
-                    pending.current = action.onSelect;
+                    if (!busy && canBulkSelect(count))
+                      pending.current = action.onSelect;
                   }}
                 >
                   {action.label}
@@ -209,7 +214,12 @@ export function CategoryContentTable({
             </TableHeader>
             <TableBody>
               {visible.map((item) => (
-                <TableRow key={item.id} className="h-12" data-item-id={item.id}>
+                <TableRow
+                  key={item.id}
+                  className="h-12 data-[selected=true]:bg-selected group-data-[pin-actions=true]/table:data-[selected=true]:hover:bg-selected group-data-[pin-actions=true]/table:data-[selected=true]:focus-within:bg-selected"
+                  data-item-id={item.id}
+                  data-selected={selectedIds.includes(item.id)}
+                >
                   <TableCell>
                     <div className="flex items-center justify-center">
                       <Checkbox
@@ -227,17 +237,20 @@ export function CategoryContentTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span
-                      className="block max-w-64 truncate sm:max-w-96"
-                      title={item.title || "Untitled item"}
-                    >
+                    <span className="block max-w-64 [overflow-wrap:anywhere] sm:max-w-96">
                       {item.title || "Untitled item"}
                     </span>
                   </TableCell>
                   <TableCell>
                     <PublicationStatus published={!!item.publishedRevision} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell
+                    className={
+                      selectedIds.includes(item.id)
+                        ? "group-data-[pin-actions=true]/table:last:bg-selected group-data-[pin-actions=true]/table:last:group-hover/row:bg-selected group-data-[pin-actions=true]/table:last:group-focus-within/row:bg-selected group-data-[pin-actions=true]/table:last:before:to-selected group-data-[pin-actions=true]/table:last:group-hover/row:before:to-selected group-data-[pin-actions=true]/table:last:group-focus-within/row:before:to-selected"
+                        : undefined
+                    }
+                  >
                     <RowActions
                       label={item.title || "Untitled item"}
                       disabled={busy}
