@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { setupAuthoringProvider, authoringUser } from "./provider-fixture";
@@ -17,6 +17,7 @@ async function setup(
   item.title = "Audience picker fixture";
   item.groups = [];
   item.assignments = [];
+  delete item.updateTeams;
   item.revision = 1;
   item.publishedRevision = 1;
   item.cardArt = {
@@ -111,7 +112,7 @@ async function setup(
       ? (
           await page.request.get(
             live
-              ? `http://127.0.0.1:3130/rest/v1/fb_documents?id=eq.${item.id}`
+              ? `http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/rest/v1/fb_documents?id=eq.${item.id}`
               : `/api/content?id=${item.id}&draft=true`,
           )
         )
@@ -130,23 +131,26 @@ async function setup(
         );
   if (installed) {
     await setupAuthoringProvider(page, data);
-    await page.request.post("http://127.0.0.1:3130/fixture", {
-      data: {
-        settings: data.settings,
-        groups: data.groups,
-        teams: data.teams,
-        users: data.users.map((u) => ({ ...u, team_id: u.teamId })),
-        curricula: data.curricula,
-        documents: data.content.map((c) => ({
-          id: c.id,
-          draft: c,
-          published: data.publishedContent![0],
-          revision: 1,
-          published_revision: 1,
-          updated_at: c.updatedAt,
-        })),
+    await page.request.post(
+      `http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`,
+      {
+        data: {
+          settings: data.settings,
+          groups: data.groups,
+          teams: data.teams,
+          users: data.users.map((u) => ({ ...u, team_id: u.teamId })),
+          curricula: data.curricula,
+          documents: data.content.map((c) => ({
+            id: c.id,
+            draft: c,
+            published: data.publishedContent![0],
+            revision: 1,
+            published_revision: 1,
+            updated_at: c.updatedAt,
+          })),
+        },
       },
-    });
+    );
     await page.route("**/api/admin/snapshot?**", (route) =>
       route.fulfill({ json: { data, user: authoringUser } }),
     );
@@ -156,17 +160,38 @@ async function setup(
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
     }, data);
   await page.goto(installed ? "/admin" : "/#admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("link", { name: item.title, exact: true }).click();
   const details = await openContentSettings(page);
   await details
-    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
+    .getByRole("button", {
+      name: /^(?:Assign audience|Edit Audience|Edit audience)$/,
+      exact: true,
+    })
     .click();
   const panel = page.getByRole("dialog", {
-    name: kind === "course" ? "Course audience" : "Update audience",
+    name: kind === "course" ? "Course assignments" : "Update recommendations",
     exact: true,
   });
   await expect(panel).toBeVisible();
   return { data, item, panel, read, details };
+}
+async function availablePane(panel: Locator) {
+  await expect(panel).toBeVisible();
+  const lists = panel.getByRole("group", {
+    name: "Assignment lists",
+    exact: true,
+  });
+  if (await lists.isVisible())
+    await lists.getByRole("button", { name: "Available", exact: true }).click();
+}
+async function assignedPane(panel: Locator) {
+  await expect(panel).toBeVisible();
+  const lists = panel.getByRole("group", {
+    name: "Assignment lists",
+    exact: true,
+  });
+  if (await lists.isVisible())
+    await lists.getByRole("button", { name: /^Assigned/ }).click();
 }
 test("linked group includes teams, parks staged choices and allows deliberate independent sources", async ({
   page,
@@ -178,52 +203,73 @@ test("linked group includes teams, parks staged choices and allows deliberate in
     "dedicated",
     "linked",
   );
-  const group = panel.getByRole("checkbox", {
-    name: "Assign directly to Group: Startups account teams",
+  await availablePane(panel);
+  const group = panel.getByRole("button", {
+    name: "Add group: Startups account teams",
     exact: true,
   });
-  const team = panel.getByRole("checkbox", {
-    name: "Assign directly to Team: AE Startups",
+  const team = panel.getByRole("button", {
+    name: "Remove team: AE Startups",
     exact: true,
   });
-  await team.check();
-  await group.check();
-  await expect(team).toHaveCount(0);
-  await expect(
-    panel.getByLabel("Team: AE Startups included", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    panel.getByLabel("Team: CSM Startups included", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    panel.getByText("Included in group: Startups account teams", {
-      exact: true,
-    }),
-  ).toHaveCount(2);
-  await group.uncheck();
-  await expect(team).toBeChecked();
-  await group.check();
   await panel
-    .getByRole("button", { name: "Keep an audience independently" })
+    .getByRole("button", { name: "Add team: AE Startups", exact: true })
     .click();
+  await group.click();
+  await assignedPane(panel);
+  await expect(team).toHaveCount(0);
   await panel
-    .getByRole("checkbox", {
-      name: "Keep AE Startups independently",
+    .getByRole("button", {
+      name: "Includes 2 teams in Startups account teams",
       exact: true,
     })
-    .check();
-  await expect(team).toBeChecked();
+    .click();
+  for (const name of ["AE Startups", "CSM Startups"])
+    await expect(
+      panel.getByRole("button", {
+        name: `${name} cannot be removed individually; included through Startups account teams`,
+        exact: true,
+      }),
+    ).toBeDisabled();
+  await panel
+    .getByRole("button", {
+      name: "Remove group: Startups account teams",
+      exact: true,
+    })
+    .click();
+  await expect(team).toBeVisible();
+  await availablePane(panel);
+  await group.click();
+  await assignedPane(panel);
+  await panel
+    .getByRole("button", { name: "Manage direct assignments", exact: true })
+    .click();
+  // Explicitly remove and re-add the direct source while its group still includes it.
+  await panel
+    .getByRole("button", {
+      name: "Remove direct assignment for AE Startups",
+      exact: true,
+    })
+    .click();
+  await panel
+    .getByRole("button", {
+      name: "Add direct assignment for AE Startups",
+      exact: true,
+    })
+    .click();
   await expect(
-    panel.getByText(
-      "Selected independently · removing this choice keeps other assignments.",
-      { exact: true },
-    ),
-  ).toHaveCount(2);
+    panel.getByRole("img", { name: "Also assigned directly", exact: true }),
+  ).toBeVisible();
+  const independent = panel.getByRole("button", {
+    name: "Remove direct assignment for AE Startups",
+    exact: true,
+  });
+  await expect(independent).toBeVisible();
   await panel
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
   await panel.getByRole("button", { name: "← Back", exact: true }).click();
-  await expect(team).toBeChecked();
+  await expect(independent).toBeVisible();
   await page.screenshot({ path: info.outputPath("audience-linked-group.png") });
 });
 for (const mode of ["overlap", "legacy"] as const) {
@@ -237,28 +283,45 @@ for (const mode of ["overlap", "legacy"] as const) {
       "dedicated",
       mode,
     );
+    await availablePane(panel);
     await panel
-      .getByRole("checkbox", {
-        name: "Assign directly to Group: Startups account teams",
+      .getByRole("button", {
+        name: "Add group: Startups account teams",
         exact: true,
       })
-      .check();
-    const team = panel.getByRole("checkbox", {
-      name: "Assign directly to Team: AE Startups",
+      .click();
+    await expect(panel).toContainText("1 person included");
+    if (mode === "legacy") {
+      await assignedPane(panel);
+      await panel
+        .getByRole("button", {
+          name: "Includes 2 teams in Startups account teams",
+          exact: true,
+        })
+        .click();
+      await expect(
+        panel.getByRole("img", {
+          name: "Direct members only · excludes subteams",
+          exact: true,
+        }),
+      ).toHaveCount(2);
+      await availablePane(panel);
+    }
+    const team = panel.getByRole("button", {
+      name: "Add team: AE Startups",
       exact: true,
     });
     await expect(team).toBeEnabled();
+    await team.click();
+    await assignedPane(panel);
     await expect(
-      panel.getByLabel("Team: AE Startups included", { exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      panel.getByText(
-        "Current members already included · select to include future members.",
-        { exact: true },
-      ),
+      panel.getByRole("button", {
+        name: "Remove team: AE Startups",
+        exact: true,
+      }),
     ).toBeVisible();
-    await team.check();
-    await expect(team).toBeChecked();
+    // Coincidental people overlap never replaces the independently selected source.
+    await expect(panel).toContainText("1 person included");
   });
 }
 test("curriculum group inclusion starts with named paths and existing reach", async ({
@@ -271,31 +334,39 @@ test("curriculum group inclusion starts with named paths and existing reach", as
     "dedicated",
     "curriculum",
   );
+  await assignedPane(panel);
   await expect(
-    panel.getByText("Assigned through curriculum: Startup onboarding", {
+    panel.getByRole("heading", { name: "Through curricula", exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByRole("img", {
+      name: "Through Startup onboarding, edit the curriculum to remove",
       exact: true,
     }),
-  ).toHaveCount(2);
-  await expect(
-    panel.getByLabel("Team: AE Startups included", { exact: true }),
   ).toBeVisible();
+  await panel
+    .getByRole("button", {
+      name: "Includes 2 teams in Startups account teams",
+      exact: true,
+    })
+    .click();
+  for (const team of ["AE Startups", "CSM Startups"])
+    await expect(
+      panel.getByRole("button", {
+        name: `${team} cannot be removed individually; included through Startups account teams`,
+        exact: true,
+      }),
+    ).toBeDisabled();
+  await expect(panel).toContainText("1 person included");
   await expect(
-    panel.getByLabel("Team: CSM Startups included", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    panel.getByText("Course assigned through curriculum: Startup onboarding", {
+    panel.getByRole("button", {
+      name: "Remove group: Startups account teams",
       exact: true,
     }),
-  ).toHaveCount(2);
+  ).toHaveCount(0);
   await expect(
-    panel.getByText("1 person already assigned", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    panel.getByText("No additional audiences selected", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Team: AE Startups",
+    panel.getByRole("button", {
+      name: "Remove team: AE Startups",
       exact: true,
     }),
   ).toHaveCount(0);
@@ -392,7 +463,10 @@ test("shared workflow parks new choices, retains saved sources and contains revi
     .click();
   await expect(panel).not.toBeVisible();
   await page
-    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
+    .getByRole("button", {
+      name: /^(?:Assign audience|Edit Audience|Edit audience)$/,
+      exact: true,
+    })
     .click();
   await expect(
     panel.getByRole("checkbox", {
@@ -416,16 +490,20 @@ test("search keeps internal geometry for many, one and zero matches", async ({
     info.project.name.startsWith("production"),
     "course",
   );
-  const search = panel.getByRole("searchbox");
+  await availablePane(panel);
+  const search = panel.getByRole("searchbox", {
+    name: "Find a team or group",
+    exact: true,
+  });
   await search.scrollIntoViewIfNeeded();
   const bounds = async () => ({
     dialog: await panel.boundingBox(),
     search: await search.boundingBox(),
     list: await panel
-      .getByLabel("Audience choices", { exact: true })
+      .getByLabel("Available teams and groups", { exact: true })
       .boundingBox(),
     summary: await panel
-      .getByLabel("Selected audiences", { exact: true })
+      .getByLabel("Assignment sources", { exact: true })
       .boundingBox(),
     footer: await panel.locator('[data-slot="dialog-footer"]').boundingBox(),
   });
@@ -433,8 +511,8 @@ test("search keeps internal geometry for many, one and zero matches", async ({
   await search.pressSequentially("Account executives");
   expect(await bounds()).toEqual(before);
   await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Group: Account executives",
+    panel.getByRole("button", {
+      name: "Add group: Account executives",
       exact: true,
     }),
   ).toBeVisible();
@@ -446,11 +524,11 @@ test("search keeps internal geometry for many, one and zero matches", async ({
     path: info.outputPath("audience-search-stable.png"),
   });
   await panel
-    .getByRole("checkbox", {
-      name: "Assign directly to Group: Account executives",
+    .getByRole("button", {
+      name: "Add group: Account executives",
       exact: true,
     })
-    .check();
+    .click();
   await search.fill("Account executives");
   await panel
     .getByRole("button", { name: "Review changes", exact: true })
@@ -466,15 +544,16 @@ test("Update picker applies to the draft, saves team/guest audiences, then publi
     info.project.name.startsWith("production"),
     "brief",
   );
+  await availablePane(panel);
   await panel
-    .getByRole("radio", {
-      name: "Organization",
+    .getByRole("button", {
+      name: "Add team: Organization",
       exact: true,
     })
-    .check();
+    .click();
   await panel
-    .getByRole("checkbox", { name: "Also include public guests", exact: true })
-    .check();
+    .getByRole("button", { name: "Add group: Visitors", exact: true })
+    .click();
   await page.screenshot({ path: info.outputPath("update-audience-draft.png") });
   await panel
     .getByRole("button", { name: "Apply to draft", exact: true })
@@ -501,12 +580,18 @@ test("Update picker applies to the draft, saves team/guest audiences, then publi
   expect((await read()).groups).toEqual([]);
   expect((await read(true)).groups).toEqual([]);
   await page
-    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
+    .getByRole("button", {
+      name: /^(?:Assign audience|Edit Audience|Edit audience)$/,
+      exact: true,
+    })
     .click();
-  await panel.getByRole("radio", { name: "Organization", exact: true }).check();
+  await availablePane(panel);
   await panel
-    .getByRole("checkbox", { name: "Also include public guests", exact: true })
-    .check();
+    .getByRole("button", { name: "Add team: Organization", exact: true })
+    .click();
+  await panel
+    .getByRole("button", { name: "Add group: Visitors", exact: true })
+    .click();
   await panel
     .getByRole("button", { name: "Apply to draft", exact: true })
     .click();
@@ -546,19 +631,26 @@ for (const mode of ["none", "private", "shared"] as const)
       "brief",
       mode,
     );
-    const guest = panel.getByRole("checkbox", {
-      name: "Also include public guests",
+    await availablePane(panel);
+    const guest = panel.getByRole("img", {
+      name: "Includes public guests",
       exact: true,
     });
     if (mode !== "shared") {
       await expect(guest).toHaveCount(0);
       return;
     }
-    await expect(panel).toContainText(
-      "Uses Account executives. Also includes 1 registered person.",
-    );
-    await guest.check();
-    await expect(panel).toContainText("1 person in audience");
+    await expect(guest).toBeVisible();
+    await expect(
+      panel.getByRole("img", { name: "1 registered people", exact: true }),
+    ).toBeVisible();
+    await panel
+      .getByRole("button", {
+        name: "Add group: Account executives",
+        exact: true,
+      })
+      .click();
+    await expect(panel).toContainText("1 person · Public guests also included");
     await panel
       .getByRole("button", { name: "Apply to draft", exact: true })
       .click();

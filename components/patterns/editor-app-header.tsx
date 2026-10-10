@@ -4,6 +4,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 export const EditorAppHeaderContext = createContext<HTMLElement | null>(null);
+export const EditorAppDockContext = createContext<HTMLElement | null>(null);
 
 /** Keep editor actions and their callbacks owned by the editor, in the app bar. */
 export function EditorAppHeader({ children }: { children: ReactNode }) {

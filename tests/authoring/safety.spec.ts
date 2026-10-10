@@ -1354,14 +1354,19 @@ test("Insert menus use full rows and can be dismissed", async ({
   await expect(writing.locator(".writing-command-line")).toHaveCount(0);
   await page.keyboard.type("ding");
   await expectMarkdown(page, /\/heading/);
-  await page.getByRole("button", { name: /^Commands:/ }).click();
+  const commands = page.getByRole("button", { name: /^Commands:/, includeHidden: true });
+  if ((await page.locator(".editor-frame").getAttribute("data-cards")) !== "true") {
+    await expect(commands).toBeHidden();
+    return;
+  }
+  await commands.click();
   await expect(menu).toBeVisible();
   await expect(
     menu.getByRole("menuitem", { name: "Heading 2", exact: true }),
   ).not.toBeFocused();
   await menu.getByRole("menuitem", { name: "Close menu esc" }).click();
   await expect(menu).toHaveCount(0);
-  await page.getByRole("button", { name: /^Commands:/ }).focus();
+  await commands.focus();
   await page.keyboard.press("Enter");
   await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");

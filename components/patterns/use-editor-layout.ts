@@ -28,7 +28,8 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
         ...Array.from(frame.children).filter((child) => !child.matches(".editor-frame-body")),
         ...editor.querySelectorAll(".editor-canvas-navigation, .mdxeditor-toolbar, .writing-view-header, .writing-root > .writing-editor-notice"),
       ];
-      const next = new Set<Element>([editor, viewport, ...chrome]);
+      const headings = Array.from(editor.querySelectorAll<HTMLElement>(".writing-document-heading"));
+      const next = new Set<Element>([editor, viewport, ...chrome, ...headings]);
       for (const element of observed) if (!next.has(element)) {
         observer.unobserve(element);
         observed.delete(element);
@@ -47,6 +48,10 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
       // A phone document always flows through the page, including its blank
       // first paragraph. Keyboard changes must not swap or reset scroll owners.
       const phone = window.matchMedia(compactLayoutQuery).matches;
+      // A tall desktop title must leave a usable writing band. Sticky and
+      // flowing headings occupy the same space, so this cannot change owners.
+      const headingHeight = Math.max(0, ...headings.map(heading => heading.getBoundingClientRect().height));
+      editor.toggleAttribute("data-flowing-heading", headingHeight > viewport.clientHeight - reserved - 12 * rem);
       const layout = !phone && frame.getBoundingClientRect().width >= 48 * rem
         && viewport.clientHeight - reserved >= 12 * rem ? "workspace" : "page";
       const writing = editor.querySelector<HTMLElement>(".writing-viewport") || editor.querySelector<HTMLElement>(".editor-frame-canvas");
@@ -66,7 +71,9 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
     }
     // Dynamic save notices and lazy/mode-specific toolbars also consume natural space.
     const mutations = new MutationObserver((records) => {
-      if (records.some(({ target }) => !(target instanceof Element)
+      const headingChanged = records.some(record => [...record.addedNodes, ...record.removedNodes].some(node =>
+        node instanceof Element && (node.matches(".writing-document-heading") || node.querySelector(".writing-document-heading"))));
+      if (headingChanged || records.some(({ target }) => !(target instanceof Element)
         || !target.closest(".writing-viewport, .editor-frame-details, .editor-frame-outline"))) schedule();
     });
     mutations.observe(editor, { childList: true, subtree: true });

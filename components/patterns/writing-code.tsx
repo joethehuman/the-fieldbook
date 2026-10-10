@@ -85,6 +85,9 @@ export function WritingCodeEditor({
       parentEditor.update(() => {
         const node = $getNodeByKey(nodeKey);
         if (!node) return;
+        // Lexical leaves native selection alone while CodeMirror owns focus.
+        // Return focus before committing the chosen sibling caret.
+        parentEditor.getRootElement()?.focus({ preventScroll: true });
         if (direction === "before") node.selectPrevious();
         else if (node.getNextSibling()) node.selectNext();
         else {
@@ -92,7 +95,7 @@ export function WritingCodeEditor({
           node.insertAfter(paragraph);
           paragraph.selectStart();
         }
-      });
+      }, { discrete: true });
       return true;
     }
     const editor = new EditorView({

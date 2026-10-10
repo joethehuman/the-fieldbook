@@ -25,7 +25,7 @@ async function setup(page: Page, production: boolean, role: "contributor" | "adm
   data.deletedItems = [{ id: "deleted-user", entity: "user", name: "Deleted account secret", revision: 1, deletedAt: new Date().toISOString(), purgeAfter: new Date(Date.now() + 86400000).toISOString(), deletedBy: "Admin", purging: false }];
   if (production) {
     await setupAuthoringProvider(page, data);
-    await page.request.post("http://127.0.0.1:3130/fixture", { data: {
+    await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, { data: {
       role, settings: data.settings, groups: data.groups, curricula: data.curricula,
       teams: data.teams, users: data.users.map((u) => ({ ...u, auth_user_id: u.id, team_id: u.teamId, group_joined_at: {}, effective_group_joined_at: {} })),
       feedback: [{ id: "general", user_id: null, content_id: null, rating: "up", comment: "Contributor general feedback", updated_at: "2026-10-01" }],
