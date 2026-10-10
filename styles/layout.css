@@ -381,6 +381,7 @@
   }
   .editor-frame-panel[data-side="outline"] { grid-area: canvas; width: var(--editor-panel-width); justify-self: start; }
   .editor-frame-panel[data-side="details"] { grid-area: canvas; width: var(--editor-panel-width); justify-self: end; }
+  .editor-frame:not([data-cards="true"]) .editor-frame-panel { max-width: 100%; }
   .editor-frame-panel[data-open="false"] { opacity: 0; visibility: hidden; }
   .editor-frame-outline, .editor-frame-details {
     display: flex;

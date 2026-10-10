@@ -1,19 +1,20 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { compactLayoutQuery, useCompactLayout } from "./use-compact-layout";
+import { compactLayoutQuery } from "./use-compact-layout";
 
-// Panels and navigation retain the existing compact layout boundary.
+// Editor presentation follows the touch dock boundary. The app shell can still
+// compact its navigation and search to fit a narrow mouse-driven window.
 export function useEditorCardsLayout() {
-  return useCompactLayout();
+  return useMobileWritingDock();
 }
 
 export function useWritingControlsLayout() {
-  return useCompactLayout();
+  return useMobileWritingDock();
 }
 
 // A narrow desktop window is still a desktop editor. Any reported fine pointer
-// (including a tablet trackpad) keeps the in-page controls and formatting popup.
+// (including a tablet trackpad) keeps desktop navigation and contextual formatting.
 export const touchWritingQuery = "(pointer: coarse) and (not (any-pointer: fine))";
 const mobileDockQuery = `${compactLayoutQuery.split(", ").map((query) => `${query} and ${touchWritingQuery}`).join(", ")}`;
 function subscribeMobileDock(callback: () => void) {
