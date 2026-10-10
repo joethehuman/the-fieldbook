@@ -206,84 +206,41 @@ test("resizing search never revives an empty or populated panel", async ({ page 
   await expect(input).toHaveValue("context");
 });
 
-test("editor controls and app navigation retain the compact layout boundary", async ({ page }, info) => {
+test("narrow mouse editors retain desktop controls while the app navigation compacts", async ({ page }, info) => {
   await open(page, info.project.name.startsWith("production"), "course");
   const writer = page.locator('.writing-content[contenteditable="true"]');
   const original = await writer.elementHandle();
+  const back = page.getByRole("button", { name: "Back to content", exact: true });
   const outline = page.getByRole("button", { name: "Outline", exact: true });
   const details = page.getByRole("button", { name: "Details", exact: true });
-  for (const width of [375, 767, 768, 1024, 1279, 1280]) {
+  for (const width of [320, 375, 767, 768, 1024, 1279, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     await page.locator(".main-shell").evaluate(async (el) => {
       await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     });
-    const compact = width <= 767 || (!!info.project.use.hasTouch && width < 900);
-    const mobile = compact;
+    const shellCompact = width < 768;
     const navigation = page.getByRole("button", { name: "Open navigation", exact: true });
-    const search = page.getByRole("button", { name: "Open search", exact: true });
-    if (compact) {
-      await expect(navigation).toBeVisible();
-      await expect(search).toBeVisible();
-      await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeHidden();
-    } else {
-      await expect(navigation).toBeHidden();
-      // Search can independently become an icon when publication controls need space.
-      await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
-    }
-    if (mobile) await expect(page.locator(".editor-frame")).toHaveAttribute("data-cards", "true");
-    else await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
-    if (mobile) {
-      const command = page.getByRole("button", { name: "Commands: insert blocks or format selected text", exact: true });
-      const showControls = compact;
-      if (showControls) await expect(command).toBeVisible(); else await expect(command).toBeHidden();
-      const row = (await page.locator(".editor-frame-controls").boundingBox())!;
-      await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeHidden();
-      const header = (await page.locator(".topbar").boundingBox())!;
-      expect(row.y).toBeGreaterThan(header.y + header.height);
-      expect(row.y + row.height).toBeCloseTo(page.viewportSize()!.height - 12, 0);
-      expect(row.x + row.width / 2).toBeCloseTo(page.viewportSize()!.width / 2, 0);
-      await page.screenshot({ path: info.outputPath(`mobile-canvas-${width}.png`) });
-      if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
-      await page.screenshot({ path: info.outputPath(`mobile-outline-${width}.png`) });
-      const canvas = (await page.locator(".editor-frame-canvas").boundingBox())!;
-      const panel = page.getByRole("complementary", { name: "Course outline", exact: true });
+    if (shellCompact) await expect(navigation).toBeVisible();
+    else await expect(navigation).toBeHidden();
+    await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
+    await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-dock", "true");
+    await expect(page.getByRole("button", { name: /^Commands:/ })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Redo", exact: true })).toBeHidden();
+    await expect(back).toBeInViewport({ ratio: 1 });
+    for (const [toggle, label] of [[outline, "Course outline"], [details, "Content details"]] as const) {
+      await expect(toggle).toBeInViewport({ ratio: 1 });
+      if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+      const panel = page.getByRole("complementary", { name: label, exact: true });
+      await expect(panel).toBeInViewport({ ratio: 1 });
       const box = (await panel.boundingBox())!;
-      expect(box.y).toBeGreaterThanOrEqual(header.y + header.height + 7);
-      expect(box.y + box.height).toBeLessThanOrEqual(row.y - 7);
-      expect(box.width).toBeCloseTo(320, 0);
-      expect(box.x).toBeCloseTo(canvas.x, 0);
-      if (showControls) await expect(command).toBeVisible(); else await expect(command).toBeHidden();
-      const bothFit = (await page.locator(".editor-frame").boundingBox())!.width >= 656;
-      await details.click();
-      await expect(outline).toHaveAttribute("aria-expanded", bothFit ? "true" : "false");
-      expect((await page.locator(".editor-frame-canvas").boundingBox())!.width).toBeCloseTo(canvas.width, 0);
-      if (!bothFit) {
-        await outline.click();
-        await expect(details).toHaveAttribute("aria-expanded", "false");
-        await details.click();
-        await expect(outline).toHaveAttribute("aria-expanded", "false");
-      }
-      const detailBox = (await page.getByRole("complementary", { name: "Content details", exact: true }).boundingBox())!;
-      expect(detailBox.y).toBeGreaterThanOrEqual(header.y + header.height + 7);
-      expect(detailBox.y + detailBox.height).toBeLessThanOrEqual(row.y - 7);
-      expect(detailBox.x + detailBox.width).toBeCloseTo(canvas.x + canvas.width, 0);
-      await page.screenshot({ path: info.outputPath(`mobile-overlays-${width}.png`) });
-      await details.click();
-      if (await outline.getAttribute("aria-expanded") === "true") await outline.click();
-      if (compact) {
-        await navigation.click();
-        await expect(page.getByRole("button", { name: "Close navigation", exact: true })).toBeVisible();
-        await expect(page.locator('.editor-frame-controls[data-cards="true"]')).toBeHidden();
-        await page.getByRole("button", { name: "Close navigation", exact: true }).click();
-        await expect(page.locator('.editor-frame-controls[data-cards="true"]')).toBeVisible();
-      }
-    } else {
-      await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
-      await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Commands: insert blocks or format selected text", exact: true })).toBeHidden();
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      await toggle.click();
     }
     expect(await original!.evaluate((node) => node.isConnected)).toBe(true);
+    if (width <= 375) await page.screenshot({ path: info.outputPath(`desktop-canvas-${width}.png`) });
   }
 });
 
@@ -756,7 +713,7 @@ test("the main writing experience keeps title flow, undo, redo and export", asyn
     name: "Commands: insert blocks or format selected text",
     exact: true,
   });
-  const extraControls = await page.evaluate(() => matchMedia("(width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait)").matches);
+  const extraControls = compact;
   if (extraControls) await expect(commands).toBeVisible();
   else await expect(commands).toBeHidden();
   const writer = page.locator('.writing-content[contenteditable="true"]');
@@ -785,7 +742,7 @@ test("desktop slash insertion and mobile Commands keep the same block tools", as
   const compact =
     (await page.locator(".editor-frame").getAttribute("data-cards")) === "true";
   await page.locator("#editor-title").press("Enter");
-  if (await page.evaluate(() => matchMedia("(width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait)").matches))
+  if (compact)
     await page
       .getByRole("button", {
         name: "Commands: insert blocks or format selected text",
@@ -1268,7 +1225,7 @@ for (const kind of ["doc", "brief", "course"] as const)
     const pinned = kind === "course" ? page.getByRole("textbox", { name: "Lesson title", exact: true }) : title;
     for (const width of [1440, 1279, 1110, 1024, 900, 768, 600]) {
       await page.setViewportSize({ width, height: 900 });
-      const compact = width <= 767 || (!!info.project.use.hasTouch && width <= 900);
+      const compact = !!info.project.use.hasTouch && width <= 900;
       const frame = page.locator(".editor-frame");
       const stacked = compact;
       if (stacked) await expect(frame).toHaveAttribute("data-cards", "true");
@@ -1286,7 +1243,6 @@ for (const kind of ["doc", "brief", "course"] as const)
       if (stacked) await expect(back).toBeHidden();
       if (!stacked) {
         expect(start).not.toBeNull();
-        await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
         const detail = (await page.getByRole("button", { name: "Details", exact: true }).boundingBox())!;
         expect(detail.y + detail.height / 2).toBeCloseTo(start!.y + start!.height / 2, 0);
         if (width >= 1024) expect(Math.abs((await back.locator("svg").boundingBox())!.x - (await title.boundingBox())!.x)).toBeLessThanOrEqual(2);
@@ -1720,11 +1676,10 @@ test("centered search yields to publication controls without changing navigation
       await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeInViewport({ ratio: 1 });
       if (geometry.shellCompact) {
         await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeVisible();
-        await expect(page.locator(".editor-frame")).toHaveAttribute("data-cards", "true");
       } else {
         await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
-        await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
       }
+      await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
     }
   }
   expect(desktopIconSeen).toBe(true);
@@ -1811,7 +1766,7 @@ for (const kind of ["doc", "brief", "course"] as const)
         await Promise.all(el.getAnimations().map(a => a.finished.catch(() => {})));
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       });
-      const compact = await page.evaluate(() => matchMedia("(width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait)").matches);
+      const compact = await page.locator(".editor-frame").getAttribute("data-dock") === "true";
       const frame = (await page.locator(".editor-frame").boundingBox())!;
       const line = (await writer.locator("p").first().boundingBox())!;
       expect(line.x - frame.x).toBeCloseTo(frame.x + frame.width - line.x - line.width, 0);
@@ -1829,7 +1784,9 @@ for (const kind of ["doc", "brief", "course"] as const)
         expect(controls.y + controls.height).toBeCloseTo(988, 0);
       } else {
         await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
-        await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
+        const navigation = page.getByRole("button", { name: "Open navigation", exact: true });
+        if (width < 768) await expect(navigation).toBeVisible();
+        else await expect(navigation).toBeHidden();
       }
       for (const [label, selector] of [["Code block", ".writing-code-block"], ["Image", '[data-editor-block-type="image"]'], ["Video", ".writing-media-block"], ["Table", ".writing-table-block"]]) {
         const block = writer.locator(selector).first();
@@ -4158,19 +4115,16 @@ test("a typed insertion command hands the current cursor back through Details", 
 test.describe("mouse writing controls", () => {
   test.use({ hasTouch: false });
 for (const width of [640, 767, 900, 1440]) {
-  test(`mouse editor at ${width}px keeps in-page controls and contextual formatting`, async ({ page }, info) => {
+  test(`mouse editor at ${width}px keeps desktop controls and contextual formatting`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 1000 });
     await open(page, info.project.name.startsWith("production"), "doc");
     await expect(page.locator('.editor-frame-controls[data-dock="true"]')).toHaveCount(0);
     await expect(page.locator(".editor-canvas-navigation")).toBeVisible();
+    await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
+    await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Commands:/ })).toBeHidden();
     const details = page.getByRole("button", { name: "Details", exact: true });
     await expect(details).toBeVisible();
-    if (width < 768) {
-      await expect(page.getByRole("button", { name: "Back to content", exact: true })).toHaveCount(0);
-      const commands = page.getByRole("button", { name: /^Commands:/ });
-      await expect(commands).toBeVisible();
-      expect((await details.boundingBox())!.x).toBeGreaterThan((await commands.boundingBox())!.x + (await commands.boundingBox())!.width);
-    }
     const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
     await writer.fill("Keep desktop formatting");
     await writer.evaluate((element) => {
@@ -4218,6 +4172,9 @@ test("connecting a fine pointer removes the dock without remounting writing", as
     await expect(page.locator(".writing-slash-menu")).toBeVisible();
     await page.evaluate(() => (window as unknown as { setFinePointer: (value: boolean) => void }).setFinePointer(true));
     await expect(page.locator('.editor-frame-controls[data-dock="true"]')).toHaveCount(0);
+    await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
+    await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Commands:/ })).toBeHidden();
     await expect(page.locator(".editor-canvas-navigation")).toBeVisible();
     await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
     expect(await mounted!.evaluate((element) => element === document.querySelector('.writing-content[contenteditable="true"]'))).toBe(true);
@@ -4227,3 +4184,58 @@ test("connecting a fine pointer removes the dock without remounting writing", as
     await expect(writer).toHaveText("Preserve my writing");
   } finally { await context.close(); }
 });
+
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: narrow desktop editing retains slash tools, formatting and history`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 375, height: 900 });
+    await open(page, info.project.name.startsWith("production"), kind, 2, (item) => {
+      const body = "Paragraph 1. Keep this writing.";
+      if (kind === "course") item.lessons[0].body = body;
+      else item.body = body;
+    });
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    const original = await writer.elementHandle();
+    await writer.focus();
+    await writer.press(process.platform === "darwin" ? "Meta+ArrowUp" : "Control+Home");
+    await page.keyboard.insertText("Narrow desktop edit. ");
+    await expect(writer).toContainText("Narrow desktop edit.");
+    await writer.press("ControlOrMeta+z");
+    await expect(writer).not.toContainText("Narrow desktop edit.");
+    await writer.press("ControlOrMeta+Shift+z");
+    await expect(writer).toContainText("Narrow desktop edit.");
+    await writer.evaluate((element) => {
+      const nodes = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      let text: Node | null;
+      while ((text = nodes.nextNode())) {
+        const start = text.textContent!.indexOf("Narrow desktop edit.");
+        if (start < 0) continue;
+        const range = document.createRange(); range.setStart(text, start); range.setEnd(text, start + 6);
+        const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+        element.dispatchEvent(new Event("pointerup", { bubbles: true }));
+        break;
+      }
+    });
+    await expect(page.locator("[data-writing-selection-menu]")).toBeVisible();
+    await page.getByRole("button", { name: "Bold", exact: true }).click();
+    await expect(writer.locator("strong")).toContainText("Narrow");
+    await page.keyboard.press("Escape");
+    await writer.press(process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End");
+    await page.keyboard.press("Enter");
+    await expect(writer.locator("p").last()).toHaveText("");
+    await expect(writer.locator("p").last()).toBeInViewport({ ratio: 1 });
+    await page.keyboard.type("/");
+    await page.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
+    await page.keyboard.insertText("Narrow heading");
+    await expect(writer.locator("h2")).toHaveText("Narrow heading");
+    await page.setViewportSize({ width: 320, height: 900 });
+    await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("button", { name: /^Commands:/ })).toBeHidden();
+    expect(await original!.evaluate((node) => node.isConnected)).toBe(true);
+    await expect(writer.locator("h2")).toHaveText("Narrow heading");
+    const exported = await downloadMarkdown(page);
+    expect(exported.body).toContain("**Narrow");
+    expect(exported.body).toMatch(/^## (Narrow heading|\*\*Narrow heading\*\*)$/m);
+    await waitForDraftSaved(page);
+    await page.screenshot({ path: info.outputPath(`${kind}-narrow-desktop-edited.png`) });
+  });
+}
