@@ -206,7 +206,7 @@ test("resizing search never revives an empty or populated panel", async ({ page 
   await expect(input).toHaveValue("context");
 });
 
-test("editor controls and app navigation retain the compact layout boundary", async ({ page }, info) => {
+test("mouse editor controls and app navigation retain the compact layout boundary", async ({ page }, info) => {
   await open(page, info.project.name.startsWith("production"), "course");
   const writer = page.locator('.writing-content[contenteditable="true"]');
   const original = await writer.elementHandle();
@@ -240,8 +240,11 @@ test("editor controls and app navigation retain the compact layout boundary", as
       const row = (await page.locator(".editor-frame-controls").boundingBox())!;
       await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeHidden();
       const header = (await page.locator(".topbar").boundingBox())!;
+      await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-dock", "true");
+      const navigationRow = (await page.locator(".editor-canvas-navigation").boundingBox())!;
       expect(row.y).toBeGreaterThan(header.y + header.height);
-      expect(row.y + row.height).toBeCloseTo(page.viewportSize()!.height - 12, 0);
+      expect(row.y).toBeCloseTo(navigationRow.y + 8, 0);
+      expect(row.y + row.height).toBeCloseTo(navigationRow.y + navigationRow.height - 4, 0);
       expect(row.x + row.width / 2).toBeCloseTo(page.viewportSize()!.width / 2, 0);
       await page.screenshot({ path: info.outputPath(`mobile-canvas-${width}.png`) });
       if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
@@ -249,24 +252,21 @@ test("editor controls and app navigation retain the compact layout boundary", as
       const canvas = (await page.locator(".editor-frame-canvas").boundingBox())!;
       const panel = page.getByRole("complementary", { name: "Course outline", exact: true });
       const box = (await panel.boundingBox())!;
-      expect(box.y).toBeGreaterThanOrEqual(header.y + header.height + 7);
-      expect(box.y + box.height).toBeLessThanOrEqual(row.y - 7);
+      expect(box.y).toBeCloseTo(navigationRow.y + navigationRow.height + 8, 0);
+      expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height - 16);
       expect(box.width).toBeCloseTo(320, 0);
       expect(box.x).toBeCloseTo(canvas.x, 0);
       if (showControls) await expect(command).toBeVisible(); else await expect(command).toBeHidden();
-      const bothFit = (await page.locator(".editor-frame").boundingBox())!.width >= 656;
       await details.click();
-      await expect(outline).toHaveAttribute("aria-expanded", bothFit ? "true" : "false");
+      await expect(outline).toHaveAttribute("aria-expanded", "false");
       expect((await page.locator(".editor-frame-canvas").boundingBox())!.width).toBeCloseTo(canvas.width, 0);
-      if (!bothFit) {
-        await outline.click();
-        await expect(details).toHaveAttribute("aria-expanded", "false");
-        await details.click();
-        await expect(outline).toHaveAttribute("aria-expanded", "false");
-      }
+      await outline.click();
+      await expect(details).toHaveAttribute("aria-expanded", "false");
+      await details.click();
+      await expect(outline).toHaveAttribute("aria-expanded", "false");
       const detailBox = (await page.getByRole("complementary", { name: "Content details", exact: true }).boundingBox())!;
-      expect(detailBox.y).toBeGreaterThanOrEqual(header.y + header.height + 7);
-      expect(detailBox.y + detailBox.height).toBeLessThanOrEqual(row.y - 7);
+      expect(detailBox.y).toBeCloseTo(navigationRow.y + navigationRow.height + 8, 0);
+      expect(detailBox.y + detailBox.height).toBeLessThanOrEqual(page.viewportSize()!.height - 16);
       expect(detailBox.x + detailBox.width).toBeCloseTo(canvas.x + canvas.width, 0);
       await page.screenshot({ path: info.outputPath(`mobile-overlays-${width}.png`) });
       await details.click();
@@ -274,7 +274,12 @@ test("editor controls and app navigation retain the compact layout boundary", as
       if (compact) {
         await navigation.click();
         await expect(page.getByRole("button", { name: "Close navigation", exact: true })).toBeVisible();
-        await expect(page.locator('.editor-frame-controls[data-cards="true"]')).toBeHidden();
+        // Mouse controls remain in the page behind the modal navigation backdrop.
+        await expect(page.getByRole("button", { name: "Dismiss navigation", exact: true })).toBeVisible();
+        expect(await details.evaluate(el => {
+          const box = el.getBoundingClientRect();
+          return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        })).toBe(false);
         await page.getByRole("button", { name: "Close navigation", exact: true }).click();
         await expect(page.locator('.editor-frame-controls[data-cards="true"]')).toBeVisible();
       }
@@ -381,19 +386,21 @@ test("small-screen search opens a full field and restores its trigger on Escape"
 });
 
 for (const kind of ["doc", "brief", "course"] as const)
-  test(`${kind}: canvas navigation keeps desktop Back and compact bottom-dock pinning`, async ({ page }, info) => {
+  test(`${kind}: mouse canvas navigation keeps desktop Back and compact in-page pinning`, async ({ page }, info) => {
     await open(page, info.project.name.startsWith("production"), kind);
     const back = page.getByRole("button", { name: "Back to content", exact: true });
     const title = page.locator("#editor-title");
     const pinnedTitle = kind === "course" ? page.getByRole("textbox", { name: "Lesson title", exact: true }) : title;
     const compact = await page.locator(".editor-frame").getAttribute("data-cards") === "true";
     const nav = page.locator(".editor-canvas-navigation");
-    const start = (await (compact ? page.locator(".topbar") : nav).boundingBox())!;
+    await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-dock", "true");
+    await expect(nav).toBeVisible();
+    const start = (await nav.boundingBox())!;
     if (compact) {
       await expect(back).toHaveCount(0);
-      await expect(nav).toHaveCount(0);
       const row = (await page.locator('.editor-frame-controls[data-cards="true"]').boundingBox())!;
-      expect(row.y + row.height).toBeCloseTo(page.viewportSize()!.height - 12, 0);
+      expect(row.y).toBeCloseTo(start.y + 8, 0);
+      expect(row.y + row.height).toBeCloseTo(start.y + start.height - 4, 0);
     } else {
       await expect(back).toBeVisible();
       expect(Math.abs((await back.locator("svg").boundingBox())!.x - (await title.boundingBox())!.x)).toBeLessThanOrEqual(2);
@@ -404,7 +411,7 @@ for (const kind of ["doc", "brief", "course"] as const)
       owner.scrollTop = 450;
     });
     const pinned = (await pinnedTitle.boundingBox())!;
-    expect(pinned.y).toBeGreaterThanOrEqual((await (compact ? page.locator(".topbar") : nav).boundingBox())!.y + start.height);
+    expect(pinned.y).toBeGreaterThanOrEqual((await nav.boundingBox())!.y + start.height);
     if (kind === "course") await expect(title).not.toBeInViewport();
     await page.locator(".editor").evaluate(el => {
       const owner = el.getAttribute("data-scroll-layout") === "workspace" ? el.querySelector(".writing-viewport")! : el.closest(".main-content")!;
@@ -1270,6 +1277,7 @@ for (const kind of ["doc", "brief", "course"] as const)
       await page.setViewportSize({ width, height: 900 });
       const compact = width <= 767 || (!!info.project.use.hasTouch && width <= 900);
       const frame = page.locator(".editor-frame");
+      await expect(frame).not.toHaveAttribute("data-dock", "true");
       const stacked = compact;
       if (stacked) await expect(frame).toHaveAttribute("data-cards", "true");
       else await expect(frame).not.toHaveAttribute("data-cards", "true");
@@ -1305,7 +1313,9 @@ for (const kind of ["doc", "brief", "course"] as const)
       await expect(page.getByRole("button", { name: "Details", exact: true })).toBeInViewport({ ratio: 1 });
       if (kind === "course") await expect(page.getByRole("button", { name: "Outline", exact: true })).toBeInViewport({ ratio: 1 });
       await expect(pinned).toBeInViewport({ ratio: 1 });
-      const cover = await page.locator(stacked ? ".writing-document-heading" : ".editor-canvas-navigation").evaluate((nav) => {
+      // Narrow mouse layouts retain the in-page navigation row above the
+      // pinned title. Card presentation alone does not make this a touch dock.
+      const cover = await page.locator(".editor-canvas-navigation").evaluate((nav) => {
         const box = nav.getBoundingClientRect();
         const editor = nav.closest(".editor")!;
         const top = editor.closest(".main-content")!.getBoundingClientRect().top;
@@ -1316,8 +1326,7 @@ for (const kind of ["doc", "brief", "course"] as const)
       });
       if (await page.locator(".editor").getAttribute("data-scroll-layout") === "page") {
         expect(cover.top).toBeLessThanOrEqual(cover.viewportTop + 1);
-        if (stacked) expect(cover.headingTop).toBeCloseTo(cover.viewportTop + 8, 0);
-        else expect(cover.headingTop).toBeCloseTo(cover.bottom, 0);
+        expect(cover.headingTop).toBeCloseTo(cover.bottom, 0);
       }
       expect(cover.background).not.toBe("rgba(0, 0, 0, 0)");
       const pinnedAt = (await pinned.boundingBox())!.y;
@@ -1576,9 +1585,10 @@ test("Quiz uses lesson title typography and stays pinned while the course title 
     });
     await expect(heading).toBeInViewport({ ratio: 1 });
     await expect(page.locator("#editor-title")).not.toBeInViewport();
-    const nav = (await page.locator(width < 768 ? ".topbar" : ".editor-canvas-navigation").boundingBox())!;
+    await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-dock", "true");
+    const nav = (await page.locator(".editor-canvas-navigation").boundingBox())!;
     const pinned = (await page.locator(".course-quiz-canvas > .writing-document-heading").boundingBox())!;
-    expect(pinned.y).toBeCloseTo(nav.y + nav.height + (width < 768 ? 8 : 0), 0);
+    expect(pinned.y).toBeCloseTo(nav.y + nav.height, 0);
     await page.locator(".editor").evaluate((el) => {
       const owner = el.getAttribute("data-scroll-layout") === "workspace" ? el.querySelector(".editor-frame-canvas")! : el.closest(".main-content")!;
       owner.scrollTop += 150;
@@ -1586,6 +1596,26 @@ test("Quiz uses lesson title typography and stays pinned while the course title 
     expect((await page.locator(".course-quiz-canvas > .writing-document-heading").boundingBox())!.y).toBeCloseTo(pinned.y, 0);
     await page.screenshot({ path: info.outputPath(`quiz-pinned-${width}.png`), animations: "disabled" });
   }
+});
+
+test("short-screen Quiz headings flow without an offset and restore pinning when space returns", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await open(page, info.project.name.startsWith("production"), "course", 2, item => {
+    item.questions = [{ id: "flow-quiz", prompt: "Question", options: ["Right", "Wrong"], optionIds: ["flow-right", "flow-wrong"], correctOptionIds: ["flow-right"] }];
+  });
+  const outline = page.getByRole("button", { name: "Outline", exact: true });
+  if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
+  await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: "Quiz", exact: true }).click();
+  const heading = page.locator(".course-quiz-canvas > .writing-document-heading");
+  const instance = await heading.elementHandle();
+  await page.setViewportSize({ width: 1440, height: 300 });
+  await expect(page.locator(".editor")).toHaveAttribute("data-flowing-heading", "");
+  await expect.poll(() => heading.evaluate(el => ({ position: getComputedStyle(el).position, top: getComputedStyle(el).top })))
+    .toEqual({ position: "relative", top: "0px" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.locator(".editor")).not.toHaveAttribute("data-flowing-heading", "");
+  await expect.poll(() => heading.evaluate(el => getComputedStyle(el).position)).toBe("sticky");
+  expect(await instance!.evaluate(el => el.isConnected)).toBe(true);
 });
 
 test("course Quiz settings follow Assign, save the passing rule and hide without a quiz", async ({ page }, info) => {
@@ -1824,9 +1854,12 @@ for (const kind of ["doc", "brief", "course"] as const)
         await expect(page.locator(".editor-frame")).toHaveAttribute("data-cards", "true");
         await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeVisible();
         const controls = (await page.locator('.editor-frame-controls[data-cards="true"]').boundingBox())!;
+        await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-dock", "true");
+        const navigation = (await page.locator(".editor-canvas-navigation").boundingBox())!;
         expect(controls.x + controls.width / 2).toBeCloseTo(width / 2, 0);
         expect(controls.width).toBeLessThanOrEqual(width - 24);
-        expect(controls.y + controls.height).toBeCloseTo(988, 0);
+        expect(controls.y).toBeCloseTo(navigation.y + 8, 0);
+        expect(controls.y + controls.height).toBeCloseTo(navigation.y + navigation.height - 4, 0);
       } else {
         await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
         await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
@@ -2268,10 +2301,9 @@ test("failed saves stay in the recovery alert and compact headers omit the failu
     await expect(alert).toContainText("The save couldn’t be confirmed.");
     await alert.evaluate(async element => { await Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => {}))); });
     const panelGap = async () => {
-      const navigation = (await page.locator(width < 768 ? ".topbar" : ".editor-canvas-navigation").boundingBox())!;
+      const navigation = (await page.locator(".editor-canvas-navigation").boundingBox())!;
       const pane = (await page.getByRole("complementary", { name: "Content details", exact: true }).boundingBox())!;
-      const frame = (await page.locator(".editor-frame").boundingBox())!;
-      return pane.y - Math.max(navigation.y + navigation.height, width < 768 ? frame.y - 8 : 0);
+      return pane.y - navigation.y - navigation.height;
     };
     if (width < 768) await expect.poll(panelGap).toBeCloseTo(8, 0);
     await expect(page.locator(".editor").getByRole("button", { name: "Retry saving", exact: true })).toBeEnabled();

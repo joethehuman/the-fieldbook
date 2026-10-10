@@ -627,6 +627,7 @@
 .editor .writing-source-panel .writing-document-heading { position: relative; }
 .editor .course-quiz-content { padding: var(--space-3) var(--editor-content-padding); }
 .editor .course-quiz-canvas > .writing-document-heading { top: var(--editor-navigation-height, 0px); }
+.editor[data-flowing-heading] .writing-document-heading { position: relative; top: auto; }
 .editor-frame-canvas[data-navigation-scrolled="true"] .course-quiz-canvas > .writing-document-heading::after { opacity: 1; }
 /* Compact writing actions join Outline and Details in one floating dock. */
 .editor-frame-controls[data-dock="true"] :is(.writing-toolbar-controls, .writing-toolbar-group) { gap: 0; }

@@ -42,14 +42,15 @@ import {
   activeEditor$,
   rootEditor$,
   $createTableNode,
+  $createCodeBlockNode,
   $createImageNode,
   $isTableNode,
-  insertCodeBlock$,
   insertThematicBreak$,
 } from "@mdxeditor/editor";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
-import { $insertList } from "@lexical/list";
+import { $insertList, $isListItemNode } from "@lexical/list";
 import {
+  $addUpdateTag,
   $getSelection,
   $createRangeSelection,
   $getNodeByKey,
@@ -62,21 +63,27 @@ import {
   RootNode,
   $isRootOrShadowRoot,
   $insertNodes,
+  $caretFromPoint,
+  $insertNodeToNearestRootAtCaret,
   $isElementNode,
   $isRangeSelection,
   $setSelection,
   type BaseSelection,
   type LexicalEditor,
   type LexicalNode,
+  type ElementNode,
   type RangeSelection,
   UNDO_COMMAND,
   REDO_COMMAND,
   CAN_UNDO_COMMAND,
   CAN_REDO_COMMAND,
   COMMAND_PRIORITY_EDITOR,
+  COMMAND_PRIORITY_HIGH,
+  SELECTION_CHANGE_COMMAND,
   HISTORY_MERGE_TAG,
   HISTORY_PUSH_TAG,
   SKIP_DOM_SELECTION_TAG,
+  SKIP_SELECTION_FOCUS_TAG,
   SKIP_SCROLL_INTO_VIEW_TAG,
 } from "lexical";
 import {
@@ -153,6 +160,39 @@ function $prepareWritingLine() {
   line.selectStart();
 }
 
+function $emptyWritingLine(node: LexicalNode | null | undefined): node is ElementNode {
+  return $isElementNode(node) && ["paragraph", "heading", "listitem", "quote"].includes(node.getType())
+    && node.getTextContentSize() === 0 && node.getChildren().every(child =>
+      $isLineBreakNode(child) || $isTextNode(child) && child.getTextContentSize() === 0);
+}
+
+function $writingInsertionSource(selection: RangeSelection) {
+  const point = selection.focus.getNode();
+  let line = $isElementNode(point) ? point : point.getParent();
+  while (line?.isInline()) line = line.getParent();
+  if (!line || !["paragraph", "heading", "listitem", "quote"].includes(line.getType())) return null;
+  return { line, container: line.getTopLevelElement(), next: line.getNextSibling(),
+    parents: line.getParents().filter(parent => !$isRootOrShadowRoot(parent)) };
+}
+
+/** Consume only a prefix emptied by this insertion, never neighboring authored blanks or media. */
+function $finishWritingInsertion(source: ReturnType<typeof $writingInsertionSource>, block: LexicalNode | null) {
+  if (!source || !block || !$emptyWritingLine(source.line) || !source.line.isAttached()
+    || !source.container?.getNextSibling()?.is(block)) return;
+  const { line, next, parents } = source;
+  line.remove();
+  for (const parent of parents) {
+    if (parent.isAttached() && parent.getChildrenSize() === 0) parent.remove();
+  }
+  if (!next?.isAttached()) return;
+  const trailing = next.getPreviousSibling();
+  if ($isElementNode(next) && !$isMediaParagraph(next) && $emptyWritingLine(trailing)
+    && trailing.getTopLevelElement()?.is(block.getNextSibling())) {
+    trailing.remove();
+    next.selectStart();
+  }
+}
+
 function $finishMediaInsertion(anchor: LexicalNode, block: LexicalNode) {
   anchor.replace(block);
   const next = block.getNextSibling();
@@ -198,6 +238,7 @@ function applyNativeWritingRange(selection: RangeSelection, native: Selection) {
 function WritingToolbar({
   onInsert,
   onEditorReady,
+  ownsMenuFocus,
   onSelectionReady,
   disabled,
   viewControls,
@@ -206,6 +247,7 @@ function WritingToolbar({
   canvas: boolean;
   onInsert: (trigger: HTMLButtonElement, fromKeyboard: boolean, fromTouch?: boolean) => void;
   onEditorReady: (editor: LexicalEditor | null, actions: WritingActions) => void;
+  ownsMenuFocus: () => boolean;
   onSelectionReady: (controller: SelectionMenuController | null) => void;
   disabled: boolean;
   viewControls: ReactNode;
@@ -214,9 +256,9 @@ function WritingToolbar({
   const phone = useMobileWritingDock();
   const actionsHost = useContext(EditorWritingActionsContext);
   const editor = useCellValue(activeEditor$);
+  const tableCell = !!editor?.getRootElement()?.closest("td, th");
   const compactControls = useContext(EditorCompactControlsContext);
   const writingTarget = useWritingTarget(editor, canvas && phone);
-  const code = usePublisher(insertCodeBlock$);
   const divider = usePublisher(insertThematicBreak$);
   const [canUndo, setCanUndo] = useState(false),
     [canRedo, setCanRedo] = useState(false);
@@ -231,10 +273,44 @@ function WritingToolbar({
       }, { discrete: true });
     onEditorReady(editor, {
       block: convert,
-      codeBlock: () => editor?.update(() => { $prepareWritingLine(); code({ code: "", language: "" }); }, { discrete: true }),
-      divider: () => editor?.update(() => { $prepareWritingLine(); divider(); }, { discrete: true }),
+      codeBlock: () => editor?.update(() => {
+        $prepareWritingLine();
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection)) return;
+        const node = $createCodeBlockNode({ code: "", language: "" });
+        const source = $writingInsertionSource(selection);
+        const point = selection.focus.getNode();
+        const item = $isListItemNode(point) ? point : point.getParents().find($isListItemNode);
+        if (selection.isCollapsed() && $emptyWritingLine(item)) {
+          // The standard insertion path safely consumes an empty list item.
+          // Removing it during a caret split can prune its parent prematurely.
+          $insertNodes([node]);
+        } else $insertNodeToNearestRootAtCaret(node, $caretFromPoint(selection.focus, "next"), { removeEmptyDestination: !item });
+        $finishWritingInsertion(source, node);
+        // Focus the code editor after its decorator has mounted.
+        setTimeout(() => { if (editor?.getElementByKey(node.getKey())) node.select(); });
+      }, { discrete: true }),
+      divider: () => editor?.update(() => {
+        $prepareWritingLine();
+        const selection = $getSelection();
+        const source = $isRangeSelection(selection) ? $writingInsertionSource(selection) : null;
+        divider();
+        // Consume only the empty command line replaced by this divider.
+        // Intentional neighboring blank lines and the writable trailing line stay.
+        const block = source?.container?.getNextSibling();
+        if (block?.getType() === "horizontalrule") $finishWritingInsertion(source, block);
+      }, { discrete: true }),
     });
-  }, [editor, onEditorReady, code, divider]);
+  }, [editor, onEditorReady, divider]);
+  useEffect(() => {
+    if (!editor) return;
+    // Native selectionchange can arrive after a keyboard menu takes focus.
+    // Keep the canvas selection synchronized without stealing menu focus.
+    return editor.registerCommand(SELECTION_CHANGE_COMMAND, () => {
+      if (ownsMenuFocus()) $addUpdateTag(SKIP_SELECTION_FOCUS_TAG);
+      return false;
+    }, COMMAND_PRIORITY_HIGH);
+  }, [editor, ownsMenuFocus]);
   useEffect(() => {
     if (!editor) return;
     const undo = editor.registerCommand(
@@ -292,7 +368,7 @@ function WritingToolbar({
             </Tooltip>
           ))}
         </div>
-        <Button type="button" size={phone ? "icon" : "sm"} variant={canvas && phone ? "ghost" : "outline"} disabled={disabled || canvas && phone && (!writingTarget || !!compactControls?.panelsOpen)}
+        <Button type="button" size={phone ? "icon" : "sm"} variant={canvas && phone ? "ghost" : "outline"} disabled={disabled || tableCell || canvas && phone && (!writingTarget || !!compactControls?.panelsOpen)}
           className={canvas && phone ? "w-[30px] h-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : undefined}
           aria-label={phone ? "Commands: insert blocks" : "Commands: insert blocks or format selected text"}
           onPointerDown={(event) => {
@@ -342,6 +418,8 @@ export default function WritingEditorEngine({
   const wasCompact = useRef(!!compactControls);
   const slashMenu = useRef<HTMLDivElement>(null);
   const mediaMenu = useRef<HTMLDivElement>(null);
+  const ownsMenuFocus = useCallback(() => !!(slashMenu.current?.contains(document.activeElement)
+    || mediaMenu.current?.contains(document.activeElement)), []);
   const paletteSession = useRef<{
     menu: HTMLDivElement;
     ready: boolean;
@@ -739,7 +817,13 @@ export default function WritingEditorEngine({
           children: Array.from({ length: 3 }, () => ({ type: "tableCell" as const, children: [] })),
         })),
       });
-      $insertNodes([table]);
+      if (line.getType() === "quote") {
+        // A table is a block: split the callout at the caret rather than
+        // flattening the decorator into its paragraph and losing the table.
+        $insertNodeToNearestRootAtCaret(table, $caretFromPoint(selection.focus, "next"), { removeEmptyDestination: true });
+        if (!$isElementNode(table.getNextSibling())) table.insertAfter($createParagraphNode());
+        table.selectNext();
+      } else $insertNodes([table]);
       if (line.isAttached() && $isParagraphNode(line) && line.getChildrenSize() === 0) line.remove();
     }, { discrete: true });
     lexical.focus();
@@ -1118,6 +1202,7 @@ export default function WritingEditorEngine({
           onInsert={openCommands}
           onSelectionReady={(controller) => { selectionTools.current = controller; }}
           onEditorReady={(active, actions) => { if (active) lexicalEditor.current = active; writingActions.current = actions; }}
+          ownsMenuFocus={ownsMenuFocus}
           disabled={disabled || busy}
           viewControls={viewControls}
         />
@@ -1136,7 +1221,7 @@ export default function WritingEditorEngine({
       openingTouchClick.current = false;
       if (event.target instanceof Element && event.target.closest(".writing-toolbar-controls")) {
         toolbarSelection.current = null;
-        lexicalEditor.current?.getEditorState().read(() => {
+        lexicalEditor.current?.read(() => {
           const current = $getSelection();
           const range = window.getSelection();
           if (canvas && compactRef.current && hasWritingTarget(lexicalEditor.current, true) && range?.rangeCount) {
@@ -1170,6 +1255,10 @@ export default function WritingEditorEngine({
       if (!images.length) return;
       event.preventDefault();
       event.stopPropagation();
+      if (event.target instanceof Element && event.target.closest("td, th")) {
+        setError("Add images outside table cells.");
+        return;
+      }
       if (!onUpload) { setError("Uploads are unavailable in this view."); return; }
       rememberSelection();
       void insertUploadedMedia(images.map(file => ({ file,
@@ -1208,7 +1297,7 @@ export default function WritingEditorEngine({
           return;
         }
       }
-      if (event.key === "/" && !disabled && !busy && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
+      if (event.key === "/" && !disabled && !busy && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]") && !event.target.closest("td, th")) {
         const selection = window.getSelection();
         const anchor = selection?.anchorNode;
         const element = anchor instanceof Element ? anchor : anchor?.parentElement;

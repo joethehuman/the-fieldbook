@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { freshWorkspace } from "../../lib/store";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
-import { expectMarkdown } from "./editor-helpers";
+import { expectMarkdown, returnToContent } from "./editor-helpers";
 
 type Kind = "doc" | "brief" | "course";
 const label = (kind: Kind) => kind === "course" ? "Lesson content" : kind === "doc" ? "Doc content" : "Update content";
@@ -94,7 +94,9 @@ for (const kind of ["doc", "brief", "course"] as const) {
     await expect(loading).toHaveText("");
     release();
     await expect(page.getByRole("textbox", { name: label(kind), exact: true })).toBeVisible();
-    await page.goBack({ waitUntil: "domcontentloaded" });
+    // Exercise a warm client navigation. Browser Back after reload can create
+    // another document, where fetching this chunk again is expected.
+    await returnToContent(page);
     await page.getByRole("link", { name: "Quiet editor fixture", exact: true }).click();
     await expect(page.getByRole("textbox", { name: label(kind), exact: true })).toBeVisible();
     expect(held).toBe(2);
@@ -159,8 +161,9 @@ for (const workflow of ["paste image", "upload image", "upload video"] as const)
       await expect(writing).toHaveText("Before media");
       await expect(loading).toHaveCount(0);
     } else {
-      await expect(writing.locator(workflow === "upload video" ? "video" : "img")).toHaveAttribute("src", /\/api\/media\//);
-      if (workflow === "upload image") await expect(writing.locator("img")).toHaveAttribute("alt", "media.png");
+      const media = writing.locator(workflow === "upload video" ? "video" : "img:not([data-lexical-managed-linebreak])");
+      await expect(media).toHaveAttribute("src", /\/api\/media\//);
+      if (workflow === "upload image") await expect(media).toHaveAttribute("alt", "media.png");
       if (workflow === "upload video") {
         const video = writing.locator("video");
         await expect(video).toHaveAttribute("controls", "");
