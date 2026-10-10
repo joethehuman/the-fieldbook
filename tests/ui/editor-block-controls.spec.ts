@@ -96,6 +96,7 @@ test("column move saves current cell edits and carries alignment; Escape cancels
   await expect(cells.nth(2)).toContainText("Edited owner");
   const before = (await downloadMarkdown(page)).body;
   expect(before).toContain("Edited owner");
+  await handle.scrollIntoViewIfNeeded();
   const grip = await handle.boundingBox();
   await page.mouse.move(grip!.x + grip!.width / 2, grip!.y + grip!.height / 2);
   await page.mouse.down();
@@ -265,7 +266,13 @@ test("triple-click paragraph selection opens formatting and applies to the entir
   const paragraph = writer
     .locator("p")
     .filter({ hasText: "Triple-click this paragraph" });
-  await paragraph.click({ clickCount: 3 });
+  const image = writer.getByRole("img", { name: "A landscape illustration", exact: true });
+  await expect(image).toBeVisible();
+  await expect.poll(() => image.evaluate((node) => {
+    const image = node as HTMLImageElement;
+    return image.complete && image.naturalWidth > 0;
+  })).toBe(true);
+  await paragraph.click({ clickCount: 3, position: { x: 20, y: 10 } });
   await expect(
     page.getByRole("group", { name: "Text formatting" }),
   ).toBeVisible();

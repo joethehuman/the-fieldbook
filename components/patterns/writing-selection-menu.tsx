@@ -24,6 +24,7 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
   onReady: (controller: SelectionMenuController | null) => void;
 }) {
   const editor = useCellValue(activeEditor$);
+  const tableCell = !!editor?.getRootElement()?.closest("td, th");
   const phone = useMobileWritingDock();
   const nativeSelection = useNativeWritingSelection();
   const disabled = unavailable || nativeSelection;
@@ -229,14 +230,20 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
       aria-label="Format selected text"
       onOpenAutoFocus={(event) => { event.preventDefault(); if (keyboardOpen.current) firstControl.current?.focus({ preventScroll: true }); if (compact) window.getSelection()?.removeAllRanges(); }}
       onCloseAutoFocus={(event) => event.preventDefault()}
-      onEscapeKeyDown={() => { if (restore()) focusEditor(); }}
+      onEscapeKeyDown={(event) => {
+        // This Escape closes the tools, not the canvas underneath them.
+        event.preventDefault();
+        event.stopPropagation();
+        dismiss();
+        if (restore()) focusEditor();
+      }}
       onInteractOutside={(event) => {
         const target = event.target;
         // A touch can finish after this popup mounted on the dock's pointerdown.
         if (compact && target instanceof Node && dockTrigger.current?.contains(target)) { event.preventDefault(); return; }
         if (target instanceof Element && (editor?.getRootElement()?.contains(target) || target.closest("[data-writing-selection-menu]"))) event.preventDefault();
       }}>
-      <DropdownMenu modal={false}>
+      {!tableCell && <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button ref={firstControl} type="button" variant="ghost" size="sm" className="w-full justify-between" onMouseDown={(event) => event.preventDefault()}>
             <currentStyle.icon aria-hidden="true" />{currentStyle.name}<ChevronRight aria-hidden="true" />
@@ -248,13 +255,13 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
             <Icon className="size-4" aria-hidden="true" />{name}{kind === currentStyle.kind && <Check className="ml-auto size-4" aria-hidden="true" />}
           </DropdownMenuItem>)}
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>}
       <div className="flex items-center gap-1" role="group" aria-label="Text formatting">
         {[
           { name: "Bold", icon: Bold, kind: "bold" as const, bit: 1 },
           { name: "Italic", icon: Italic, kind: "italic" as const, bit: 2 },
           { name: "Inline code", icon: Code, kind: "code" as const, bit: 16 },
-        ].map(({ name, icon: Icon, kind, bit }) => <Button key={kind} type="button" size="icon" variant="ghost" aria-label={name} aria-pressed={!!(format & bit)} className={format & bit ? "bg-accent" : undefined}
+        ].map(({ name, icon: Icon, kind, bit }) => <Button key={kind} ref={tableCell && kind === "bold" ? firstControl : undefined} type="button" size="icon" variant="ghost" aria-label={name} aria-pressed={!!(format & bit)} className={format & bit ? "bg-accent" : undefined}
             onMouseDown={(event) => event.preventDefault()} onClick={() => formatText(kind)}><Icon aria-hidden="true" /></Button>
         )}
         <Button type="button" size="icon" variant="ghost" aria-label="Link" onMouseDown={(event) => event.preventDefault()} onClick={() => {

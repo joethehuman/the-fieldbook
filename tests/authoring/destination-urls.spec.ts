@@ -71,7 +71,7 @@ async function setup(page: Page, production: boolean, role = "admin") {
   data.progress = {};
   if (production) {
     await setupAuthoringProvider(page, data);
-    await page.request.post("http://127.0.0.1:3130/fixture", {
+    await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, {
       data: {
         settings: data.settings,
         groups: data.groups,

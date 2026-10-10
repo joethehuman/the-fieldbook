@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
-import { freshWorkspace } from "../../lib/store";
+import { freshWorkspace, type Workspace } from "../../lib/store";
+import { learningStage } from "../../lib/learning";
 import { setupAuthoringProvider, authoringUser } from "./provider-fixture";
 async function section(page: Page, name: string) {
   const picker = page.getByRole("combobox", {
@@ -32,8 +33,12 @@ test("bulk group edits preserve the organization and preregistered people use th
       onboardingDays: 45,
     })),
   );
-  const course = data.content.find((c) => c.kind === "course")!;
-  course.title = "Bulk assignment fixture";
+  const courses = data.content.filter((c) => c.kind === "course").slice(0, 2);
+  for (const [index, course] of courses.entries()) {
+    course.title = `Bulk assignment fixture ${index + 1}`;
+    // Keep both owned fixtures on the initial newest-created page.
+    course.createdAt = "2026-10-01T12:00:00.000Z";
+  }
   const group = data.groups[0];
   const revisions: number[] = [];
   if (production) {
@@ -70,20 +75,23 @@ test("bulk group edits preserve the organization and preregistered people use th
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
     }, data);
   await page.goto(production ? "/admin" : "/#admin");
-  await page
-    .getByRole("checkbox", {
-      name: "Select Bulk assignment fixture",
-      exact: true,
-    })
-    .check();
+  for (const course of courses)
+    await page
+      .getByRole("checkbox", { name: `Select ${course.title}`, exact: true })
+      .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await page
     .getByRole("menuitem", { name: "Assign to teams or groups", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("checkbox", { name: `Group: ${group.name}`, exact: true }).check();
   await dialog
-    .getByRole("button", { name: "Apply changes", exact: true })
+    .getByRole("button", { name: `Add group: ${group.name}`, exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Save assignments", exact: true })
     .click();
   await expect(dialog).toHaveCount(0);
   await section(page, production ? "People" : "Demo profiles");
@@ -91,12 +99,20 @@ test("bulk group edits preserve the organization and preregistered people use th
     name: /Search (people|profiles)/,
   });
   await search.fill("Pending");
-  await expect(
-    page.getByRole("row").filter({ hasText: "Pending one" }),
-  ).toContainText("Not signed in");
-  await expect(
-    page.getByRole("row").filter({ hasText: "Pending one" }),
-  ).toContainText("Existing user");
+  const pendingOne = page.getByRole("row").filter({ hasText: "Pending one" });
+  await expect(pendingOne).toContainText("Manager");
+  const roster: Workspace = production
+    ? data
+    : await page.evaluate(() =>
+        JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
+      );
+  const preregistered = roster.users.find(
+    (person) => person.name === "Pending one",
+  )!;
+  expect(preregistered.registered).toBe(false);
+  expect(learningStage(preregistered, roster.settings, "2026-10-10")).toBe(
+    "Existing user",
+  );
   await page
     .getByRole("checkbox", { name: "Select Pending one", exact: true })
     .check();
@@ -111,12 +127,21 @@ test("bulk group edits preserve the organization and preregistered people use th
   await dialog
     .getByRole("button", { name: "Apply changes", exact: true })
     .click();
+  await page
+    .getByRole("dialog", { name: "Review changes", exact: true })
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
   await expect(dialog).toHaveCount(0);
   await page
     .getByRole("row")
     .filter({ hasText: "Pending one" })
-    .getByRole("button", { name: "Edit", exact: true })
+    .getByRole("button", { name: "Actions for Pending one", exact: true })
     .click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  if (production)
+    await expect(dialog).toContainText(
+      "This preregistered user can activate their account with verified Google sign-in",
+    );
   await expect(dialog.getByLabel("Hire date", { exact: true })).toHaveValue(
     "2020-01-01",
   );
@@ -128,13 +153,23 @@ test("bulk group edits preserve the organization and preregistered people use th
   });
   await dialog.getByRole("button", { name: /Save (person|profile)/ }).click();
   await expect(dialog).toHaveCount(0);
+  const savedRoster: Workspace = production
+    ? data
+    : await page.evaluate(() =>
+        JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
+      );
+  const savedPending = savedRoster.users.filter((person) =>
+    ["Pending one", "Pending two"].includes(person.name),
+  );
+  expect(savedPending).toHaveLength(2);
+  expect(
+    savedPending.every(
+      (person) =>
+        person.registered === false && person.groups.includes(group.id),
+    ),
+  ).toBe(true);
   if (production) {
     expect(revisions).toEqual([10, 11, 12]);
-    expect(
-      data.users
-        .filter((p) => p.registered === false)
-        .every((p) => p.groups.includes(group.id)),
-    ).toBe(true);
     await search.fill("");
     await page
       .getByRole("button", { name: "Pre-register person", exact: true })
@@ -154,7 +189,10 @@ test("bulk group edits preserve the organization and preregistered people use th
     await search.fill("new@example.test");
     await expect(
       page.getByRole("row").filter({ hasText: "New person" }),
-    ).toContainText("Not signed in");
+    ).toBeVisible();
+    expect(
+      data.users.find((person) => person.name === "New person")?.registered,
+    ).toBe(false);
     expect(revisions).toEqual([10, 11, 12, 13]);
   }
   expect(

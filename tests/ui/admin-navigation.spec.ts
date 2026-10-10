@@ -13,6 +13,7 @@ async function section(page: Page, name: string) {
 }
 async function revealed(target: Locator) {
   await expect
+    .configure({ soft: true })
     .poll(async () =>
       target.evaluate((el) => {
         const top = el.getBoundingClientRect().top;
@@ -59,29 +60,35 @@ test("admin destinations reveal details and keep filters and fieldset footers co
   await page.goto("/#admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Progress");
-  await page
-    .getByRole("button", { name: "View courses", exact: true })
-    .first()
-    .click();
-  const assignments = page.locator(
-    '[data-reveal-target][aria-label$="’s assignments"]',
-  );
+  const person = page.locator("[data-person-id]").first();
+  const personName = await person.innerText();
+  await person.click();
+  const assignments = page.getByRole("heading", {
+    name: `${personName}’s assignments`,
+    exact: true,
+  });
   await revealed(assignments);
-  await expect(assignments).toBeFocused();
-  // A second click on the same person must reveal the already-mounted panel.
+  await expect.soft(assignments).toBeFocused();
+  // Returning and reopening the same person must reveal and focus the detail again.
   await page
-    .getByRole("button", { name: "View courses", exact: true })
-    .first()
+    .getByRole("button", { name: "Back to progress", exact: true })
     .click();
+  await page.getByRole("button", { name: personName, exact: true }).click();
   await revealed(assignments);
+  await expect.soft(assignments).toBeFocused();
 
   await section(page, "Teams");
   await revealed(page.getByRole("tabpanel"));
+  const team = data.teams!.find((item) => item.id === "sales-team")!;
   await page
-    .getByRole("button", { name: "Manage Sales team", exact: true })
+    .getByRole("searchbox", { name: "Find teams", exact: true })
+    .fill(team.name);
+  await page
+    .getByRole("button", { name: `Actions for ${team.name}`, exact: true })
     .click();
-  const detail = page.getByRole("region", {
-    name: "Sales team management",
+  await page.getByRole("menuitem", { name: "Open team", exact: true }).click();
+  const detail = page.getByRole("heading", {
+    name: team.name,
     exact: true,
   });
   await revealed(detail);
@@ -96,7 +103,7 @@ test("admin destinations reveal details and keep filters and fieldset footers co
     editor.getByRole("textbox", { name: "Team name", exact: true }),
   ).toBeFocused();
   await expect(editor.locator('[data-slot="dialog-footer"]')).toContainText(
-    "Assigning a manager",
+    "The manager sees this team and its subteams",
   );
   await expect(
     editor.getByRole("combobox", { name: "Manager", exact: true }),
@@ -109,13 +116,26 @@ test("admin destinations reveal details and keep filters and fieldset footers co
   await section(page, "Feedback");
   const filters = page.getByRole("button", { name: /^Filters/ });
   await filters.click();
-  const rating = page.getByRole("combobox", { name: "Feedback rating", exact: true });
+  const rating = page.getByRole("combobox", {
+    name: "Feedback rating",
+    exact: true,
+  });
   await rating.click();
   await page.getByRole("option", { name: "Useful", exact: true }).click();
   await page.keyboard.press("Escape");
-  await expect(page.locator("article")).toHaveCount(1);
+  const feedbackRows = page
+    .getByRole("region", { name: "Feedback table" })
+    .locator("tbody tr");
+  await expect(feedbackRows).toHaveCount(1);
+  await feedbackRows
+    .first()
+    .getByRole("button", { name: /^Actions for feedback/ })
+    .click();
   await page
-    .getByRole("button", { name: "View all feedback for this item" })
+    .getByRole("menuitem", {
+      name: "View all feedback for this item",
+      exact: true,
+    })
     .click();
   const heading = page.getByRole("heading", {
     name: `Feedback for ${content.title}`,
@@ -123,18 +143,25 @@ test("admin destinations reveal details and keep filters and fieldset footers co
   });
   await revealed(heading);
   await expect(heading).toBeFocused();
-  await expect(page.getByRole("button", { name: "Remove Useful filter", exact: true })).toHaveCount(0);
-  await expect(page.locator("article")).toHaveCount(2);
   await expect(
-    page.getByRole("button", { name: "View all feedback for this item" }),
+    page.getByRole("button", { name: "Remove Useful filter", exact: true }),
+  ).toHaveCount(0);
+  await expect(feedbackRows).toHaveCount(2);
+  await expect(
+    page.getByRole("menuitem", { name: "View all feedback for this item" }),
   ).toHaveCount(0);
   await filters.click();
   await expect(rating).toContainText("All ratings");
-  const filterPanel = page.getByRole("dialog", { name: "Collection filters", exact: true });
+  const filterPanel = page.getByRole("dialog", {
+    name: "Collection filters",
+    exact: true,
+  });
   await expect(filterPanel).toBeVisible();
   const bounds = await filterPanel.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
-  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(
+    page.viewportSize()!.width + 1,
+  );
   await page.keyboard.press("Escape");
 
   expect(

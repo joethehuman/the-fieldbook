@@ -45,10 +45,10 @@ test("curriculum cards retain selection, editing and guarded menu actions", asyn
   });
   await menu.click();
   await page
-    .getByRole("menuitem", { name: "Edit audience", exact: true })
+    .getByRole("menuitem", { name: "Manage Audience", exact: true })
     .click();
   const picker = page.getByRole("dialog", {
-    name: "Curriculum audience",
+    name: "Manage Audience",
     exact: true,
   });
   await expect(picker).toBeVisible();
@@ -59,7 +59,7 @@ test("curriculum cards retain selection, editing and guarded menu actions", asyn
     .getByRole("menuitem", { name: "Delete curriculum", exact: true })
     .click();
   const review = page.getByRole("dialog", {
-    name: `Delete ${curriculum.name}?`,
+    name: "Delete 1 curriculum?",
     exact: true,
   });
   await expect(review).toBeVisible();
@@ -76,8 +76,8 @@ test("curriculum cards retain selection, editing and guarded menu actions", asyn
   const draft = page.getByRole("button", { name: /^Actions for A draft/ });
   await draft.click();
   await expect(
-    page.getByRole("menuitem", { name: "Edit audience", exact: true }),
-  ).toHaveCount(0);
+    page.getByRole("menuitem", { name: "Manage Audience", exact: true }),
+  ).toBeDisabled();
   await page.keyboard.press("Escape");
   expect(
     await page.evaluate(
@@ -100,23 +100,48 @@ test("shared menu and nested team highlights keep keyboard access", async ({
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
   await page.goto("/#admin/teams");
-  await page
-    .getByRole("button", {
-      name: "Browse Customer Success subteams",
+  if (info.project.name === "phone") {
+    const nested = page.getByRole("button", {
+      name: "Customer Success Managers",
       exact: true,
-    })
-    .click();
-  const nested = page.getByRole("button", {
-    name: "Browse Customer Success Managers subteams",
-    exact: true,
-  });
-  await nested.hover();
-  await page.screenshot({ path: info.outputPath("team-nested-hover.png") });
-  await nested.focus();
-  await page.keyboard.press("Enter");
-  await expect(
-    page.getByText("Subteams of Customer Success Managers", { exact: true }),
-  ).toBeVisible();
+    });
+    await nested.focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      page.getByRole("heading", {
+        name: "Customer Success Managers",
+        exact: true,
+      }),
+    ).toBeVisible();
+    const subteams = page.getByRole("tab", { name: "Subteams", exact: true });
+    await subteams.focus();
+    await page.keyboard.press("Enter");
+    await expect(subteams).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByRole("heading", { name: "Subteams", exact: true }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath("team-nested-keyboard.png"),
+    });
+  } else {
+    await page
+      .getByRole("button", {
+        name: "Browse Customer Success subteams",
+        exact: true,
+      })
+      .click();
+    const nested = page.getByRole("button", {
+      name: "Browse Customer Success Managers subteams",
+      exact: true,
+    });
+    await nested.hover();
+    await page.screenshot({ path: info.outputPath("team-nested-hover.png") });
+    await nested.focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      page.getByText("Subteams of Customer Success Managers", { exact: true }),
+    ).toBeVisible();
+  }
 });
 
 test("administration keeps the requested order and clear team and group labels", async ({

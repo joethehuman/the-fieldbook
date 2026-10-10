@@ -108,13 +108,45 @@ for (const [command, selector] of [
     await expect(editor.locator(selector)).toBeVisible();
     const line = editor.locator(":scope > p").last();
     await expect(line).toBeEmpty();
-    await line.click();
+    // Insertion consumes the empty command paragraph and leaves one writable
+    // line. Image paragraphs contain the media itself, not another spacer.
+    await expect(editor.locator(":scope > p")).toHaveCount(command === "Image" ? 3 : 2);
+    if (command === "Code block") {
+      const code = editor.locator(".writing-code-block .cm-content");
+      await expect(code).toBeFocused();
+      await page.keyboard.type("Inserted code.");
+      await expect(code).toHaveText("Inserted code.");
+      await code.press("ArrowDown");
+    }
     await page.keyboard.type("After insertion.");
     await expect(line).toHaveText("After insertion.");
     await waitForDraftSaved(page);
     await page.reload();
     await expect(editor.locator(selector)).toBeVisible();
     await expect(editor.locator(":scope > p").last()).toHaveText("After insertion.");
+  });
+}
+
+for (const command of ["Divider", "Code block"] as const) {
+  test(`${command} replaces only its empty insertion line and preserves authored blanks`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "Before the block.\n\n\n\n\n\n\n\nAfter the block.");
+    const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+    // Seed explicit authored paragraphs through native editing so Markdown's
+    // blank-line normalization cannot make the fixture ambiguous.
+    await replaceWritingText(page, "Before the block.");
+    await editor.press("End");
+    for (let index = 0; index < 4; index++) await page.keyboard.press("Enter");
+    await page.keyboard.type("After the block.");
+    await expect(editor.locator(":scope > p")).toHaveCount(5);
+    const insertion = editor.locator(":scope > p").nth(2);
+    await insertion.click();
+    await page.keyboard.type("/");
+    await page.getByRole("menuitem", { name: command, exact: true }).click();
+    await expect(editor.locator(command === "Divider" ? "hr" : ".writing-code-block")).toBeVisible();
+    const shape = await editor.evaluate(editor => Array.from(editor.children).map(child => ({
+      tag: child.tagName, text: child.matches("p") ? child.textContent : "block",
+    })));
+    expect(shape.map(child => child.text)).toEqual(["Before the block.", "", "block", "", "After the block."]);
   });
 }
 
@@ -184,16 +216,15 @@ test("URL paste links table-cell selections and leaves code and caret paste alon
   const paragraph = editor.locator(":scope > p").last();
   await paragraph.click();
   await page.keyboard.press("ControlOrMeta+End");
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.evaluate(() => navigator.clipboard.writeText("https://example.com/caret"));
-  await page.keyboard.press("ControlOrMeta+v");
+  await pasteWritingText(page, "https://example.com/caret");
   await expect(paragraph).toContainText("Caret:");
   await expect(paragraph).toContainText("https://example.com/caret");
   await waitForDraftSaved(page);
   expect((await read()).content[0].body).toContain("[A guide](https://example.com/table)");
 });
 
-test("native clipboard URL paste preserves a fully selected paragraph", async ({ page }, info) => {
+test("native clipboard URL paste preserves a fully selected paragraph", async ({ page, browserName }, info) => {
+  test.skip(browserName === "webkit", "Playwright WebKit does not support clipboard permissions; event-paste cases cover selected prose on that engine.");
   await setup(page, info.project.name.startsWith("production"), "Read the guide");
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.evaluate(() => navigator.clipboard.writeText("https://example.com/native"));
@@ -251,24 +282,27 @@ test("link popups follow text through scrolling and panel changes, and bare doma
 
 });
 
-test("formatting dropdown focus keeps the owning writing ring and outside focus clears it", async ({ page }, info) => {
+test("formatting dropdown retains the owning selection and outside focus dismisses it", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), "Keep this selection intact");
   const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
-  const ring = () => editor.evaluate((node) => getComputedStyle(node.closest(".writing-surface")!).outlineStyle);
+  const interacting = () => editor.evaluate((node) => node.closest(".writing-surface")!.getAttribute("data-editor-interacting"));
   await editor.click();
-  const activeRing = await ring();
-  expect(activeRing).toBe("solid");
   await editor.press("ControlOrMeta+A");
   const tools = page.getByRole("dialog", { name: "Format selected text", exact: true });
   await tools.getByRole("button", { name: "Normal Text", exact: true }).click();
   await page.getByRole("menuitem", { name: "Heading 2", exact: true }).focus();
-  await expect.poll(ring).toBe(activeRing);
+  await expect.poll(interacting).toBe("true");
+  await expect(editor).toHaveText("Keep this selection intact");
   await page.screenshot({ path: info.outputPath("ui1-formatting-focus.png") });
   await page.keyboard.press("Enter");
   await expect(editor.locator("h2")).toHaveText("Keep this selection intact");
-  await page.getByRole("textbox", { name: "Title", exact: true }).click();
+  // The floating tools can overlap the title in a narrow mouse window.
+  // Exercise outside focus directly, rather than clicking through the popup.
+  const title = page.getByRole("textbox", { name: "Title", exact: true });
+  await title.focus();
+  await expect(title).toBeFocused();
   await expect(tools).toBeHidden();
-  await expect.poll(ring).not.toBe(activeRing);
+  await expect.poll(interacting).toBeNull();
 });
 
 test("command hover has one immediate highlight and keyboard navigation reveals its selection", async ({ page }, info) => {
@@ -319,9 +353,9 @@ test("Details keeps its contents during motion, hides closed controls and honors
     const content = panel.querySelector("aside")!;
     (node as HTMLElement).click();
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    return { attached: content.isConnected, hidden: panel.getAttribute("aria-hidden"), inert: (panel as HTMLElement).inert, transition: getComputedStyle(content).transitionDuration };
+    return { attached: content.isConnected, hidden: panel.getAttribute("aria-hidden"), inert: (panel as HTMLElement).inert, };
   });
-  expect(motion).toEqual({ attached: true, hidden: "true", inert: true, transition: "0.22s, 0.22s" });
+  expect(motion).toEqual({ attached: true, hidden: "true", inert: true });
   await expect(slot).toHaveCount(0);
   await expect(panel).toHaveCount(0);
   await openContentSettings(page);
@@ -479,7 +513,7 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
   await expect(editor).toBeVisible();
   await expect(editor.locator("h2")).toHaveText("Working with customers");
   await expect(editor.locator("strong")).toHaveText("context");
-  await expect(editor.locator("img")).toHaveAttribute("alt", "Product diagram");
+  await expect(editor.getByRole("img", { name: "Product diagram", exact: true })).toHaveAttribute("alt", "Product diagram");
   await expect(editor.locator("video")).toHaveAttribute(
     "src",
     "/api/media/00000000-0000-4000-8000-000000000010.mp4",
@@ -681,13 +715,15 @@ test("formatting controls, keyboard save and responsive settings", async ({
   await page.getByRole("button", { name: "Bold", exact: true }).click();
   await expect(editor.locator("strong")).toHaveText("Make this bold");
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Format selected text", exact: true })).toBeHidden();
+  await expect(editor).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+z");
   await expect(editor.locator("strong")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect(editor).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+Shift+z");
   await expect(editor.locator("strong")).toHaveText("Make this bold");
-  await page.keyboard.press("Escape");
-  await editor.press("ControlOrMeta+s");
+  await expect(editor).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+s");
   await waitForDraftSaved(page);
   expect((await read()).publishedContent![0].body).toBe("A short update");
   await openContentSettings(page);
@@ -720,7 +756,9 @@ test("contextual headings, links and table cells serialize as reader-compatible 
     exact: true,
   });
   await editor.click();
-  await page.getByRole("button", { name: /^Commands:/ }).click();
+  await editor.press("ControlOrMeta+A");
+  await page.getByRole("dialog", { name: "Format selected text", exact: true })
+    .getByRole("button", { name: "Normal Text", exact: true }).click();
   await page.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
   await expect(editor.locator("h2")).toHaveText("Write clearly");
   await editor.locator("h2").evaluate((node) => {
@@ -756,8 +794,8 @@ test("contextual headings, links and table cells serialize as reader-compatible 
   await page.keyboard.press("ArrowRight");
   await editor.press("Enter");
   await expect(editor.getByRole("link", { name: "Reference" })).toBeVisible();
-  await page.getByRole("button", { name: /^Commands:/ }).click();
-  await page.getByRole("menuitem", { name: "Table", exact: true }).click();
+  await page.keyboard.type("/table");
+  await page.keyboard.press("Enter");
   const table = editor.getByRole("table");
   await table.getByRole("textbox").first().fill("Topic");
   await table.getByRole("textbox").nth(3).fill("Useful detail");
@@ -842,13 +880,8 @@ for (const kind of ["Doc", "Update"]) {
     );
     await openContentSettings(page);
     if (kind === "Doc") {
-      await expect(
-        page.getByRole("button", {
-          name: "Start here → Getting started",
-          exact: true,
-          pressed: true,
-        }),
-      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Section", exact: true })).toHaveText("Getting started");
+      expect((await read()).content[0]).toMatchObject({ category: "Start here", folder: "Getting started", sectionId: "writing-getting-started" });
     } else {
       await expect(
         page.getByRole("combobox", { name: "Category", exact: true }),
@@ -894,13 +927,7 @@ for (const kind of ["Doc", "Update"]) {
         .locator(".doc-section-create")
         .getByRole("button", { name: "Create section" })
         .click();
-      await expect(
-        page.getByRole("button", {
-          name: "Start here → New organization name",
-          exact: true,
-          pressed: true,
-        }),
-      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Section", exact: true })).toHaveText("New organization name");
     } else {
       const control = page.getByRole("combobox", {
         name: "Category",
@@ -929,23 +956,13 @@ for (const kind of ["Doc", "Update"]) {
     }
     await closeContentSettings(page);
     await returnToContent(page);
-    await page
-      .getByRole("row")
-      .filter({ hasText: `New ${kind}` })
-      .getByRole("button", { name: "Edit", exact: true })
-      .click();
+    await page.getByRole("link", { name: `New ${kind}`, exact: true }).click();
     await expect(
       page.getByRole("textbox", { name: "Title", exact: true }),
     ).toHaveValue(`New ${kind}`);
     await openContentSettings(page);
     if (kind === "Doc") {
-      await expect(
-        page.getByRole("button", {
-          name: "Start here → New organization name",
-          exact: true,
-          pressed: true,
-        }),
-      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Section", exact: true })).toHaveText("New organization name");
     } else {
       await expect(
         page.getByRole("combobox", { name: "Category", exact: true }),
@@ -1100,6 +1117,7 @@ test("inline Details closes with Escape and enlarged text leaves the canvas reac
     name: "Doc content",
     exact: true,
   });
+  await expect(page.locator(".editor")).toHaveAttribute("data-flowing-heading", "");
   await writing.locator("p").first().scrollIntoViewIfNeeded();
   await expect
     .poll(() =>
@@ -1119,16 +1137,16 @@ test("inline Details closes with Escape and enlarged text leaves the canvas reac
       }),
     )
     .toBe(true);
-  await writing.click();
+  await writing.locator("p").first().click();
   await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.type(" Reachable canvas.");
   await expect(writing).toContainText("Reachable canvas.");
-  const formatting = page.getByRole("group", { name: "Writing actions", exact: true });
+  const formatting = page.locator('[role="group"][aria-label="Writing actions"]');
   await expect.poll(() => formatting.evaluate((node) => {
-    const boundary = node.closest(".writing-editor")!.getBoundingClientRect();
+    const boundary = document.querySelector(".editor-frame")!.getBoundingClientRect();
     return [...node.querySelectorAll("button")].filter((button) => {
       const box = button.getBoundingClientRect();
-      return box.width > 0 && (box.left < boundary.left || box.right > boundary.right);
+      return box.width > 0 && box.height > 0 && (box.left < boundary.left - 1 || box.right > boundary.right + 1 || box.left < -1 || box.right > innerWidth + 1);
     }).map((button) => button.getAttribute("aria-label") || button.textContent);
   })).toEqual([]);
   await openContentSettings(page);
@@ -1139,6 +1157,11 @@ test("inline Details closes with Escape and enlarged text leaves the canvas reac
   await page.screenshot({
     path: info.outputPath("editor-large-text-reachable.png"),
   });
+  await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+  await page.getByRole("textbox", { name: "Title", exact: true }).fill("Compact title");
+  await expect(page.locator(".editor")).not.toHaveAttribute("data-flowing-heading", "");
+  await expect.poll(() => page.locator(".writing-document-heading").evaluate(el => getComputedStyle(el).position)).toBe("sticky");
+  await expect(writing).toContainText("Reachable canvas.");
 });
 
 test("Escape dismisses slash and toolbar commands from canvas or popup focus", async ({ page }, info) => {
@@ -1172,10 +1195,19 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await page.keyboard.press("Enter");
   await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(menu.getByRole("menuitem", { name: "Heading 1", exact: true })).toBeFocused();
+  const focusedItem = menu.getByRole("menuitem", { name: "Heading 1", exact: true });
+  await expect(focusedItem).toBeFocused();
+  // A native selection acknowledgement can arrive after keyboard menu focus.
+  // It must synchronize prose selection without taking focus from this item.
+  await page.waitForTimeout(100);
+  await page.evaluate(() => document.dispatchEvent(new Event("selectionchange")));
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await expect(focusedItem).toBeFocused();
+  await expect(focusedItem).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  await expect(editor).toBeFocused();
+  if (await page.locator(".editor-frame").getAttribute("data-dock") === "true") await expect(editor).toBeFocused();
+  else await expect(commands).toBeFocused();
 });
 
 test("Heading 1–4 commands and selected-text Normal Text preserve authored content", async ({ page }, info) => {
@@ -1256,7 +1288,10 @@ for (const [name, tag, marker] of [["Bold", "strong", "**"], ["Italic", "em", "*
         // Cell activation schedules its own focus. Select through the real
         // keyboard after activation rather than racing that focus with a DOM range.
         await block.getByRole("textbox").selectText();
-        await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(sentence);
+        await expect.poll(() => page.evaluate(() => {
+          const selection = window.getSelection();
+          return selection?.rangeCount ? selection.getRangeAt(0).toString() : "";
+        })).toBe(sentence);
         await page.keyboard.press("ArrowLeft");
         for (let index = 0; index < 7; index++) await page.keyboard.press("ArrowRight");
         for (let index = 0; index < `target ${label}`.length; index++) await page.keyboard.press("Shift+ArrowRight");

@@ -191,6 +191,54 @@ test("long code scrolls within its block, retains horizontal layout, and undo re
   );
 });
 
+for (const direction of ["before", "after"] as const) {
+  test(`code arrow keys stay inside the block until its ${direction} edge, then preserve the neighboring heading`, async ({ page }, info) => {
+    await open(
+      page,
+      info.project.name.startsWith("production"),
+      "doc",
+      `## **Before code**\n\n${fence("first\nsecond\nthird", "text")}\n\n### *After code*`,
+    );
+    const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+    const input = page.locator(".writing-code .cm-content");
+    const arrow = direction === "before" ? "ArrowUp" : "ArrowDown";
+    await input.click();
+    // Start away from the exit edge: the first arrow belongs to CodeMirror.
+    await page.keyboard.press(direction === "before" ? "ControlOrMeta+End" : "ControlOrMeta+Home");
+    await page.keyboard.press(arrow);
+    await expect(input).toBeFocused();
+    await page.keyboard.type("X");
+    await expect(input).toContainText("X");
+    await expect(writer.locator("h2")).toHaveText("Before code");
+    await expect(writer.locator("h3")).toHaveText("After code");
+    const editedCode = await input.innerText();
+
+    await page.keyboard.press(direction === "before" ? "ControlOrMeta+Home" : "ControlOrMeta+End");
+    await page.keyboard.press(arrow);
+    // Type without clicking or waiting for a focus assertion to hide a race.
+    await page.keyboard.type(" here ");
+    await expect(writer).toBeFocused();
+    await expect(writer.locator(direction === "before" ? "h2" : "h3"))
+      .toHaveText(direction === "before" ? "Before code here " : " here After code");
+    await expect(writer.locator("h2 strong")).toContainText("Before code");
+    await expect(writer.locator("h3 em")).toContainText("After code");
+    expect(await input.innerText()).toBe(editedCode);
+  });
+}
+
+test("ArrowDown leaves a final code block at its end and types into the trailing writing line", async ({ page }, info) => {
+  await open(page, info.project.name.startsWith("production"), "doc", fence("last line", "text"));
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  const input = page.locator(".writing-code .cm-content");
+  await input.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.type("After the code.");
+  await expect(writer).toBeFocused();
+  await expect(writer.locator(":scope > p")).toHaveText("After the code.");
+  await expect(input).toHaveText("last line");
+});
+
 test("a newly inserted code block starts on Auto-detect and accepts focus, typing and paste", async ({
   page,
 }, info) => {

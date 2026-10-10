@@ -13,7 +13,7 @@ function fixture() {
   course.groups = [];
   course.assignments = [];
   course.lessons = Array.from({ length: 40 }, (_, i) => ({
-    ...course.lessons[0], id: `lesson-${i}`, title: `Lesson ${String(i + 1).padStart(2, "0")}`,
+    ...course.lessons[0], id: `lesson-${i}`, title: `Lesson ${String(i + 1).padStart(2, "0")}`, videoUrl: undefined,
     body: i === 0 ? "A short lesson that fits the writing pane."
       : Array.from({ length: 60 }, (_, j) => `Paragraph ${j + 1}. Longer authoring content.`).join("\n\n"),
   }));
@@ -202,15 +202,15 @@ test("editor Details and reader outlines contain native wheel input", async ({
     .getByRole("searchbox", { name: "Search content", exact: true })
     .fill("Scrolling course");
   const row = page.getByRole("row").filter({ hasText: "Scrolling course" });
-  await row.getByRole("button", { name: "Edit", exact: true }).click();
+  await row.getByRole("link", { name: "Scrolling course", exact: true }).click();
   await openContentSettings(page);
   const main = page.locator(".main-content");
   await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "workspace");
   await expect.poll(() => main.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
-  await contained(page, page.locator(".editor-frame-details"), [
+  await contained(page, page.locator(".editor-frame-details .editor-floating-body"), [
     page.locator(".topbar"), page.getByRole("textbox", { name: "Title", exact: true }),
   ]);
-  await page.locator(".editor-frame-details").evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await page.locator(".editor-frame-details .editor-floating-body").evaluate((el) => { el.scrollTop = el.scrollHeight; });
   const last = page.getByRole("button", { name: "Revert to published version", exact: true });
   expect(await last.evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThanOrEqual(page.viewportSize()!.height);
   await page.screenshot({
@@ -232,7 +232,7 @@ test("complete editor fits at its starting position and each overflowing pane re
   await page.setViewportSize({ width: 1440, height: 900 });
   await setup(page, info.project.name.startsWith("production"));
   await page.getByRole("searchbox", { name: "Search content", exact: true }).fill("Scrolling course");
-  await page.getByRole("row").filter({ hasText: "Scrolling course" }).getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("row").filter({ hasText: "Scrolling course" }).getByRole("link", { name: "Scrolling course", exact: true }).click();
   const main = page.locator(".main-content");
   const title = page.getByRole("textbox", { name: "Title", exact: true });
   const controls = page.locator(".editor-frame-controls");
@@ -249,8 +249,9 @@ test("complete editor fits at its starting position and each overflowing pane re
   await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.type(" An unpublished edit.");
   const details = await openContentSettings(page);
-  await contained(page, details, [title, controls]);
-  await details.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  const detailsScroll = details.locator(".editor-floating-body");
+  await contained(page, detailsScroll, [title, controls]);
+  await detailsScroll.evaluate((el) => { el.scrollTop = el.scrollHeight; });
   const revert = details.getByRole("button", { name: "Revert to published version", exact: true });
   await expect(revert).toBeEnabled();
   expect(await revert.evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThanOrEqual(page.viewportSize()!.height);
@@ -265,7 +266,7 @@ test("complete editor fits at its starting position and each overflowing pane re
   await page.getByRole("button", { name: /^Outline/ }).click();
   expect(await instance!.evaluate((el) => el.isConnected)).toBe(true);
   const outline = page.locator(".editor-frame-outline");
-  await contained(page, outline, [title, controls]);
+  await contained(page, outline.locator(".editor-floating-body"), [title, controls]);
   await outline.getByRole("button", { name: "Quiz", exact: true }).click();
   const quiz = page.locator(".editor-frame-canvas");
   await contained(page, quiz, [title, controls]);
@@ -274,13 +275,15 @@ test("complete editor fits at its starting position and each overflowing pane re
   await expect(page.getByRole("heading", { name: "Question 9", exact: true })).toBeVisible();
   expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
   await page.screenshot({ path: info.outputPath("editor-quiz-contained.png") });
+  await page.getByRole("button", { name: "Outline", exact: true }).click();
   await outline.getByRole("button", { name: "2 Lesson 02", exact: true }).click();
   await expect(writing).toBeVisible();
   await expect.poll(() => page.locator(".writing-scroll-area").evaluate((el) => el.scrollTop)).toBe(0);
   await page.setViewportSize({ width: 1440, height: 600 });
   await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "workspace");
   await expect.poll(() => main.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
-  await page.setViewportSize({ width: 1440, height: 420 });
+  // Page scrolling takes over only when the remaining writing band is under 12rem.
+  await page.setViewportSize({ width: 1440, height: 300 });
   await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "page");
   await writing.locator("p").first().click();
   await page.keyboard.type("Reachable on a short screen. ");
@@ -295,7 +298,7 @@ test("audience search and actions stay visible through long, one and zero choice
     .getByRole("searchbox", { name: "Search content", exact: true })
     .fill("Scrolling course");
   const row = page.getByRole("row").filter({ hasText: "Scrolling course" });
-  await row.getByRole("button", { name: "Edit", exact: true }).click();
+  await row.getByRole("link", { name: "Scrolling course", exact: true }).click();
   const details = await openContentSettings(page);
   await details
     .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })

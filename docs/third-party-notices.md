@@ -26,6 +26,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+## Lexical selection synchronization
+
+The pinned `lexical@0.48.0` dependency includes a narrow selection-synchronization backport from [Lexical PR #8931](https://github.com/facebook/lexical/pull/8931). The [dependency patch](../patches/lexical@0.48.0.patch) records programmatically applied selection endpoints so a stale acknowledgment flag cannot discard a later native cursor move. It includes equivalent source, development and production changes; the unrelated decorator-paint changes are excluded. pnpm applies this patch from the locked workspace configuration for both apps. When updating the editor dependencies, remove it only after verifying the upstream endpoint guard is included and native-selection regression checks pass.
+
+Copyright (c) Meta Platforms, Inc. and affiliates. These upstream changes remain under the MIT terms reproduced above, together with Lexical's packaged license; they are not relicensed under ELv2.
+
 ## Code highlighting
 
 Fieldbook uses [Highlight.js](https://github.com/highlightjs/highlight.js) for automatic language detection and reader syntax highlighting. It retains its BSD 3-Clause license; the complete [copyright notice and license](../public/licenses/highlightjs-bsd-3-clause.txt) ship with both apps at `/licenses/highlightjs-bsd-3-clause.txt`. CodeMirror and Lezer provide code editing and retain their MIT licenses and packaged notices. Preserve these dependency licenses when redistributing bundled software.
