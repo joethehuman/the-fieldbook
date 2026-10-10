@@ -75,6 +75,21 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   await page.goto(production ? "/admin" : "/#admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Docs navigation");
+  await expect(page.getByRole("button", { name: "Save settings" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "New section", exact: true }).click();
+  const newSection = page.getByRole("dialog", {
+    name: "New section",
+    exact: true,
+  });
+  await newSection
+    .getByRole("textbox", { name: "New section name", exact: true })
+    .fill("Navigation fixture");
+  await newSection
+    .getByRole("button", { name: "Create section", exact: true })
+    .click();
+  await expect(newSection).toHaveCount(0);
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();
   await section(page, "Identity");

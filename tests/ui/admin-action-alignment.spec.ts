@@ -164,8 +164,7 @@ test("curriculum individual and bulk publication, assignment, deletion menus ali
   await menu(page, first.name);
   for (const name of [
     "Edit curriculum",
-    "Assign to teams or groups",
-    "Remove team or group assignments",
+    "Manage Audience",
     "Delete curriculum",
   ])
     await expect(
@@ -209,10 +208,8 @@ test("groups directory exposes the same membership and assignment commands indiv
     "Edit group",
     "Add people",
     "Remove people",
-    "Assign courses",
-    "Remove courses",
-    "Assign updates",
-    "Remove updates",
+    "Manage Courses",
+    "Manage Updates",
     "Delete group",
   ])
     await expect(
@@ -234,10 +231,8 @@ test("groups directory exposes the same membership and assignment commands indiv
   for (const name of [
     "Add people",
     "Remove people",
-    "Assign courses",
-    "Remove courses",
-    "Assign updates",
-    "Remove updates",
+    "Manage Courses",
+    "Manage Updates",
     "Delete groups",
   ])
     await expect(

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 async function section(page: Page, name: string) {
+  await expect(page.locator(".admin-layout")).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
@@ -147,19 +148,26 @@ test("all matching selection crosses pages and group pickers wait for Apply", as
     page.getByRole("region", { name: "Selected items" }),
   ).toContainText("26 selected");
   await section(page, "Groups");
-  await page
-    .getByRole("button", { name: /^Manage / })
-    .first()
-    .click();
-  await page.getByRole("tab", { name: "Members", exact: true }).click();
-  const add = page.getByRole("button", { name: "Add people", exact: true });
+  await page.locator("[data-group-id]").first().click();
+  await page.getByRole("tab", { name: "People", exact: true }).click();
+  const add = page.getByRole("button", { name: "Add Members", exact: true });
   await add.click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("checkbox").first().check();
+  await dialog
+    .getByRole("searchbox", { name: "Find a user", exact: true })
+    .fill("Unassigned fixture");
+  await dialog.getByRole("checkbox", { name: /^Unassigned fixture / }).check();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Confirm", exact: true })
+    .click();
   await add.click();
+  await dialog
+    .getByRole("searchbox", { name: "Find a user", exact: true })
+    .fill("Unassigned fixture");
   await expect(
-    page.getByRole("dialog").getByRole("checkbox").first(),
+    dialog.getByRole("checkbox", { name: /^Unassigned fixture / }),
   ).not.toBeChecked();
 });
 
@@ -226,7 +234,9 @@ test("existing categories, mixed types and one People menu", async ({
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await section(page, "Demo profiles");
-  await page.getByRole("checkbox", { name: /^Select all / }).check();
+  await page
+    .getByRole("checkbox", { name: "Select page (25)", exact: true })
+    .check();
   await expect(
     page.getByRole("button", { name: "Bulk actions", exact: true }),
   ).toHaveCount(1);
@@ -251,54 +261,95 @@ test("group learning, Updates and linked teams use selected rows", async ({
     (item) => item.kind !== "brief" || updates.includes(item),
   );
   for (const update of updates) update.groups = [];
+  data.publishedContent = undefined;
   const group = data.groups[0];
+  group.learningItems = [];
+  const courses = data.content
+    .filter((item) => item.kind === "course")
+    .slice(0, 2);
   await page.addInitScript((workspace) => {
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   }, data);
   await page.goto("/#admin");
   await section(page, "Groups");
+  await page.getByRole("link", { name: group.name, exact: true }).click();
   await page
-    .getByRole("button", { name: `Manage ${group.name}`, exact: true })
+    .getByRole("tab", { name: "Assigned Courses", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Add courses or curricula", exact: true })
+    .getByRole("button", { name: "Manage Courses", exact: true })
     .click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByRole("checkbox", { name: /^Select (page|all) / }).check();
-  await dialog.getByRole("button", { name: /^Add items / }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Manage Courses",
+    exact: true,
+  });
+  for (const course of courses)
+    await dialog
+      .getByRole("button", { name: `Add ${course.title}`, exact: true })
+      .click();
+  await dialog
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Save assignments", exact: true })
+    .click();
+  await expect(page.locator(".learning-order li")).toHaveCount(courses.length);
   await page
     .getByRole("checkbox", { name: "Select all matching rows", exact: true })
     .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await page
-    .getByRole("menuitem", { name: "Remove from group", exact: true })
+    .getByRole("menuitem", { name: "Remove courses", exact: true })
     .click();
   await page.screenshot({
     path: info.outputPath("group-learning-selection.png"),
   });
   await dialog
-    .getByRole("button", { name: "Apply changes", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Save assignments", exact: true })
     .click();
   await expect(page.locator(".learning-order li")).toHaveCount(0);
-  await page.getByRole("tab", { name: "Updates", exact: true }).click();
-  await page.getByRole("button", { name: "Add Updates", exact: true }).click();
+  await page
+    .getByRole("tab", { name: "Assigned Updates", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Manage Updates", exact: true })
+    .click();
+  const updateDialog = page.getByRole("dialog", {
+    name: "Manage Updates",
+    exact: true,
+  });
+  for (const update of updates)
+    await updateDialog
+      .getByRole("button", { name: `Add ${update.title}`, exact: true })
+      .click();
+  await updateDialog
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Review Update audiences", exact: true })
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
   await expect(
-    dialog.getByRole("checkbox", { name: /^Select (page|all) / }),
-  ).toHaveCount(1);
-  await dialog.getByRole("checkbox", { name: /^Select (page|all) / }).check();
-  await dialog.getByRole("button", { name: /^Add Updates / }).click();
+    page
+      .getByRole("table", { name: "Assigned Updates", exact: true })
+      .locator("tbody tr"),
+  ).toHaveCount(updates.length);
   await page
     .getByRole("checkbox", {
-      name: /^Select (page|all) .*Updates for this group/,
+      name: "Select this page of Updates",
+      exact: true,
     })
     .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await expect(
-    page.getByRole("menuitem", { name: "Remove from group", exact: true }),
+    page.getByRole("menuitem", { name: "Remove updates", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByRole("tab", { name: "Members", exact: true }).click();
+  await page.getByRole("tab", { name: "People", exact: true }).click();
   await expect(
     page.getByRole("checkbox", {
       name: /^Select (page|all) .*Linked teams/,
@@ -429,30 +480,64 @@ test("single curriculum and empty or single linked teams have no bulk controls",
   ).toBeVisible();
   await page.screenshot({ path: info.outputPath("single-curriculum.png") });
   await section(page, "Groups");
-  await page
-    .getByRole("button", { name: `Manage ${group.name}`, exact: true })
-    .click();
-  await page.getByRole("tab", { name: "Members", exact: true }).click();
-  const teams = page.getByRole("group", { name: "Linked teams", exact: true });
-  await expect(teams.getByRole("checkbox")).toHaveCount(0);
-  await page.getByRole("button", { name: "Add teams", exact: true }).click();
-  const dialog = page.getByRole("dialog");
+  await page.getByRole("link", { name: group.name, exact: true }).click();
+  await page.getByRole("tab", { name: "People", exact: true }).click();
+  const addMembers = page.getByRole("button", {
+    name: "Add Members",
+    exact: true,
+  });
+  await addMembers.click();
+  const dialog = page.getByRole("dialog", { name: "Add Members", exact: true });
+  await dialog.getByRole("tab", { name: "Teams", exact: true }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Bulk actions", exact: true }),
+  ).toHaveCount(0);
+  const team = data.teams!.find((item) => item.system !== "organization")!;
   await dialog
-    .getByRole("checkbox", { name: data.teams![0].name, exact: true })
+    .getByRole("searchbox", { name: "Find a team", exact: true })
+    .fill(team.name);
+  await dialog
+    .getByRole("checkbox", { name: new RegExp(`^${team.name} `) })
     .check();
   await dialog
-    .getByRole("button", { name: "Add teams 1", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
-  await expect(teams.getByRole("checkbox")).toHaveCount(0);
-  await expect(teams).toContainText(data.teams![0].name);
-  await page.screenshot({ path: info.outputPath("single-linked-team.png") });
-  // Only the teams list has a single-item menu in this fixture.
-  await page.getByRole("button", { name: "Actions", exact: true }).click();
   await page
-    .getByRole("menuitem", { name: "Remove team links", exact: true })
-    .click();
-  await dialog
+    .getByRole("dialog", { name: "Review changes", exact: true })
     .getByRole("button", { name: "Apply changes", exact: true })
     .click();
-  await expect(teams).toContainText("No items in this list.");
+  await expect(dialog).toHaveCount(0);
+  await addMembers.click();
+  await dialog.getByRole("tab", { name: "Teams", exact: true }).click();
+  await dialog
+    .getByRole("searchbox", { name: "Find a team", exact: true })
+    .fill(team.name);
+  await expect(
+    dialog.getByRole("checkbox", { name: new RegExp(`^${team.name} `) }),
+  ).toBeChecked();
+  await expect(
+    dialog.getByRole("button", { name: "Bulk actions", exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("single-linked-team.png") });
+  await dialog
+    .getByRole("checkbox", { name: new RegExp(`^${team.name} `) })
+    .uncheck();
+  await dialog
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Review changes", exact: true })
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (id) =>
+          JSON.parse(
+            localStorage.getItem("fieldbook.workspace.v1")!,
+          ).groups.find((item: { id: string }) => item.id === id).teamIds,
+        group.id,
+      ),
+    )
+    .toEqual([]);
 });
