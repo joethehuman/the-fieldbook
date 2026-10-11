@@ -659,7 +659,7 @@ test("floating panels preserve their surfaces and expose every final control", a
 });
 
 test("desktop menus stay at the workspace edges and artwork has room", async ({ page }, info) => {
-  test.skip((page.viewportSize()?.width || 0) < 1280);
+  test.skip((page.viewportSize()?.width || 0) < 1280, "This check exercises wide workspace geometry; phone panels have separate coverage.");
   await open(page, info.project.name.startsWith("production"), "course");
   await page.getByRole("button", { name: "Details", exact: true }).click();
   const writer = page.locator('.writing-content[contenteditable="true"] p').first();
@@ -689,7 +689,7 @@ test("desktop menus stay at the workspace edges and artwork has room", async ({ 
 });
 
 test("editor entry collapses navigation but authors can reopen it", async ({ page }, info) => {
-  test.skip((page.viewportSize()?.width || 0) < 1280);
+  test.skip((page.viewportSize()?.width || 0) < 1280, "This check exercises wide workspace geometry; phone panels have separate coverage.");
   await open(page, info.project.name.startsWith("production"), "doc");
   const app = page.locator(".app");
   await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
@@ -2393,7 +2393,7 @@ for (const kind of ["doc", "brief", "course"] as const) {
 }
 
 test("editor delete failure retains the draft and uses the latest saved revision", async ({ page }, info) => {
-  test.skip(!info.project.name.startsWith("production"));
+  test.skip(!info.project.name.startsWith("production"), "Controlled deletion failures use the installed-app provider fixture.");
   const { state } = await open(page, true, "doc");
   const toggle = page.getByRole("button", { name: "Details", exact: true });
   if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();

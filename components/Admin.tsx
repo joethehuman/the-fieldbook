@@ -623,7 +623,9 @@ export default function Admin({
           : null,
       );
       setNotice("");
-      adminPanel.reveal(false);
+      // Teams and groups restore their own list context on detail navigation.
+      if (next.tab !== previous.tab || (next.tab !== "teams" && next.tab !== "groups"))
+        adminPanel.reveal(false);
       return true;
     } catch (error) {
       destinationRef.current = previous;
@@ -1376,7 +1378,6 @@ export default function Admin({
               <FeedbackAdmin data={data} onDeleteFeedback={admin ? onDeleteFeedback : undefined} />
             ) : tab === "teams" ? (
               <TeamsAdmin
-                key={adminHref(destination)}
                 initialTeam={destination.id}
                 initialTab={destination.panel}
                 onDestinationChange={(id, panel) =>
@@ -1986,7 +1987,6 @@ export default function Admin({
               />
             ) : tab === "groups" ? (
               <LearningGroups
-                key={adminHref(destination)}
                 initialGroup={destination.id}
                 hrefForGroup={(id) => recordHref({ tab: "groups", id })}
                 initialTab={destination.panel}

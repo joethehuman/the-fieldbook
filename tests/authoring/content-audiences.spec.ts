@@ -374,112 +374,22 @@ test("curriculum group inclusion starts with named paths and existing reach", as
     path: info.outputPath("audience-curriculum-group-path.png"),
   });
 });
-test("shared workflow parks new choices, retains saved sources and contains review/cancel", async ({
-  page,
-}, info) => {
-  const { panel } = await setup(
-    page,
-    info.project.name.startsWith("production"),
-    "course",
-  );
-  await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    }),
-  ).toBeChecked();
-  await panel
-    .getByRole("checkbox", {
-      name: "Assign directly to Group: Account executives",
-      exact: true,
-    })
-    .check();
-  const selectBounds = await panel.boundingBox();
-  await panel.getByRole("radio", { name: "Organization", exact: true }).check();
-  await expect(
-    panel.getByText("Separately saved audiences", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    panel.getByRole("button", { name: "Remove Sales", exact: true }),
-  ).toBeVisible();
-  await expect(
-    panel.getByRole("button", {
-      name: "Remove Account executives",
-      exact: true,
-    }),
-  ).toHaveCount(0);
-  await panel
-    .getByRole("checkbox", { name: "Also include public guests", exact: true })
-    .check();
-  await expect(panel).toContainText("All 4 registered people");
-  await page.screenshot({ path: info.outputPath("audience-organization.png") });
-  await panel
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await expect(
-    panel.getByRole("button", { name: "Save assignments", exact: true }),
-  ).toBeVisible();
-  expect(await panel.boundingBox()).toEqual(selectBounds);
+test("shared workflow retains direct sources through review and cancels without saving", async ({ page }, info) => {
+  const { panel, read } = await setup(page, info.project.name.startsWith("production"), "course");
+  const before = await read();
+  await assignedPane(panel);
+  await expect(panel.getByRole("button", { name: "Remove team: Sales", exact: true })).toBeVisible();
+  await availablePane(panel);
+  await panel.getByRole("button", { name: "Add group: Account executives", exact: true }).click();
+  await panel.getByRole("button", { name: "Review changes", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(1);
-  await panel
-    .getByRole("button", { name: "View people and due dates", exact: true })
-    .click();
-  expect(await panel.boundingBox()).toEqual(selectBounds);
-  await expect(
-    panel.getByRole("table", { name: "Assignment recipients" }),
-  ).toBeVisible();
-  await page.screenshot({
-    path: info.outputPath("audience-review-expanded.png"),
-  });
+  await expect(panel.getByRole("button", { name: "Save assignments", exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "← Back", exact: true }).click();
-  await panel
-    .getByRole("radio", { name: "Specific teams or groups", exact: true })
-    .check();
-  await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Group: Account executives",
-      exact: true,
-    }),
-  ).toBeChecked();
+  await assignedPane(panel);
+  await expect(panel.getByRole("button", { name: "Remove group: Account executives", exact: true })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Remove team: Sales", exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(
-    panel.getByText("Discard audience changes?", { exact: true }),
-  ).toBeVisible();
-  expect(await panel.boundingBox()).toEqual(selectBounds);
-  await panel
-    .getByRole("button", { name: "Keep editing", exact: true })
-    .click();
-  await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    }),
-  ).toBeChecked();
-  await panel
-    .getByRole("button", { name: "Close audience editor", exact: true })
-    .click();
-  await panel
-    .getByRole("button", { name: "Discard changes", exact: true })
-    .click();
-  await expect(panel).not.toBeVisible();
-  await page
-    .getByRole("button", {
-      name: /^(?:Assign audience|Edit Audience|Edit audience)$/,
-      exact: true,
-    })
-    .click();
-  await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    }),
-  ).toBeChecked();
-  await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Group: Account executives",
-      exact: true,
-    }),
-  ).not.toBeChecked();
+  expect(await read()).toEqual(before);
 });
 
 test("search keeps internal geometry for many, one and zero matches", async ({

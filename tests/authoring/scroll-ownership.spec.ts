@@ -2,8 +2,9 @@ import { replaceWritingText } from "./editor-helpers";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
-import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
+import { authoringUser, setupAuthoringProvider, syncAuthoringProvider } from "./provider-fixture";
 import { openContentSettings } from "./editor-helpers";
+import { teamCommand } from "../helpers/team-navigation";
 
 function fixture() {
   const data = freshWorkspace();
@@ -304,33 +305,29 @@ test("audience search and actions stay visible through long, one and zero choice
     .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const dialog = page.getByRole("dialog", {
-    name: "Course audience",
+    name: "Course assignments",
     exact: true,
   });
   const search = dialog.getByRole("searchbox", {
     name: "Find a team or group",
     exact: true,
   });
-  const results = dialog.locator('[aria-label="Audience choices"]');
+  const tabs = dialog.getByRole("group", { name: "Assignment lists", exact: true });
+  if (await tabs.isVisible()) await tabs.getByRole("button", { name: "Available", exact: true }).click();
+  const results = dialog.getByLabel("Available teams and groups", { exact: true });
   const footer = dialog.locator('[data-slot="dialog-footer"]');
   await contained(page, results, [search, footer]);
   const bounds = await results.boundingBox();
   await search.fill("Audience 39");
   await expect(
-    dialog.getByRole("checkbox", { name: /Assign directly/ }),
+    dialog.getByRole("button", { name: /^Add (team|group):/ }),
   ).toHaveCount(1);
   expect(await results.boundingBox()).toEqual(bounds);
   await search.fill("no such audience");
   await expect(dialog.getByText("No matching teams or groups.")).toBeVisible();
   expect(await results.boundingBox()).toEqual(bounds);
   await search.clear();
-  await dialog
-    .getByRole("radio", { name: "Organization", exact: true })
-    .check();
-  await expect(dialog.getByText(/All \d+ registered people/)).toBeVisible();
-  await dialog
-    .getByRole("radio", { name: "Specific teams or groups", exact: true })
-    .check();
+  await dialog.getByRole("button", { name: "Add team: Organization", exact: true }).click();
   await expect(search).toBeVisible();
   await page.screenshot({ path: info.outputPath("audience-contained.png") });
 });
@@ -340,11 +337,11 @@ test("membership picker results scroll independently and retain search across ta
 }, info) => {
   await setup(page, info.project.name.startsWith("production"));
   await section(page, "Groups");
-  await page.getByRole("button", { name: "Audience 00", exact: true }).click();
+  await page.getByRole("link", { name: "Audience 00", exact: true }).click();
   await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const search = dialog.getByRole("searchbox", {
-    name: "Find a person",
+    name: "Find a user",
     exact: true,
   });
   await contained(page, dialog.locator('[data-slot="selection-results"]'), [
@@ -431,7 +428,7 @@ test("short and enlarged membership layouts retain usable content and reachable 
 }, info) => {
   await setup(page, info.project.name.startsWith("production"));
   await section(page, "Groups");
-  await page.getByRole("button", { name: "Audience 00", exact: true }).click();
+  await page.getByRole("link", { name: "Audience 00", exact: true }).click();
   await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const dialog = page.getByRole("dialog");
   for (const size of [
@@ -474,7 +471,7 @@ test("short and enlarged membership layouts retain usable content and reachable 
     });
     expect(await footer.boundingBox()).toEqual(footerBox);
     const search = dialog.getByRole("searchbox", {
-      name: "Find a person",
+      name: "Find a user",
       exact: true,
     });
     await search.fill("Person 29");
@@ -570,3 +567,80 @@ test("compact catalog pickers preserve natural dimensions and contain long resul
     path: info.outputPath("picker-forty-contained.png"),
   });
 });
+
+
+for (const name of ["Teams", "Groups"] as const) {
+  test(`${name} restores list context through detail, browser history and return navigation`, async ({ page }, info) => {
+    await page.setViewportSize({ width: info.project.use.viewport!.width, height: 600 });
+    await setup(page, info.project.name.startsWith("production"));
+    if (info.project.name.startsWith("production")) {
+      // A refreshed team URL reads the server fixture, rather than the mocked client snapshot.
+      await syncAuthoringProvider(page, fixture(), { includeTeams: true });
+    }
+    await section(page, name);
+    const search = page.getByRole("searchbox", {
+      name: name === "Teams" ? "Find teams" : "Find a group", exact: true,
+    });
+    await search.fill(name === "Teams" ? "Branch" : "Audience");
+    if (name === "Teams")
+      await page.getByRole("button", { name: "Select multiple", exact: true }).click();
+    else {
+      await page.getByRole("combobox", { name: "Sort groups", exact: true }).click();
+      await page.getByRole("option", { name: "Name (Z–A)", exact: true }).click();
+    }
+    await page.getByRole("navigation", { name: `${name} pages`, exact: true })
+      .getByRole("button", { name: "Next", exact: true }).click();
+    const record = name === "Teams" ? "Branch 35" : "Audience 05";
+    const choice = page.getByRole("checkbox", { name: `Select ${record}`, exact: true });
+    await choice.check();
+    const opener = name === "Teams"
+      ? page.getByRole("button", { name: `Actions for ${record}`, exact: true })
+      : page.getByRole("link", { name: record, exact: true });
+    await opener.scrollIntoViewIfNeeded();
+    const positions = () => opener.evaluate(element => {
+      const result: number[] = [];
+      for (let parent: HTMLElement | null = element as HTMLElement; parent; parent = parent.parentElement) {
+        if (/auto|scroll/.test(getComputedStyle(parent).overflowY)) result.push(parent.scrollTop);
+      }
+      result.push(document.scrollingElement!.scrollTop);
+      return result;
+    });
+    const before = await positions();
+    expect(before.some(position => position > 0)).toBe(true);
+    if (name === "Teams") await teamCommand(page, record);
+    else await opener.click();
+    await expect(page.getByRole("heading", { name: record, exact: true })).toBeVisible();
+    await page.goBack();
+    const verifyReturn = async () => {
+      await expect(page.getByRole("heading", { name, exact: true })).toBeFocused();
+      await expect(search).toHaveValue(name === "Teams" ? "Branch" : "Audience");
+      await expect(choice).toBeChecked();
+      await expect(page.getByText("Page 2 of 2", { exact: true })).toBeVisible();
+      await expect.poll(async () => {
+        const restored = await positions();
+        if (restored.length !== before.length) return Infinity;
+        return Math.max(...restored.map((position, index) => Math.abs(position - before[index])));
+      }).toBeLessThanOrEqual(1);
+      if (name === "Groups") await expect(page.getByRole("combobox", { name: "Sort groups", exact: true })).toContainText("Name (Z–A)");
+    };
+    await verifyReturn();
+    await page.goForward();
+    await expect(page.getByRole("heading", { name: record, exact: true })).toBeVisible();
+    await page.getByRole("button", { name: name === "Teams" ? "Back to teams" : "All groups", exact: true }).click();
+    await verifyReturn();
+    await section(page, name === "Teams" ? "Groups" : "Teams");
+    await section(page, name);
+    await expect(search).toHaveValue("");
+    if (name === "Teams") await expect(page.getByRole("button", { name: "Select multiple", exact: true })).toHaveAttribute("aria-pressed", "false");
+    else await expect(page.getByRole("checkbox", { name: "Select Audience 00", exact: true })).not.toBeChecked();
+    // A refreshed detail has no previous list context and returns to its start.
+    if (name === "Teams") await teamCommand(page, record);
+    else await page.getByRole("link", { name: record, exact: true }).click();
+    await expect(page.getByRole("heading", { name: record, exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { name: record, exact: true })).toBeVisible();
+    await page.getByRole("button", { name: name === "Teams" ? "Back to teams" : "All groups", exact: true }).click();
+    await expect(search).toHaveValue("");
+    await expect(page.getByRole("heading", { name, exact: true })).toBeInViewport();
+  });
+}

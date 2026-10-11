@@ -76,6 +76,7 @@ import { SectionHeader, EmptyState } from "./patterns/layout";
 import { Pagination } from "./patterns/pagination";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
 import { useRevealTarget } from "./patterns/use-reveal-target";
+import { useListReturn } from "./patterns/use-list-return";
 import { SaveChangesControl } from "./patterns/save-changes-control";
 import { groupPath } from "@/lib/group-hierarchy";
 import { organizationTeam } from "@/lib/organization-team";
@@ -134,6 +135,9 @@ export function TeamsAdmin({
   }>();
   const browserRevealCount = useRef(0);
   const [selected, setSelected] = useState(initialTeam || "");
+  const routeKey = `${initialTeam || ""}/${initialTab || "members"}`;
+  const [previousRoute, setPreviousRoute] = useState(routeKey);
+  const listReturn = useListReturn(selected);
   const [tab, setTab] = useState<string>(initialTab || "members");
   const [query, setQuery] = useState("");
   const [selectTeams, setSelectTeams] = useState(false);
@@ -234,6 +238,7 @@ export function TeamsAdmin({
   }
   async function openTeam(id: string) {
     if (!(await guard.current())) return;
+    listReturn.rememberList();
     if (onDestinationChange) {
       await onDestinationChange(id || undefined);
       return;
@@ -243,8 +248,6 @@ export function TeamsAdmin({
     setTab("members");
     setQuery("");
     setPage(1);
-    if (id) destination.reveal();
-    else browserTarget.reveal();
   }
   async function browseTeam(id: string) {
     if (!(await guard.current())) return;
@@ -806,8 +809,19 @@ export function TeamsAdmin({
     );
   }
 
+  // Synchronize accepted URL changes without recreating the directory state.
+  if (previousRoute !== routeKey) {
+    setPreviousRoute(routeKey);
+    setSelected(initialTeam || "");
+    setTab(initialTab || "members");
+    setQuery("");
+    setPage(1);
+    resetDraft();
+  }
+
   return (
     <section
+      ref={listReturn.ref}
       aria-label={team ? `${team.name} management` : "Teams"}
       className="grid min-w-0 gap-6"
     >

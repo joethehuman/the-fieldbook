@@ -11,7 +11,7 @@ export const authoringUser: User = {
   groups: [],
 };
 
-export async function syncAuthoringProvider(page: Page, data: Workspace) {
+export async function syncAuthoringProvider(page: Page, data: Workspace, options: { includeTeams?: boolean } = {}) {
   const published = new Map(
     (data.publishedContent || []).map((item) => [item.id, item]),
   );
@@ -22,6 +22,7 @@ export async function syncAuthoringProvider(page: Page, data: Workspace) {
         settings: data.settings,
         governanceRevision: data.governanceRevision,
         groups: data.groups,
+        ...(options.includeTeams ? { teams: data.teams } : {}),
         curricula: data.curricula,
         documents: data.content.map((item) => ({
           id: item.id,

@@ -91,13 +91,20 @@ test("contributors share publishing editors with four permitted destinations on 
     node.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
   ));
   await page.screenshot({ path: info.outputPath("contributor-editor.png"), fullPage: true });
-  await page.getByRole("button", { name: "Existing empty section", exact: true }).click();
+  await page.getByRole("button", { name: "Section", exact: true }).click();
+  await page.getByRole("option", { name: "Existing empty section", exact: true }).click();
   await page.getByRole("textbox", { name: "Short description", exact: true }).fill("Contributor publishing check.");
   await closeContentSettings(page);
   await page.getByRole("textbox", { name: "Doc content", exact: true }).fill("Contributor-written reference content.");
   await waitForDraftSaved(page);
+  const published = production ? page.waitForResponse(response => new URL(response.url()).pathname === "/api/content" && response.request().method() === "POST" && response.request().postDataJSON().publish === true) : null;
   await page.getByRole("button", { name: "Publish", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Published", exact: true })).toBeVisible();
+  if (production) {
+    const response = await published!;
+    expect(response.status()).toBe(200);
+    expect((await response.json()).publishedRevision).toBeGreaterThan(0);
+  }
+  await expect(page.locator('[data-slot="toast"]')).toHaveText("Doc published.");
   await returnToContent(page);
   await page.getByRole("button", { name: "Content", exact: true }).click();
   await page.getByRole("menuitem", { name: "Course", exact: true }).click();
@@ -130,19 +137,19 @@ test("contributor Update audience offers groups without team or Organization con
     .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const panel = page.getByRole("dialog", {
-    name: "Update audience",
+    name: "Update recommendations",
     exact: true,
   });
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("radio")).toHaveCount(0);
   await expect(panel.getByRole("checkbox", { name: /Team:/ })).toHaveCount(0);
   await expect(
-    panel.getByRole("checkbox", { name: /Group:/ }).first(),
+    panel.getByRole("button", { name: /^Add group:/ }).first(),
   ).toBeVisible();
   await panel
-    .getByRole("checkbox", { name: /Group:/ })
+    .getByRole("button", { name: /^Add group:/ })
     .first()
-    .check();
+    .click();
   await panel
     .getByRole("button", { name: "Apply to draft", exact: true })
     .click();

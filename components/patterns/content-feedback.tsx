@@ -252,14 +252,14 @@ export function ContentFeedback({
         <PopoverAnchor asChild>
           <div
             className={cn(
-              "flex w-full max-w-full min-w-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm sm:w-fit",
+              "flex w-full max-w-full min-w-0 flex-wrap items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm sm:w-fit",
               !desktop && open && "hidden",
             )}
           >
             <Button
               type="button"
               variant="ghost"
-              className="h-auto min-h-9 min-w-0 flex-1 justify-start whitespace-normal rounded-full py-1.5 text-left leading-snug font-normal text-muted-foreground sm:flex-initial"
+              className="h-auto min-h-9 min-w-0 flex-1 justify-start whitespace-normal rounded-full py-1.5 text-left leading-snug font-normal text-muted-foreground [overflow-wrap:anywhere] sm:flex-initial"
               disabled={disabled}
               aria-expanded={open}
               aria-controls={`${id}-panel`}
@@ -271,7 +271,7 @@ export function ContentFeedback({
               Did you find this useful?
             </Button>
             <div
-              className="flex shrink-0 gap-1"
+              className="flex max-w-full shrink-0 flex-wrap gap-1"
               role="group"
               aria-label="Rate this content"
             >

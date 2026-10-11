@@ -7,7 +7,7 @@ import { setupAuthoringProvider } from "./provider-fixture";
 test("installed category controls count actual rows and save settings through the provider", async ({
   page,
 }, info) => {
-  test.skip(!info.project.name.startsWith("production"));
+  test.skip(!info.project.name.startsWith("production"), "Settings persistence uses the installed-app provider fixture.");
   const data = withPublishedSnapshots(freshWorkspace());
   data.settings = {
     ...data.settings!,

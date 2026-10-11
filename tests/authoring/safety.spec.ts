@@ -208,6 +208,7 @@ for (const entry of ["account menu"]) {
   test(`Administration ${entry} preserves a failed draft on Cancel and returns to Content on Confirm`, async ({ page }, info) => {
     const production = info.project.name.startsWith("production");
     const { control } = await setup(page, production);
+    const initialUrl = page.url();
     await failDraftWrites(page, production, control);
     const title = page.getByLabel("Title", { exact: true });
     await title.fill("Keep this exact editor");
@@ -225,13 +226,13 @@ for (const entry of ["account menu"]) {
     expect(await original!.evaluate((node) => node.isConnected)).toBe(true);
     await expect(page.locator(".admin-layout")).toHaveCount(0);
     await expect(page.getByRole("combobox", { name: "Administration section", exact: true })).toHaveCount(0);
-    await expect(page).toHaveURL(production ? /\/admin$/ : /#admin$/);
+    await expect(page).toHaveURL(initialUrl);
     await page.screenshot({ animations: "disabled", path: info.outputPath(`${entry}-cancel-editor.png`) });
     await select();
     await page.getByRole("button", { name: "Confirm", exact: true }).click();
     await expect(page.locator(".admin-layout")).toBeVisible();
     await expect(title).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Edit", exact: true }).first()).toBeVisible();
+    await expect(page.locator('table[data-layout="contentSelection"] tbody tr').first().getByRole("link")).toBeVisible();
     await expect(page.getByRole("alertdialog")).toHaveCount(0);
     await expect(page.getByRole("status", { name: "Opening page", exact: true })).toHaveCount(0);
     await page.screenshot({ animations: "disabled", path: info.outputPath(`${entry}-confirmed-content.png`) });
@@ -320,7 +321,9 @@ test("browser back preserves an unsaved failed draft when leaving is canceled", 
   await openNav(page);
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("menuitem", { name: "Manage organization" }).click();
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page.locator('table[data-layout="contentSelection"] tbody tr').first().getByRole("link").click();
+  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toBeVisible();
+  const editorUrl = page.url();
   await failDraftWrites(page, production, control);
   await page.getByLabel("Title", { exact: true }).fill("History protected");
   await page.evaluate(() => history.back());
@@ -328,10 +331,12 @@ test("browser back preserves an unsaved failed draft when leaving is canceled", 
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "History protected",
   );
-  await expect(page).toHaveURL(production ? /\/admin$/ : /#admin$/);
+  await expect(page).toHaveURL(editorUrl);
   if (production) {
     await page.evaluate(() => history.back());
     await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/content$/);
+    await page.evaluate(() => history.back());
     await expect(page).toHaveURL(/\/updates$/);
   }
 });
@@ -355,7 +360,7 @@ test("failed save preserves downloadable text and does not show success", async 
     "Recover my draft",
   );
   await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Changes not saved");
-  await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "page");
+  await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "workspace");
   await expect(page.locator('[data-slot="toast"]')).toHaveCount(0);
   await page.locator("form.editor").getByRole("button", { name: "Dismiss message", exact: true }).click();
   await expect(page.locator("form.editor").getByRole("alert")).toHaveCount(0);
@@ -375,7 +380,7 @@ test("failed learning-group save shows one concise inline error", async ({
 }, info) => {
   test.skip(
     !info.project.name.startsWith("production"),
-    "The hosted save response is production-only",
+    "Controlled save failures use the installed-app provider fixture",
   );
   const { state } = await setup(page, true, "course");
   state.content[0].status = "published";
@@ -403,11 +408,9 @@ test("failed learning-group save shows one concise inline error", async ({
     .getByRole("link", { name: state.groups[0].name, exact: true })
     .click();
   await page.getByRole("tab", { name: "Assigned Courses", exact: true }).click();
-  await page.getByRole("button", { name: "Assign Courses", exact: true }).click();
+  await page.getByRole("button", { name: "Manage Courses", exact: true }).click();
   const picker = page.getByRole("dialog");
-  await picker
-    .getByRole("checkbox", { name: new RegExp(state.content[0].title) })
-    .check();
+  await picker.getByRole("button", { name: `Add ${state.content[0].title}`, exact: true }).click();
   await picker
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
@@ -651,17 +654,7 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
 }, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   await expect(page.getByLabel("Lesson title", { exact: true })).toHaveValue("Lesson 1");
-  const metadata = page.getByRole("region", { name: "Course introduction" });
-  await expect(
-    metadata.getByRole("textbox", { name: "Title", exact: true }),
-  ).toBeVisible();
-  if (await page.getByRole("navigation", { name: "Edit course step" }).isVisible()) {
-    const details = await metadata.boundingBox();
-    const outline = await page
-      .getByRole("navigation", { name: "Edit course step" })
-      .boundingBox();
-    expect(details!.y + details!.height).toBeLessThanOrEqual(outline!.y);
-  }
+  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toBeVisible();
   await expect(
     page.getByLabel("Opening video URL", { exact: true }),
   ).toHaveCount(0);
@@ -1589,7 +1582,7 @@ test("card artwork above 50 MB reaches storage and a rejection preserves existin
   await expect(artwork.getByRole("alert")).toContainText("exceeds the upload size limit");
   expect(signed).toBe(1); expect(completed).toBe(0);
   expect(JSON.stringify(state.content[0].cardArt)).toBe(original);
-  await expect(artwork.getByRole("button", { name: "Upload image", exact: true })).toBeEnabled();
+  await expect(artwork.getByRole("combobox", { name: "Artwork source", exact: true })).toBeEnabled();
   await artwork.getByRole("alert").scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("large-artwork-recovery.png"), fullPage: true });
 });

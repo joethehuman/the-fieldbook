@@ -1,8 +1,9 @@
+import { recordSegment } from "../../lib/record-url";
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 
-async function start(page: Page, section: string) {
-  const data = freshWorkspace();
+async function start(page: Page, section: string, fixture?: Workspace) {
+  const data = fixture || freshWorkspace();
   await page.addInitScript((workspace) => {
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     if (!localStorage.getItem("fieldbook.workspace.v1"))
@@ -72,7 +73,7 @@ test("content edit links and published course assignment remain available", asyn
   const link = row.getByRole("link", { name: course.title, exact: true });
   await expect(link).toHaveAttribute(
     "href",
-    `#admin/content/${course.id}/edit`,
+    `#admin/content/${recordSegment(course.id, course.title)}/edit`,
   );
   await row.getByRole("button", { name: /^Actions for/ }).click();
   await expect(
@@ -81,9 +82,9 @@ test("content edit links and published course assignment remain available", asyn
   await expect(
     page.getByRole("menuitem", { name: "Unpublish", exact: true }),
   ).toBeVisible();
-  await page.getByRole("menuitem", { name: "Assign", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Assign to teams or groups", exact: true }).click();
   await expect(
-    page.getByRole("dialog", { name: "Course audience", exact: true }),
+    page.getByRole("dialog", { name: "Course assignments", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("dialog")
@@ -173,7 +174,7 @@ test("learning group shortcuts open the correct existing editor and retain the f
   const before = await page.evaluate(() =>
     localStorage.getItem("fieldbook.workspace.v1"),
   );
-  for (const action of ["Add people", "Assign courses", "Assign updates"]) {
+  for (const action of ["Add people", "Manage Courses", "Manage Updates"]) {
     await actions.click();
     await page.getByRole("menuitem", { name: action, exact: true }).click();
     const dialog = page.getByRole("dialog");
@@ -199,7 +200,16 @@ test("learning group shortcuts open the correct existing editor and retain the f
 test("group row membership and assignment saves affect the chosen group and retain other sources", async ({
   page,
 }) => {
-  await start(page, "groups");
+  const fixture = freshWorkspace();
+  const courses = fixture.content.filter(item => item.kind === "course" && item.status === "published");
+  fixture.groups = [
+    { id: "target", name: "A target group", learningItems: [], teamIds: [] },
+    { id: "other", name: "B other group", learningItems: [{ kind: "course", id: courses[1].id }], teamIds: [] },
+  ];
+  fixture.users = fixture.users.map(person => ({ ...person, groups: person.id === "demo-learner" ? ["other"] : [] }));
+  fixture.content = fixture.content.map(item => ({ ...item, groups: item.kind === "brief" ? ["other"] : [], assignments: [] }));
+  fixture.publishedContent = undefined;
+  await start(page, "groups", fixture);
   const saved = async (): Promise<Workspace> =>
     page.evaluate(() =>
       JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
@@ -221,18 +231,18 @@ test("group row membership and assignment saves affect the chosen group and reta
   await actions.click();
   await page.getByRole("menuitem", { name: "Add people", exact: true }).click();
   const membership = page.getByRole("dialog", {
-    name: "Add Members",
+    name: "Add people",
     exact: true,
   });
   await membership
-    .getByRole("searchbox", { name: "Find a user", exact: true })
+    .getByRole("searchbox")
     .fill(person.email);
   await membership.getByRole("checkbox").check();
   expect(
     (await saved()).users.find((user) => user.id === person.id)!.groups,
   ).toEqual(person.groups);
   await membership
-    .getByRole("button", { name: "Review changes", exact: true })
+    .getByRole("button", { name: "Apply changes", exact: true })
     .click();
   const membershipReview = page.getByRole("dialog", {
     name: "Review changes",
@@ -276,26 +286,18 @@ test("group row membership and assignment saves affect the chosen group and reta
   )!;
   await actions.click();
   await page
-    .getByRole("menuitem", { name: "Assign updates", exact: true })
+    .getByRole("menuitem", { name: "Manage Updates", exact: true })
     .click();
   const updates = page.getByRole("dialog", {
-    name: "Assign Updates",
+    name: "Manage Updates",
     exact: true,
   });
-  await updates
-    .getByRole("searchbox", { name: "Find Updates", exact: true })
-    .fill(update.title);
-  await updates.getByRole("checkbox").check();
-  await updates
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  const review = page.getByRole("dialog", {
-    name: "Review Update audiences",
-    exact: true,
-  });
-  await review
-    .getByRole("button", { name: "Apply changes", exact: true })
-    .click();
+  const availableUpdates = updates.getByRole("region", { name: "Available items", exact: true });
+  await availableUpdates.getByRole("searchbox").fill(update.title);
+  await availableUpdates.getByRole("button", { name: `Add ${update.title}`, exact: true }).click();
+  await updates.getByRole("button", { name: "Review changes", exact: true }).click();
+  await page.getByRole("dialog", { name: "Review Update audiences", exact: true }).getByRole("button", { name: "Apply changes", exact: true }).click();
+
   await expect(updates).not.toBeVisible();
   await expect(search).toHaveValue(group.name);
   const after = await saved();
@@ -310,10 +312,10 @@ test("group row membership and assignment saves affect the chosen group and reta
     );
   await actions.click();
   await page
-    .getByRole("menuitem", { name: "Assign courses", exact: true })
+    .getByRole("menuitem", { name: "Manage Courses", exact: true })
     .click();
-  const courses = page.getByRole("dialog", {
-    name: "Assign Courses",
+  const courseDialog = page.getByRole("dialog", {
+    name: "Manage Courses",
     exact: true,
   });
   const target = after.content.find(
@@ -324,23 +326,12 @@ test("group row membership and assignment saves affect the chosen group and reta
         (learning) => learning.kind === "course" && learning.id === item.id,
       ),
   )!;
-  await courses
-    .getByRole("searchbox", { name: "Find courses or curricula", exact: true })
-    .fill(target.title);
-  await courses
-    .getByRole("checkbox", {
-      name: new RegExp(
-        `^${target.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} Course`,
-      ),
-    })
-    .check();
-  await courses
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await courses
-    .getByRole("button", { name: "Save assignments", exact: true })
-    .click();
-  await expect(courses).not.toBeVisible();
+  const availableCourses = courseDialog.getByRole("region", { name: "Available items", exact: true });
+  await availableCourses.getByRole("searchbox").fill(target.title);
+  await availableCourses.getByRole("button", { name: `Add ${target.title}`, exact: true }).click();
+  await courseDialog.getByRole("button", { name: "Review changes", exact: true }).click();
+  await courseDialog.getByRole("button", { name: "Save assignments", exact: true }).click();
+  await expect(courseDialog).not.toBeVisible();
   await expect(search).toHaveValue(group.name);
   const assigned = await saved();
   expect(
@@ -368,20 +359,33 @@ test("shared table measures wrap unusual names and keep surplus before actions",
   const geometry = await table.evaluate((node) => {
     const row = node.querySelector("tbody tr")!;
     const contents = [...row.querySelectorAll<HTMLElement>("[data-slot=table-cell-content]")];
+    const viewport = node.closest('[role="region"][aria-label="Scrollable table"]')!.getBoundingClientRect();
     return {
       columns: contents.map((el) => ({ width: el.getBoundingClientRect().width, max: parseFloat(getComputedStyle(el).maxWidth) })),
       space: row.querySelector("[data-slot=table-space]")!.getBoundingClientRect().width,
+      available: row.getBoundingClientRect().width,
+      viewport: { left: viewport.left, right: viewport.right, width: viewport.width },
+      maximum: contents.reduce((width, content) => {
+        const cell = getComputedStyle(content.parentElement!);
+        return width + parseFloat(getComputedStyle(content).maxWidth) + parseFloat(cell.paddingLeft) + parseFloat(cell.paddingRight);
+      }, 0),
       dataRight: contents.at(-2)!.getBoundingClientRect().right,
       actionLeft: contents.at(-1)!.getBoundingClientRect().left,
+      actionRight: contents.at(-1)!.getBoundingClientRect().right,
     };
   });
   for (const column of geometry.columns) {
     expect(Number.isFinite(column.max)).toBe(true);
     expect(column.width).toBeLessThanOrEqual(column.max + 1);
   }
-  if (info.project.use.viewport!.width >= 1024)
+  if (geometry.available - geometry.maximum > 20)
     expect(geometry.space).toBeGreaterThan(20);
-  expect(geometry.actionLeft).toBeGreaterThanOrEqual(geometry.dataRight);
+  if (geometry.available <= geometry.viewport.width + 1)
+    expect(geometry.actionLeft).toBeGreaterThanOrEqual(geometry.dataRight);
+  else {
+    expect(geometry.actionLeft).toBeGreaterThanOrEqual(geometry.viewport.left);
+    expect(geometry.actionRight).toBeLessThanOrEqual(geometry.viewport.right);
+  }
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.screenshot({ path: info.outputPath("content-sized-table.png") });
 });

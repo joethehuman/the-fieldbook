@@ -52,14 +52,22 @@ export function FieldDescription({ className, ...props }: ComponentProps<"p">) {
 }
 
 /** Dismissal hides validation copy; the owning control keeps its invalid state. */
-export function FieldError({ className, ...props }: ComponentProps<typeof Alert>) {
+export function FieldError({
+  className,
+  id,
+  children,
+  ...props
+}: ComponentProps<typeof Alert>) {
   return (
     <Alert
       variant="destructive"
       dismissible={!props["aria-hidden"]}
       data-slot="field-error"
+      id={id}
       className={cn("min-h-control-sm border-0 bg-transparent px-0 py-0 text-copy font-normal [&>button]:end-0 [&>button]:top-0", className)}
       {...props}
-    />
+    >
+      <span id={id ? `${id}-message` : undefined}>{children}</span>
+    </Alert>
   );
 }

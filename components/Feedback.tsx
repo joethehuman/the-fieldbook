@@ -270,7 +270,7 @@ export function FeedbackAdmin({
           {ratingRecords.length}{" "}
           {ratingRecords.length === 1 ? "rating" : "ratings"}
         </strong>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="ghost"

@@ -113,374 +113,81 @@ async function start(page: Page, kind: "courses" | "updates" = "courses") {
       exact: true,
     })
     .click();
-  const name = kind === "courses" ? "Assign Courses" : "Assign Updates";
+  const name = kind === "courses" ? "Manage Courses" : "Manage Updates";
   await page.getByRole("button", { name, exact: true }).click();
   return page.getByRole("dialog", { name, exact: true });
 }
-async function choose(
-  page: Page,
-  picker: Locator,
-  control: string,
-  option: string,
-) {
-  if (control !== "Sort content")
-    await picker.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("combobox", { name: control, exact: true }).click();
-  await page.getByRole("option", { name: option, exact: true }).click();
-  if (control !== "Sort content")
-    await page.getByRole("dialog", { name: "Collection filters", exact: true }).press("Escape");
-}
 async function saved(page: Page): Promise<Workspace> {
-  return page.evaluate(() =>
-    JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
-  );
+  return page.evaluate(() => JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!));
+}
+async function pane(picker: Locator, side: "Available" | "Assigned") {
+  const region = picker.getByRole("region", { name: `${side} items`, exact: true });
+  if (!(await region.isVisible()))
+    await picker.getByRole("button", { name: side === "Available" ? "Available" : /^Assigned \(\d+\)$/, exact: true }).click();
+  return region;
+}
+async function add(picker: Locator, label: string) {
+  const available = await pane(picker, "Available");
+  await available.getByRole("searchbox").fill(label);
+  await available.getByRole("button", { name: `Add ${label}`, exact: true }).click();
 }
 
-test("100 content choices keep selections through discovery and cancel without saving", async ({
-  page,
-}, info) => {
+test("large transfer lists retain choices through independent searches and cancel without saving", async ({ page }, info) => {
   const picker = await start(page);
-  const search = picker.getByRole("searchbox", {
-    name: "Find courses or curricula",
-    exact: true,
-  });
-  await expect(
-    picker.getByRole("combobox", { name: "Sort content", exact: true }),
-  ).toContainText("Sort: Title (A–Z)");
-  await choose(page, picker, "Sort content", "Title (Z–A)");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course/ }).first(),
-  ).toHaveAccessibleName(/^Course 097\b/);
-  await picker.getByRole("checkbox", { name: /^Course 097\b/ }).check();
-  await picker.getByRole("button", { name: "Next", exact: true }).click();
-  await picker.getByRole("checkbox", { name: /^Course 087\b/ }).check();
-  await search.fill("marker003");
-  await picker.getByRole("checkbox", { name: /^Course 003\b/ }).check();
-  await search.clear();
-  await choose(page, picker, "Category", "Engineering");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course/ }).first(),
-  ).toHaveAccessibleName(/Engineering/);
-  await expect(
-    picker.getByText("1–10 of 49 shown", { exact: true }),
-  ).toBeVisible();
-  await picker.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(
-    picker.getByText("11–20 of 49 shown", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course 077\b/ }),
-  ).toBeVisible();
-  await picker.getByRole("button", { name: "Previous", exact: true }).click();
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course 097\b/ }),
-  ).toBeChecked();
-  await choose(page, picker, "Sort content", "Title (A–Z)");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course/ }).first(),
-  ).toHaveAccessibleName(/^Course 001\b/);
-  await choose(page, picker, "Sort content", "Title (Z–A)");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course/ }).first(),
-  ).toHaveAccessibleName(/^Course 097\b/);
-  await choose(page, picker, "Content type", "Curricula");
-  await expect(
-    picker.getByText(/^No content matches your search or filters\./),
-  ).toBeVisible();
-  await picker
-    .getByRole("button", { name: "Clear search and filters", exact: true })
-    .click();
-  await choose(page, picker, "Content type", "Curricula");
-  await expect(picker.getByRole("checkbox", { name: /^Course/ })).toHaveCount(
-    0,
-  );
-  await picker.getByRole("checkbox", { name: /^Regional curriculum/ }).check();
-  await picker
-    .getByRole("button", { name: "Review selected", exact: true })
-    .click();
-  await expect(
-    picker.getByRole("checkbox", { name: /^(Course|Regional)/ }),
-  ).toHaveCount(4);
-  for (const choice of await picker
-    .getByRole("checkbox", { name: /^(Course|Regional)/ })
-    .all())
-    await expect(choice).toBeChecked();
-  await page.screenshot({
-    path: info.outputPath("content-picker-selected.png"),
-    fullPage: true,
-  });
-  await picker
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  const review = picker;
-  await review.getByRole("button", { name: "← Back", exact: true }).click();
-  await expect(
-    picker.getByRole("checkbox", { name: /^(Course|Regional)/ }),
-  ).toHaveCount(4);
-  expect((await saved(page)).groups[0].learningItems).toEqual([]);
+  const before = (await saved(page)).groups;
+  await expect(picker.getByRole("combobox", { name: "Sort content", exact: true })).toHaveCount(0);
+  await add(picker, "Course 097");
+  await add(picker, "Course 003");
+  await add(picker, "Regional curriculum");
+  const assigned = await pane(picker, "Assigned");
+  await expect(assigned.getByRole("button", { name: /^Remove / })).toHaveCount(3);
+  await assigned.getByRole("searchbox").fill("Course 003");
+  await expect(assigned.getByRole("button", { name: "Remove Course 003", exact: true })).toBeVisible();
+  await assigned.getByRole("button", { name: "Remove Course 003", exact: true }).click();
+  await assigned.getByRole("searchbox").clear();
+  await expect(assigned.getByRole("button", { name: /^Remove / })).toHaveCount(2);
+  await picker.screenshot({ path: info.outputPath("transfer-retained-choices.png") });
   await picker.getByRole("button", { name: "Cancel", exact: true }).click();
-  await picker
-    .getByRole("button", { name: "Discard changes", exact: true })
-    .click();
-  await expect(picker).not.toBeVisible();
-  expect((await saved(page)).groups[0].learningItems).toEqual([]);
+  expect((await saved(page)).groups).toEqual(before);
 });
 
-test("course selections apply in displayed sort order and find curriculum child titles", async ({
-  page,
-}) => {
+test("course and curriculum transfers review, save, reopen and remove direct sources", async ({ page }) => {
   const picker = await start(page);
-  const search = picker.getByRole("searchbox", {
-    name: "Find courses or curricula",
-    exact: true,
-  });
-
-  await search.fill("harb quart");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course 003\b/ }),
-  ).toBeVisible();
-  await expect(
-    picker.getByRole("checkbox", { name: /^Foundation curriculum/ }),
-  ).toBeVisible();
-  await search.fill("quart harb");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course 003\b/ }),
-  ).toBeVisible();
-  await search.fill("navig orb");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course 003\b/ }),
-  ).toBeVisible();
-  await search.fill("mast sequo");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Foundation curriculum/ }),
-  ).toBeVisible();
-  await search.fill("embargo cobalt");
-  await expect(picker.getByRole("checkbox")).toHaveCount(0);
-  await search.fill("Course 003");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Foundation curriculum/ }),
-  ).toBeVisible();
-  await picker.getByRole("checkbox", { name: /^Course 003\b/ }).check();
-  await search.fill("Course 097");
-  await picker.getByRole("checkbox", { name: /^Course 097\b/ }).check();
-  await choose(page, picker, "Sort content", "Title (A–Z)");
-  await picker
-    .getByRole("button", { name: "Review selected", exact: true })
-    .click();
-  await expect(
-    picker.getByRole("checkbox", { name: /^Course/ }).first(),
-  ).toHaveAccessibleName(/^Course 003\b/);
-  await picker
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await picker
-    .getByRole("button", { name: "Save assignments", exact: true })
-    .click();
-  await expect(picker).not.toBeVisible();
-  expect((await saved(page)).groups[0].learningItems).toEqual([
-    { kind: "course", id: "course-3" },
-    { kind: "course", id: "course-97" },
-  ]);
-});
-
-test("100 Updates expose real categories and searchable descriptions without a course type filter", async ({
-  page,
-}, info) => {
-  const picker = await start(page, "updates");
-  await choose(page, picker, "Sort content", "Updated (newest)");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Update/ }).first(),
-  ).toHaveAccessibleName(/^Update 099\b/);
-  await picker.getByRole("button", { name: /^Filters/ }).click();
-  await expect(
-    page.getByRole("combobox", { name: "Content type", exact: true }),
-  ).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Category", exact: true }).click();
-  await expect(page.getByRole("option")).toHaveText([
-    "All categories",
-    "Engineering",
-    "Sales",
-  ]);
-  await page.getByRole("option", { name: "Sales", exact: true }).click();
-  await page
-    .getByRole("dialog", { name: "Collection filters", exact: true })
-    .press("Escape");
-  const search = picker.getByRole("searchbox", {
-    name: "Find Updates",
-    exact: true,
-  });
-  await search.fill("lighth amb");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Update 002\b/ }),
-  ).toBeVisible();
-  await search.fill("amb lighth");
-  await expect(
-    picker.getByRole("checkbox", { name: /^Update 002\b/ }),
-  ).toBeVisible();
-  await search.fill("marker002");
-  await picker.getByRole("checkbox", { name: /^Update 002\b/ }).check();
-  await search.fill("Engineering");
-  await expect(
-    picker.getByText(/^No content matches your search or filters\./),
-  ).toBeVisible();
-  await picker
-    .getByRole("button", { name: "Review selected", exact: true })
-    .click();
-  await expect(
-    picker.getByRole("checkbox", { name: /^Update 002\b/ }),
-  ).toBeChecked();
-  await page.screenshot({
-    path: info.outputPath("updates-picker-selected.png"),
-    fullPage: true,
-  });
-  await picker
-    .getByRole("button", { name: "Clear selection", exact: true })
-    .click();
-  await expect(picker.getByRole("checkbox", { name: /^Update/ })).toHaveCount(
-    10,
-  );
-  await expect(
-    picker.getByRole("checkbox", { name: /^Update/ }).first(),
-  ).toHaveAccessibleName(/^Update 099\b/);
-  await expect(
-    picker.getByRole("button", { name: "Show all options", exact: true }),
-  ).toHaveCount(0);
-  await picker.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(picker).not.toBeVisible();
-  expect(
-    (await saved(page)).content.filter(
-      (item) => item.kind === "brief" && item.groups.includes("picker"),
-    ),
-  ).toEqual([]);
-});
-
-test("content search explains body matches and holds dialog and footer geometry for many, few and zero results", async ({
-  page,
-}, info) => {
-  const picker = await start(page);
-  const search = picker.getByRole("searchbox", {
-    name: "Find courses or curricula",
-    exact: true,
-  });
-  const original = await picker.boundingBox();
-  const footer = picker.locator('[data-slot="dialog-footer"]');
-  const footerOriginal = await footer.boundingBox();
-  expect(original).not.toBeNull();
-  expect(footerOriginal).not.toBeNull();
-  await search.fill("harb quart");
-  const match = picker
-    .locator("label")
-    .filter({ has: page.getByRole("checkbox", { name: /^Course 003\b/ }) });
-  await expect(match).toContainText("Quartz harbor");
-  await expect(
-    match.locator("mark").filter({ hasText: "Quartz" }).first(),
-  ).toBeVisible();
-  await expect(
-    match.locator("mark").filter({ hasText: "harbor" }).first(),
-  ).toBeVisible();
-  for (const query of ["Course 097", "nothingmatcheszzqx"]) {
-    await search.fill(query);
-    const box = await picker.boundingBox();
-    const actions = await footer.boundingBox();
-    expect(Math.abs(box!.height - original!.height)).toBeLessThanOrEqual(1);
-    expect(Math.abs(box!.y - original!.y)).toBeLessThanOrEqual(1);
-    expect(Math.abs(actions!.y - footerOriginal!.y)).toBeLessThanOrEqual(1);
-    await expect(
-      picker.getByRole("button", { name: "Cancel", exact: true }),
-    ).toBeInViewport();
-  }
-  await search.fill("Course 003");
-  await expect(
-    picker.getByRole("checkbox", { name: /^(Course|Foundation)/ }).first(),
-  ).toHaveAccessibleName(/^Course 003\b/);
-  const cards = await picker
-    .locator('[data-slot="selection-results"] > label')
-    .evaluateAll((rows) =>
-      rows.map((row) => {
-        const card = row.getBoundingClientRect();
-        const text = row
-          .querySelector(":scope > span")!
-          .getBoundingClientRect();
-        const excerpt = row.querySelector<HTMLElement>(
-          '[data-slot="selection-excerpt"]',
-        )!;
-        const detail = excerpt.getBoundingClientRect();
-        return {
-          top: card.top,
-          bottom: card.bottom,
-          textBottom: text.bottom,
-          excerptBottom: detail.bottom,
-          excerptHeight: detail.height,
-          lineHeight: Number.parseFloat(getComputedStyle(excerpt).lineHeight),
-        };
-      }),
-    );
-  expect(cards).toHaveLength(2);
-  for (const [index, card] of cards.entries()) {
-    expect(card.textBottom).toBeLessThanOrEqual(card.bottom + 1);
-    expect(card.excerptBottom).toBeLessThanOrEqual(card.bottom + 1);
-    expect(card.excerptHeight).toBeLessThanOrEqual(card.lineHeight * 3 + 1);
-    if (index) expect(card.top).toBeGreaterThanOrEqual(cards[index - 1].bottom);
-  }
-  await page.screenshot({
-    path: info.outputPath("content-search-excerpt-stable-dialog.png"),
-    fullPage: true,
-  });
-  await search.fill("Engineering");
-  await expect(picker.getByText(/^No content matches/)).toBeVisible();
-  await picker
-    .getByRole("button", { name: "Clear search and filters", exact: true })
-    .click();
-  await expect(picker.getByRole("checkbox", { name: /^Course/ })).toHaveCount(
-    10,
-  );
-  await picker.getByRole("button", { name: "Cancel", exact: true }).click();
-  expect((await saved(page)).groups[0].learningItems).toEqual([]);
-});
-
-test("changing title sort during search applies additions in the visible relevance order", async ({
-  page,
-}) => {
-  const picker = await start(page);
-  await picker
-    .getByRole("searchbox", { name: "Find courses or curricula", exact: true })
-    .fill("Course 003");
-  await picker.getByRole("checkbox", { name: /^Course 003\b/ }).check();
-  await picker
-    .getByRole("checkbox", { name: /^Foundation curriculum/ })
-    .check();
-  await choose(page, picker, "Sort content", "Title (Z–A)");
-  await expect(
-    picker.getByRole("checkbox", { name: /^(Course|Foundation)/ }).first(),
-  ).toHaveAccessibleName(/^Course 003\b/);
-  await picker
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  const review = picker;
-  await review
-    .getByRole("button", { name: "Save assignments", exact: true })
-    .click();
-  await expect(picker).not.toBeVisible();
-  expect((await saved(page)).groups[0].learningItems).toEqual([
-    { kind: "course", id: "course-3" },
-    { kind: "curriculum", id: "foundation" },
-  ]);
-});
-
-test("leaving course-only dates keeps applied selections in the displayed title order", async ({ page }) => {
-  const picker = await start(page);
-  await choose(page, picker, "Content type", "Courses");
-  await choose(page, picker, "Sort content", "Updated (newest)");
-  await picker.getByRole("checkbox", { name: /^Course 097\b/ }).check();
-  await picker.getByRole("checkbox", { name: /^Course 095\b/ }).check();
-  await choose(page, picker, "Content type", "Curricula");
-  await expect(picker.getByRole("combobox", { name: "Sort content", exact: true })).toContainText("Title (A–Z)");
-  await picker.getByRole("button", { name: "Review selected", exact: true }).click();
-  await expect(picker.getByRole("checkbox", { name: /^Course/ }).first()).toHaveAccessibleName(/^Course 095\b/);
+  await add(picker, "Course 097");
+  await add(picker, "Course 003");
+  await add(picker, "Regional curriculum");
   await picker.getByRole("button", { name: "Review changes", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(1);
   await picker.getByRole("button", { name: "Save assignments", exact: true }).click();
   await expect(picker).not.toBeVisible();
+  const items = (await saved(page)).groups[0].learningItems;
+  expect(items).toEqual(expect.arrayContaining([
+    { kind: "course", id: "course-3" }, { kind: "course", id: "course-97" },
+    { kind: "curriculum", id: "regional" },
+  ]));
+  expect(items).toHaveLength(3);
+  await page.getByRole("button", { name: "Manage Courses", exact: true }).click();
+  const assigned = await pane(picker, "Assigned");
+  await assigned.getByRole("button", { name: "Remove Regional curriculum", exact: true }).click();
+  await picker.getByRole("button", { name: "Review changes", exact: true }).click();
+  await picker.getByRole("button", { name: "Save assignments", exact: true }).click();
   expect((await saved(page)).groups[0].learningItems).toEqual([
-    { kind: "course", id: "course-95" }, { kind: "course", id: "course-97" },
+    { kind: "course", id: "course-97" }, { kind: "course", id: "course-3" },
   ]);
+});
+
+test("Update transfers save chosen audiences and preserve unrelated Updates", async ({ page }) => {
+  const picker = await start(page, "updates");
+  const before = (await saved(page)).content;
+  await add(picker, "Update 099");
+  await add(picker, "Update 002");
+  await picker.getByRole("button", { name: "Review changes", exact: true }).click();
+  await page.getByRole("dialog", { name: "Review Update audiences", exact: true })
+    .getByRole("button", { name: "Apply changes", exact: true }).click();
+  await expect(picker).not.toBeVisible();
+  const after = (await saved(page)).content;
+  expect(after.filter(item => item.kind === "brief" && item.groups.includes("picker")).map(item => item.id).sort())
+    .toEqual(["brief-2", "brief-99"]);
+  for (const item of before.filter(item => !["brief-2", "brief-99"].includes(item.id)))
+    expect(after.find(next => next.id === item.id)!.groups).toEqual(item.groups);
 });

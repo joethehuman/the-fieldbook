@@ -403,6 +403,11 @@ async function dragAfter(
   });
   await expect(target).toHaveAttribute("data-drop", "after");
   await page.screenshot({ path: screenshot });
+  // The destination caption can wrap and change row geometry during the drag.
+  const settled = await target.boundingBox();
+  expect(settled).toBeTruthy();
+  await page.mouse.move(settled!.x + settled!.width / 2, settled!.y + settled!.height / 2);
+  await page.mouse.move(settled!.x + settled!.width / 2 + 1, settled!.y + settled!.height / 2 + 1);
   await page.mouse.up();
 }
 
@@ -940,7 +945,13 @@ async function dragInto(
   await expect(target).toHaveAttribute("data-drop-inside", "true");
   await expect(target).toContainText("Move to");
   await page.screenshot({ path: screenshot });
+  // The destination caption can wrap and change row geometry during the drag.
+  const settled = await target.boundingBox();
+  expect(settled).toBeTruthy();
+  await page.mouse.move(settled!.x + settled!.width / 2, settled!.y + settled!.height / 2);
+  await page.mouse.move(settled!.x + settled!.width / 2 + 1, settled!.y + settled!.height / 2 + 1);
   await page.mouse.up();
+
 }
 
 test("native drag moves documents and subsection branches into another section, including an empty destination", async ({

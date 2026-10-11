@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
+import { openCatalog } from "../helpers/catalog-ready";
 
 test("confirmations replace one another without shifting layout and fade automatically", async ({
   page,
 }, info) => {
-  await page.goto("/ui");
+  await openCatalog(page);
   const trigger = page.getByRole("button", {
     name: "Preview confirmation",
     exact: true,
   });
-  await expect(page.getByRole("group", { name: "Formatting" })).toBeVisible();
   await expect(trigger).toBeVisible();
   await trigger.scrollIntoViewIfNeeded();
   const documentPosition = () =>

@@ -60,7 +60,7 @@ test("installed Teams keeps its organization team manageable and reveals a newly
     browser.getByRole("button", { name: "Open Company", exact: true }),
   ).toHaveCount(0);
   await expect(
-    browser.getByRole("button", { name: "Open Sales", exact: true }),
+    browser.getByRole("button", { name: "Actions for Sales", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Organization", exact: true }).click();
   await expect(
@@ -124,7 +124,7 @@ test("installed Teams keeps its organization team manageable and reveals a newly
     }),
   ).toBeFocused();
   await expect(
-    browser.getByRole("button", { name: "Edit New region", exact: true }),
+    browser.getByRole("button", { name: "Actions for New region", exact: true }),
   ).toBeVisible();
   await page.screenshot({
     path: info.outputPath("installed-team-browser.png"),

@@ -83,7 +83,7 @@ export function ReorderRow({
               {detail && (
                 <small
                   data-slot="reorder-detail"
-                  className="inline-flex h-6 shrink-0 items-center gap-2 text-xs text-muted-foreground"
+                  className="inline-flex min-h-6 min-w-0 max-w-full flex-wrap items-center gap-2 text-xs text-muted-foreground @min-[20rem]:h-6"
                 >
                   <span aria-hidden="true">·</span>
                   {detail}

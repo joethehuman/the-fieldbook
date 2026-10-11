@@ -172,20 +172,18 @@ test("bulk group edits preserve the organization and preregistered people use th
     expect(revisions).toEqual([10, 11, 12]);
     await search.fill("");
     await page
-      .getByRole("button", { name: "Pre-register person", exact: true })
+      .getByRole("button", { name: "Pre-register user", exact: true })
       .click();
-    const form = page.locator("#preregister-person");
+    const form = page.getByRole("dialog", { name: "Pre-register user", exact: true });
     await form.getByLabel("Name", { exact: true }).fill("New person");
     await form
       .getByLabel("Google email", { exact: true })
       .fill("new@example.test");
     await form.getByLabel("Hire date", { exact: true }).fill("2026-10-01");
     await form
-      .getByRole("button", { name: "Save person", exact: true })
+      .getByRole("button", { name: "Pre-register user", exact: true })
       .click();
-    await expect(
-      form.getByRole("button", { name: "Pre-register person" }),
-    ).toBeVisible();
+    await expect(form).not.toBeVisible();
     await search.fill("new@example.test");
     await expect(
       page.getByRole("row").filter({ hasText: "New person" }),

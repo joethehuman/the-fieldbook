@@ -126,14 +126,17 @@ test("content row menus preserve assignment selection and canceled publication c
   });
   await trigger.click();
   await screenshot(page, info, "content-actions");
-  await page.getByRole("menuitem", { name: "Assign", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Assign to teams or groups", exact: true }).click();
   const audience = page.getByRole("dialog", {
-    name: "Course audience",
+    name: "Course assignments",
     exact: true,
   });
   await expect(audience).toBeVisible();
+  const panes = audience.getByRole("group", { name: "Assignment lists", exact: true });
+  if (await panes.isVisible()) await panes.getByRole("button", { name: "Available", exact: true }).click();
+  await expect(audience).toBeVisible();
   await expect(
-    audience.getByRole("checkbox", { checked: true }).first(),
+    audience.getByRole("button", { name: /^Add (team|group):/ }).first(),
   ).toBeVisible();
   await audience.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(trigger).toBeFocused();
@@ -143,7 +146,7 @@ test("content row menus preserve assignment selection and canceled publication c
   await trigger.click();
   await page.getByRole("menuitem", { name: "Unpublish", exact: true }).click();
   await page
-    .getByRole("alertdialog")
+    .getByRole("dialog", { name: "Unpublish", exact: true })
     .getByRole("button", { name: "Cancel", exact: true })
     .click();
   await expect(trigger).toBeFocused();

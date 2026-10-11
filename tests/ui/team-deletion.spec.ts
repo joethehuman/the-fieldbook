@@ -21,6 +21,7 @@ async function seed(page: Page, manyManagedTeams = false) {
     root,
     { id: "parent", name: "Parent", parentId: root.id },
     { id: "deleted", name: "Delete this team", parentId: "parent" },
+    { id: "deleted-extra", name: "Delete another team", parentId: "parent" },
     {
       id: "child",
       name: "Surviving subteam",
@@ -72,6 +73,7 @@ test("bulk team deletion reviews paths, cancels safely and promotes the survivin
   await page
     .getByRole("checkbox", { name: "Select Delete this team", exact: true })
     .check();
+  await page.getByRole("checkbox", { name: "Select Delete another team", exact: true }).check();
   const before = await saved(page);
   const open = async () => {
     await page
@@ -83,7 +85,7 @@ test("bulk team deletion reviews paths, cancels safely and promotes the survivin
   };
   await open();
   const dialog = page.getByRole("dialog", {
-    name: "Delete 1 team?",
+    name: "Delete 2 teams?",
     exact: true,
   });
   await expect(dialog.getByLabel("Teams to delete")).toContainText(
@@ -108,7 +110,7 @@ test("bulk team deletion reviews paths, cancels safely and promotes the survivin
     .click();
   await expect(dialog).toHaveCount(0);
   const after = await saved(page);
-  expect(after.teams!.some((t) => t.id === "deleted")).toBe(false);
+  expect(after.teams!.some((t) => ["deleted", "deleted-extra"].includes(t.id))).toBe(false);
   expect(after.teams!.find((t) => t.id === "child")).toEqual({
     ...before.teams!.find((t) => t.id === "child")!,
     parentId: root,

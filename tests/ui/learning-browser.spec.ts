@@ -178,7 +178,7 @@ test("For you uses curriculum cards, one category picker and a simple ordered pa
   ).toHaveCount(0);
   await noOverflow(page);
   await library.locator(".course-card").click();
-  await expect(page).toHaveURL(/#curricula\/sales-foundations$/);
+  await expect(page).toHaveURL(/#curricula\/account-executive-foundations--sales-foundations$/);
   await expect(
     page.getByRole("heading", {
       name: "Account executive foundations",

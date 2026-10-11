@@ -44,7 +44,7 @@ for (const profile of [
         page,
       }, info) => {
         test.setTimeout(90_000);
-        test.skip(info.project.name === "production-phone" && !profile.touch);
+        test.skip(info.project.name === "production-phone" && !profile.touch, "The phone project is covered by the touch profiles.");
         const installed = info.project.name.startsWith("production");
         const errors: string[] = [];
         page.on("pageerror", (error) => errors.push(error.message));

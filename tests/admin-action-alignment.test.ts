@@ -91,26 +91,34 @@ test("group Update lists retain individual action targets for one item and four 
       createElement(
         InteractionDialogProvider,
         null,
-        createElement(LearningGroups, {
-          data,
-          onChange: () => {},
-          onLearning: async () => {},
-          initialGroup: group.id,
-          initialTab: "updates",
-        }),
+        createElement(
+          TooltipProvider,
+          null,
+          createElement(LearningGroups, {
+            data,
+            onChange: () => {},
+            onLearning: async () => {},
+            initialGroup: group.id,
+            initialTab: "updates",
+          }),
+        ),
       ),
     ),
   );
+  // The mounted directory is hidden while the selected group detail is visible.
+  assert.match(html, /data-slot="detail-navigation"/);
+  const detail = html.slice(html.indexOf('data-slot="detail-navigation"'));
   assert.match(
-    html,
+    detail,
     new RegExp(
       `Actions for ${update.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
     ),
   );
-  assert.doesNotMatch(html, /Bulk actions/);
+  assert.doesNotMatch(detail, /Bulk actions/);
   const table =
-    html.match(/<table[^>]*data-layout="groupUpdates"[\s\S]*?<\/table>/)?.[0] ||
-    "";
+    detail.match(
+      /<table[^>]*data-layout="groupUpdates"[\s\S]*?<\/table>/,
+    )?.[0] || "";
   assert.equal((table.match(/<col class=/g) || []).length, 5);
   assert.equal((table.match(/<td /g) || []).length, 5);
   assert.equal((table.match(/data-slot="table-space"/g) || []).length, 2);
@@ -138,18 +146,24 @@ test("single direct group member has a row action without a bulk-selection fallb
       createElement(
         InteractionDialogProvider,
         null,
-        createElement(LearningGroups, {
-          data,
-          onChange: () => {},
-          onLearning: async () => {},
-          initialGroup: group.id,
-          initialTab: "people",
-        }),
+        createElement(
+          TooltipProvider,
+          null,
+          createElement(LearningGroups, {
+            data,
+            onChange: () => {},
+            onLearning: async () => {},
+            initialGroup: group.id,
+            initialTab: "people",
+          }),
+        ),
       ),
     ),
   );
-  assert.match(html, /Actions for Direct fixture/);
-  assert.doesNotMatch(html, /Bulk actions/);
+  assert.match(html, /data-slot="detail-navigation"/);
+  const detail = html.slice(html.indexOf('data-slot="detail-navigation"'));
+  assert.match(detail, /Actions for Direct fixture/);
+  assert.doesNotMatch(detail, /Bulk actions/);
 });
 
 test("Organization roster retains a single-user move menu without changing the root model", async () => {

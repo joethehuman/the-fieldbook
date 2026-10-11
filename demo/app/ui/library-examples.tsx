@@ -222,7 +222,7 @@ export function LibraryExamples() {
     <section
       id="shared-library"
       aria-label="Shared library states"
-      className="grid min-w-0 gap-6"
+      className="grid min-w-0 grid-cols-1 gap-6"
     >
       <h2>Shared library states and usage</h2>
       <AudienceSelectionExample />

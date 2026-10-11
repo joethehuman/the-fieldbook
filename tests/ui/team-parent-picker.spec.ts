@@ -1,3 +1,4 @@
+import { teamCommand } from "../helpers/team-navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 
@@ -132,9 +133,7 @@ test("parent picker excludes the edited team and all its descendants", async ({
   }, data);
   await page.goto("/#admin");
   await teams(page);
-  await page
-    .getByRole("button", { name: "Edit Cycle parent", exact: true })
-    .click();
+  await teamCommand(page, "Cycle parent", "Edit team");
   const dialog = page.getByRole("dialog", {
     name: "Edit Cycle parent",
     exact: true,

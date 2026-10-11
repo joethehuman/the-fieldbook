@@ -19,7 +19,7 @@ export function TextField({
     [
       props["aria-describedby"],
       description && `${id}-description`,
-      error && `${id}-error`,
+      error && `${id}-error-message`,
     ]
       .filter(Boolean)
       .join(" ") || undefined;

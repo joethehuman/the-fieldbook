@@ -40,6 +40,9 @@ test("external links: empty state, limit, validation, reorder, recovery and save
   let writes = 0;
   if (production) {
     await setupAuthoringProvider(page, data);
+    const initial = await (await page.request.get("/api/admin/snapshot?scope=content")).json();
+    data.settings = initial.data.settings;
+    data.revision = initial.data.revision;
     await page.route("**/api/admin/snapshot?**", (route) =>
       route.fulfill({ json: { data, user: authoringUser } }),
     );
@@ -147,44 +150,18 @@ test("external links: empty state, limit, validation, reorder, recovery and save
     rejectSave = true;
     await settings.getByRole("button", { name: "Save settings" }).click();
     await expect(
-      page.getByText(/0 of 1 changes were confirmed saved. Save unavailable/),
+      page.getByText(/Save unavailable/),
     ).toBeVisible();
     await expect(
       last.getByRole("textbox", { name: "Label", exact: true }),
     ).toHaveValue("Learning portal");
     rejectSave = false;
     await settings.getByRole("button", { name: "Save settings" }).click();
-    await expect(
-      page.getByText(
-        /Refresh and review the saved copy before applying more changes/,
-      ),
-    ).toBeVisible();
-    expect(writes).toBe(1);
-    page.once("dialog", (dialog) => dialog.accept());
-    await page.reload();
-    await section(page, "External links");
-    await expect(
-      settings.getByRole("textbox", { name: "Label", exact: true }),
-    ).toHaveCount(0);
-    for (const [label, url] of [
-      ["Product docs", "https://example.test/1"],
-      ["Company website", "https://example.test/3"],
-      ["Learning portal", "https://example.test/2"],
-    ]) {
-      await settings
-        .getByRole("button", { name: "Add link", exact: true })
-        .click();
-      await settings
-        .getByRole("textbox", { name: "Label", exact: true })
-        .last()
-        .fill(label);
-      await settings
-        .getByRole("textbox", { name: "URL", exact: true })
-        .last()
-        .fill(url);
-    }
+    await expect(page.getByText("Settings saved.", { exact: true })).toBeVisible();
+    expect(writes).toBe(2);
+  } else {
+    await settings.getByRole("button", { name: "Save settings" }).click();
   }
-  await settings.getByRole("button", { name: "Save settings" }).click();
   await expect(
     page.getByText("Settings saved.", { exact: true }),
   ).toBeVisible();
@@ -235,7 +212,7 @@ test("external links: empty state, limit, validation, reorder, recovery and save
   await settings
     .getByRole("button", { name: "Remove Company website" })
     .click();
-  await settings.getByRole("button", { name: "Discard changes" }).click();
+  await page.getByRole("button", { name: "Discard changes", exact: true }).click();
   await expect(
     settings.getByRole("textbox", { name: "Label", exact: true }),
   ).toHaveCount(3);

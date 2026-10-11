@@ -10,7 +10,7 @@ import {
 test("installed mixed picker saves one complete governance mutation and blocks stale retry", async ({
   page,
 }, info) => {
-  test.skip(!info.project.name.startsWith("production"));
+  test.skip(!info.project.name.startsWith("production"), "Revision-checked writes use the installed-app provider fixture.");
   const data = withPublishedSnapshots(freshWorkspace());
   data.governanceRevision = 10;
   const course = data.content.find((c) => c.kind === "course")!;
@@ -43,43 +43,29 @@ test("installed mixed picker saves one complete governance mutation and blocks s
   await page
     .getByRole("searchbox", { name: "Search content" })
     .fill(course.title);
-  await page
-    .getByRole("row")
-    .filter({ hasText: course.title })
-    .getByRole("button", { name: "Assign", exact: true })
-    .click();
+  await page.getByRole("row").filter({ hasText: course.title }).getByRole("button", { name: /^Actions for/ }).click();
+  await page.getByRole("menuitem", { name: "Assign to teams or groups", exact: true }).click();
   const panel = page.getByRole("dialog", {
-    name: "Course audience",
+    name: "Course assignments",
     exact: true,
   });
   await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Group: Sales",
-      exact: true,
-    }),
+    panel.getByRole("button", { name: "Add group: Sales", exact: true }),
   ).toBeVisible();
-  await panel
-    .getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    })
-    .check();
+  await panel.getByRole("button", { name: "Add team: Sales", exact: true }).click();
   await panel
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
   const review = page.getByRole("dialog", {
-    name: "Course audience",
+    name: "Course assignments",
     exact: true,
   });
   await expect(review).toBeVisible();
   expect(calls).toBe(0);
   await review.getByRole("button", { name: "← Back", exact: true }).click();
   await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    }),
-  ).toBeChecked();
+    panel.getByRole("button", { name: "Remove team: Sales", exact: true }),
+  ).toBeVisible();
   await expect(
     panel.getByRole("button", { name: "Review changes", exact: true }),
   ).toBeVisible();
@@ -88,7 +74,7 @@ test("installed mixed picker saves one complete governance mutation and blocks s
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
   await page
-    .getByRole("dialog", { name: "Course audience", exact: true })
+    .getByRole("dialog", { name: "Course assignments", exact: true })
     .getByRole("button", { name: "Save assignments", exact: true })
     .click();
   await expect(panel.getByRole("alert")).toBeVisible();
@@ -100,11 +86,8 @@ test("installed mixed picker saves one complete governance mutation and blocks s
     .getByRole("button", { name: "Refresh audience", exact: true })
     .click();
   await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    }),
-  ).toBeChecked();
+    panel.getByRole("button", { name: "Remove team: Sales", exact: true }),
+  ).toBeVisible();
   await panel
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
@@ -122,23 +105,14 @@ test("installed mixed picker saves one complete governance mutation and blocks s
     .getByRole("button", { name: "Discard changes", exact: true })
     .click();
   await expect(panel).not.toBeVisible();
-  await page
-    .getByRole("row")
-    .filter({ hasText: course.title })
-    .getByRole("button", { name: "Assign", exact: true })
-    .click();
+  await page.getByRole("row").filter({ hasText: course.title }).getByRole("button", { name: /^Actions for/ }).click();
+  await page.getByRole("menuitem", { name: "Assign to teams or groups", exact: true }).click();
   await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Group: Sales",
-      exact: true,
-    }),
-  ).toBeChecked();
+    panel.getByRole("button", { name: "Remove group: Sales", exact: true }),
+  ).toBeVisible();
   await expect(
-    panel.getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    }),
-  ).not.toBeChecked();
+    panel.getByRole("button", { name: "Add team: Sales", exact: true }),
+  ).toBeVisible();
   await expect(panel.getByRole("alert")).toHaveCount(0);
   expect(calls).toBe(1);
 });
@@ -146,7 +120,7 @@ test("installed mixed picker saves one complete governance mutation and blocks s
 test("installed editor saves after assignments change its document revision", async ({
   page,
 }, info) => {
-  test.skip(!info.project.name.startsWith("production"));
+  test.skip(!info.project.name.startsWith("production"), "Revision-checked writes use the installed-app provider fixture.");
   const data = withPublishedSnapshots(freshWorkspace());
   data.governanceRevision = 10;
   const course = structuredClone(
@@ -197,7 +171,7 @@ test("installed editor saves after assignments change its document revision", as
     await route.fulfill({ json: { revision: 11 } });
   });
   await page.goto("/admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("link", { name: course.title, exact: true }).click();
   await page
     .getByRole("textbox", { name: "Lesson content", exact: true })
     .waitFor();
@@ -206,20 +180,15 @@ test("installed editor saves after assignments change its document revision", as
     .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const panel = page.getByRole("dialog", {
-    name: "Course audience",
+    name: "Course assignments",
     exact: true,
   });
-  await panel
-    .getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    })
-    .check();
+  await panel.getByRole("button", { name: "Add team: Sales", exact: true }).click();
   await panel
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
   await page
-    .getByRole("dialog", { name: "Course audience", exact: true })
+    .getByRole("dialog", { name: "Course assignments", exact: true })
     .getByRole("button", { name: "Save assignments", exact: true })
     .click();
   await expect(panel).not.toBeVisible();

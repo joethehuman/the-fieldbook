@@ -1158,7 +1158,7 @@ test("long item titles wrap and selection remains visible after focus leaves the
 test("drag and menu reordering stage and save the same course category order", async ({
   page,
 }, info) => {
-  test.skip(info.project.name !== "desktop");
+  test.skip(info.project.name !== "desktop", "Native mouse drag is checked on desktop; menu reordering covers tablet and phone.");
   const before = await fixture(page);
   const names = before.settings!.contentCategories!.course;
   await page
