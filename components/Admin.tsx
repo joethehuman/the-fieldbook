@@ -2501,6 +2501,9 @@ export function Editor({
     data.settings?.docCategoryOrder,
     createdSections || data.settings?.docSections,
   );
+  const categories = c.kind === "doc" ? [] : availableCategories(
+    data.content, c.kind, data.settings,
+  );
   const existing = data.content.some((x) => x.id === c.id);
   type Requirement = {
     id: string;
@@ -2777,20 +2780,23 @@ export function Editor({
           </>
         ) : (
           <>
-          <FormField label="Category" visuallyHiddenLabel>
-            {data.settings?.contentCategories ? <HierarchyPicker
+          <FormField label="Category" visuallyHiddenLabel
+            description={!onWorkspaceChange ? "Ask an administrator to create a new category." : undefined}>
+            {data.settings?.contentCategories || !onWorkspaceChange ? <HierarchyPicker
               inputVariant="metadata"
               value={c.category}
               onValueChange={(value) => set("category", value)}
-              options={availableCategories(data.content, c.kind, data.settings).map((name) => ({ id: name, label: name, path: [name] }))}
+              options={categories.map((name) => ({ id: name, label: name, path: [name] }))}
               searchLabel="Categories" searchPlaceholder="Find a category…" placeholder="Choose a category…"
               visibleRows={5} disabled={busy} showFullHierarchy={false}
-              emptyMessage="No categories yet. An administrator can create one."
+              emptyMessage={categories.length ? "No matching categories." : onWorkspaceChange
+                ? "No categories yet. Create one below."
+                : "An administrator must create a category first."}
             /> : <CreatableCombobox
               variant="metadata"
               value={c.category}
               onValueChange={(value) => set("category", value)}
-              options={availableCategories(data.content, c.kind, data.settings)}
+              options={categories}
               listLabel="Categories"
               visibleRows={5}
               placeholder="Choose or add category…"

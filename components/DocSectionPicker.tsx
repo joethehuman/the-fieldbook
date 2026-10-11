@@ -14,7 +14,8 @@ export function DocSectionPicker({ sections, value, onChange, disabled = false, 
   inputVariant?: ComponentProps<typeof Input>["variant"];
 }) {
   return (
-    <FormField label="Section" visuallyHiddenLabel>
+    <FormField label="Section" visuallyHiddenLabel
+      description={!canCreate ? "Ask an administrator to create a new section." : undefined}>
       <HierarchyPicker
         inputVariant={inputVariant}
         value={value}

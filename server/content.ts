@@ -99,12 +99,18 @@ export async function saveContent(
       parsed.error.issues.map((i) => i.message).join(" "),
     );
   const c = parsed.data;
+  const contributor = user.role === "contributor";
   if (c.kind !== "doc" && c.category.trim()) {
     const config = await dataStore().readSettings();
     if (!config)
       throw new HttpError(503, "Settings are unavailable. Try again.");
+    const existing = contributor && !config.settings.contentCategories
+      ? (await dataStore().listDraftIndex()).map((item) => ({
+          id: item.id, kind: item.kind || "doc", category: item.category || "",
+        }))
+      : undefined;
     try {
-      assertContentCategory(c, config.settings);
+      assertContentCategory(c, config.settings, existing);
     } catch (error) {
       throw new HttpError(400, (error as Error).message);
     }
@@ -114,7 +120,6 @@ export async function saveContent(
       400,
       "Only publishing an Update can renew its feed date.",
     );
-  const contributor = user.role === "contributor";
   if (publish && !c.summary.trim())
     throw new HttpError(400, "Add a short description before publishing.");
   if (c.kind === "doc") {
