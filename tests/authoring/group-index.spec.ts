@@ -102,7 +102,7 @@ test("installed group directory cancels bulk deletion intact and sends one revis
     .getByRole("button", { name: "Delete groups", exact: true })
     .click();
   await expect(
-    table.getByRole("button", { name: "Keep audience", exact: true }),
+    table.getByRole("link", { name: "Keep audience", exact: true }),
   ).toBeVisible();
   await expect(table.getByRole("row")).toHaveCount(2);
   expect(writes).toBe(1);

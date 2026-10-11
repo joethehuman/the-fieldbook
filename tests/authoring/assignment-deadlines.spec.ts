@@ -75,7 +75,7 @@ test("installed deadline review paginates 500 people and retains a stale review 
   await dialog.getByRole("button", { name: "Next", exact: true }).click();
   await expect(dialog).toContainText("Person 025");
   await dialog
-    .getByRole("textbox", { name: "Find a person or course", exact: true })
+    .getByRole("textbox", { name: "Find a user or course", exact: true })
     .fill("Person 499");
   await expect(dialog.getByRole("row")).toHaveCount(2);
   await expect(dialog).toContainText("Person 499");

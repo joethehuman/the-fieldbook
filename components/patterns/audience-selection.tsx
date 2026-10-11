@@ -635,14 +635,14 @@ export function AudienceSelection({
       )}
     >
       <div
-        className="flex shrink-0 gap-2 md:hidden"
+        className="grid shrink-0 grid-cols-2 gap-2 md:hidden"
         role="group"
         aria-label="Assignment lists"
       >
         <Button
           type="button"
           variant={pane === "available" ? "default" : "outline"}
-          className="flex-1"
+          className="w-full min-w-0 whitespace-normal [overflow-wrap:anywhere]"
           aria-pressed={pane === "available"}
           aria-controls={`${id}-available`}
           onClick={() => setPane("available")}
@@ -652,7 +652,7 @@ export function AudienceSelection({
         <Button
           type="button"
           variant={pane === "assigned" ? "default" : "outline"}
-          className="flex-1"
+          className="w-full min-w-0 whitespace-normal [overflow-wrap:anywhere]"
           aria-pressed={pane === "assigned"}
           aria-controls={`${id}-assigned`}
           onClick={() => setPane("assigned")}
@@ -677,7 +677,7 @@ export function AudienceSelection({
               className="shrink-0 text-sm font-semibold outline-none"
             >
               Available{" "}
-              <span className="font-normal text-muted-foreground">
+              <span className="font-normal tabular-nums text-muted-foreground">
                 · {model.available.length}
               </span>
             </h3>
@@ -736,7 +736,7 @@ export function AudienceSelection({
               className="shrink-0 text-sm font-semibold outline-none"
             >
               {rightLabel}{" "}
-              <span className="font-normal text-muted-foreground">
+              <span className="font-normal tabular-nums text-muted-foreground">
                 · {rightCount}
               </span>
             </h3>

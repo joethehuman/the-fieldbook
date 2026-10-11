@@ -87,6 +87,7 @@ test("bulk publication loads authoritative bodies and never invents a course ver
   let saved = false;
   await fixture(
     (url, method, body) => {
+      if (url.pathname.endsWith("fb_config")) return { settings: {} };
       if (url.pathname.endsWith("fb_documents"))
         return {
           id,

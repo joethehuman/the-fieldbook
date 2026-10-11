@@ -82,7 +82,7 @@ test("short lessons fit without empty reader scroll and keep Next reachable", as
     page.getByRole("heading", { name: "Put it into practice" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Finish course", exact: true }),
+    page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Finish course(?: Course complete)?$/ }),
   ).toBeVisible();
 });
 
@@ -126,7 +126,7 @@ test("required quiz shows one question at a time, grades, and retries", async ({
   page,
 }, info) => {
   await openCourse(page, "required");
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await expect(page.getByText("Question 1 of 2")).toBeVisible();
   await expect(
     page.getByText("How should a useful conversation end?"),
@@ -194,7 +194,7 @@ test("optional quiz completes after a missed answer and still offers retry", asy
   page,
 }, info) => {
   await openCourse(page, "optional");
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await page.getByRole("radio", { name: "Every available feature" }).check();
   await page.getByRole("button", { name: "Submit and continue" }).click();
   await page.getByRole("radio", { name: "With an agreed next step" }).check();
@@ -237,7 +237,7 @@ test("last no-quiz lesson completes and opens expanded feedback", async ({
   await openCourse(page, "no-quiz");
   const outlineBeforeCompletion = await outlineOffset(page);
   await page
-    .getByRole("button", { name: "Finish course Course complete" })
+    .getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Finish course(?: Course complete)?$/ })
     .click();
   await expect(
     page.getByRole("heading", { name: "Course complete" }),
@@ -309,7 +309,7 @@ test("course sidebar preserves header spacing across natural-height lessons and 
     .poll(async () => Math.abs((await outlineOffset(page)) - outlineTop))
     .toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("lesson-2-layout.png") });
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await expect(page.getByText("Question 1 of 2")).toBeVisible();
   await cardInView(page, ".course-quiz");
   await expect
@@ -395,7 +395,7 @@ test("next question's submit button starts disabled without showing its enabled 
   page,
 }, info) => {
   await openCourse(page, "required");
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await page.getByRole("radio", { name: "The customer’s goal" }).check();
   await page.evaluate(() => {
     const samples: string[] = [];

@@ -18,6 +18,7 @@ import {
 } from "./docs-navigation-save";
 import { createSettingsSaver } from "./settings-save";
 import type { SiteSettings } from "./settings";
+import { createCategorySettingsSaver, type SaveCategories } from "./category-settings-save";
 export type AdminRuntime = {
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
   saveSettings: (
@@ -25,6 +26,7 @@ export type AdminRuntime = {
     settings: SiteSettings,
   ) => Promise<Workspace>;
   saveDocsNavigation: SaveDocsNavigation;
+  saveCategories: SaveCategories;
   saveContent: (
     content: Content,
     intent: SaveIntent,
@@ -140,6 +142,7 @@ export function createAdminRuntime(initial: {
   const saver = createWorkspaceSaver(request, fresh);
   const settingsSaver = createSettingsSaver(request, fresh);
   const docsNavigationSaver = createDocsNavigationSaver(request, fresh);
+  const categoriesSaver = createCategorySettingsSaver(request, fresh);
   return {
     deleteFeedback: (ids) =>
       mutate(async () => {
@@ -172,6 +175,12 @@ export function createAdminRuntime(initial: {
         cached.set(scope, result.data);
         return result;
       }),
+    saveCategories: (before, settings, moves) => mutate(async () => {
+      const result = await categoriesSaver(before, settings, moves);
+      clearCached();
+      cached.set(scope, result.data);
+      return result;
+    }),
     publishedContent: (id) =>
       request(`/api/content?id=${encodeURIComponent(id)}&snapshot=published`),
     saveContent: (content, intent, options) =>

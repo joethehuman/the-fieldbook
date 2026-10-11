@@ -2,6 +2,7 @@
 import { sortLabels } from "@/lib/collection-sort";
 import { SortPicker } from "./patterns/sort-picker";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useListReturn } from "./patterns/use-list-return";
 import {
   Plus,
   Network,
@@ -132,6 +133,9 @@ export default function LearningGroups({
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const [selected, setSelected] = useState(initialGroup || "");
+  const routeKey = `${initialGroup || ""}/${initialTab || "people"}`;
+  const [previousRoute, setPreviousRoute] = useState(routeKey);
+  const listReturn = useListReturn(selected);
   const [indexAction, setIndexAction] = useState<{
     id: string;
     kind: "people" | "courses" | "updates";
@@ -238,7 +242,7 @@ export default function LearningGroups({
     groupPage * PAGE_SIZE,
   );
   const groupSelection = useBulkSelection(
-    JSON.stringify([selected, indexQuery, indexPeople, indexCourses]),
+    JSON.stringify([indexQuery, indexPeople, indexCourses]),
     groups.map((candidate) => candidate.id),
   );
   const clearIndexFilters = () => {
@@ -573,7 +577,9 @@ export default function LearningGroups({
       setNotice("");
     }
   }
-  function openGroup(id: string) {
+  async function openGroup(id: string) {
+    if (!(await guard.current())) return;
+    listReturn.rememberList();
     if (onDestinationChange) {
       void onDestinationChange(id);
       return;
@@ -584,7 +590,6 @@ export default function LearningGroups({
     setQuery("");
     setPage(1);
     setNotice("");
-    destination.reveal();
   }
   function openMembership() {
     if (!group) return;
@@ -1009,9 +1014,23 @@ export default function LearningGroups({
       ),
     ];
   }
+  // Detail routes reset their own form state while the list keeps its context.
+  if (previousRoute !== routeKey) {
+    setPreviousRoute(routeKey);
+    setSelected(initialGroup || "");
+    setTab(initialTab || "people");
+    resetPeopleFilters();
+    finishEditor();
+    setNotice("");
+  }
+
   return (
     <section
       {...destination.targetProps}
+      ref={(element) => {
+        destination.targetProps.ref.current = element;
+        listReturn.ref.current = element;
+      }}
       className="learning-admin"
       aria-label={(selected && group?.name) || "Groups"}
     >
@@ -1023,8 +1042,7 @@ export default function LearningGroups({
           These groups use an older hierarchy. Convert them before editing assignments.
         </Alert>
       )}
-      {!selected || !group ? (
-        <>
+      <div hidden={!!selected && !!group} className={selected && group ? "hidden" : "grid min-w-0 gap-6"}>
           <SectionHeader
             variant="page"
             title={<h2>Groups</h2>}
@@ -1271,8 +1289,8 @@ export default function LearningGroups({
             total={groups.length}
             onPageChange={setIndexPage}
           />
-        </>
-      ) : (
+      </div>
+      {selected && group && (
         <>
           <DetailNavigation
             current={group.name}
@@ -1280,15 +1298,7 @@ export default function LearningGroups({
             items={[
               {
                 label: "All groups",
-                onSelect: () => {
-                  if (onDestinationChange) {
-                    void onDestinationChange();
-                    return;
-                  }
-                  setSelected("");
-                  setNotice("");
-                  destination.reveal();
-                },
+                onSelect: () => openGroup(""),
               },
             ]}
           />
@@ -1318,7 +1328,8 @@ export default function LearningGroups({
           </SectionHeader>
           <Tabs
             value={tab}
-            onValueChange={(value) => {
+            onValueChange={async (value) => {
+              if (!(await guard.current())) return;
               if (onDestinationChange) {
                 void onDestinationChange(
                   selected,

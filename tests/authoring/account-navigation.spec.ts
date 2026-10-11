@@ -453,7 +453,7 @@ test("server roles still deny Admin entry and manager reports exclude other team
   await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, { data: fixture() });
   await page.reload();
   await expect(
-    page.getByText("Visible team member", { exact: true }),
+    page.getByRole("button", { name: "Visible team member", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("Outside reporting scope", { exact: true }),

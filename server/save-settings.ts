@@ -13,6 +13,7 @@ import {
 } from "@/lib/docs-navigation";
 import type { DocLink } from "@/lib/docs-navigation";
 import { organizationTeam } from "@/lib/organization-team";
+import { assertCategoriesCanBeRemoved } from "@/lib/content-categories";
 export async function saveSettings(
   user: User | null,
   a: { settings: unknown; expected: number },
@@ -76,6 +77,27 @@ export async function saveSettings(
       "The built-in Organization team cannot be changed or removed.",
     );
   parsed.data.organizationTeamId = root.id;
+  // Older clients must preserve optional category configuration they did not load.
+  if (!parsed.data.contentCategories && config.settings.contentCategories)
+    parsed.data.contentCategories = config.settings.contentCategories;
+  if (
+    parsed.data.contentCategories &&
+    JSON.stringify(parsed.data.contentCategories) !==
+      JSON.stringify(config.settings.contentCategories)
+  ) {
+    const rows = await dataStore().listDocumentPlacements();
+    try {
+      assertCategoriesCanBeRemoved(
+        config.settings,
+        parsed.data.contentCategories,
+        rows.flatMap((row) =>
+          [row.draft, row.published].filter((item): item is Content => !!item),
+        ),
+      );
+    } catch (error) {
+      throw new HttpError(400, (error as Error).message);
+    }
+  }
   if (
     JSON.stringify(parsed.data.docSections) !==
     JSON.stringify(config.settings.docSections)

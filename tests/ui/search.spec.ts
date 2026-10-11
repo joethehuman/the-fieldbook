@@ -1,5 +1,14 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
+async function searchInput(page: Page) {
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  const compact = page.getByRole("button", { name: "Open search", exact: true });
+  await expect(input.or(compact).first()).toBeVisible();
+  if (await compact.isVisible()) await compact.click();
+  await input.focus();
+  return input;
+}
+
 test("search titles, lessons, filters, keyboard, destinations and empty state", async ({
   page,
 }, info) => {
@@ -19,7 +28,7 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
     sessionStorage.setItem("fieldbook.profile.v1", "demo-learner");
   }, data);
   await page.goto("/#courses");
-  const input = page.getByRole("textbox", { name: "Search all content" });
+  const input = await searchInput(page);
   const originalPage = await page.locator("main").innerText();
   await page.locator("main").evaluate((main) => {
     main.firstElementChild!.setAttribute(
@@ -45,19 +54,24 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
         .evaluate((el) => el.getBoundingClientRect().right),
     );
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
-  expect(bounds.height).toBeLessThanOrEqual(viewport.height * 0.65 + 1);
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
   if (viewport.width > 1000)
     expect(bounds.width).toBeLessThan(viewport.width * 0.8);
   await input.press("Escape");
   await expect(panel).toHaveCount(0);
-  await expect(input).toBeFocused();
+  const compact = page.getByRole("button", { name: "Open search", exact: true });
+  if (await compact.isVisible()) {
+    await expect(compact).toBeFocused();
+    await searchInput(page);
+  } else await expect(input).toBeFocused();
   await expect(input).toHaveValue("quorum");
   await input.blur();
-  await input.focus();
+  await searchInput(page);
   await expect(result).toBeVisible();
   await page.mouse.click(4, 4);
   await expect(panel).toHaveCount(0);
-  await input.focus();
+  await searchInput(page);
   await expect(result).toBeVisible();
   await input.fill("a");
   await expect(panel.getByRole("status")).not.toContainText("Searching");
@@ -104,6 +118,7 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
   await expect(
     page.getByRole("heading", { name: "Consensus", exact: true }),
   ).toBeVisible();
+  await searchInput(page);
   await input.fill("distrib");
   await expect(result).toBeVisible();
   await input.fill("distrbiuted");
@@ -134,7 +149,7 @@ test("search preserves an unsaved editor and guards result navigation", async ({
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
   }, data);
   await page.goto("/#admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page.locator('table[data-layout="contentSelection"] tbody tr').first().getByRole("link").click();
   const title = page.getByRole("textbox", { name: "Title", exact: true });
   // Successful autosave allows navigation. Hold a real failed save to exercise
   // the unsaved-work guard while search remains available over the editor.
@@ -147,7 +162,7 @@ test("search preserves an unsaved editor and guards result navigation", async ({
     };
   });
   await title.fill("Unsaved work survives search");
-  const input = page.getByRole("textbox", { name: "Search all content" });
+  const input = await searchInput(page);
   await input.fill("Published destination");
   const result = page.getByRole("link", { name: /Published destination/ });
   await expect(result).toBeVisible();
@@ -158,7 +173,7 @@ test("search preserves an unsaved editor and guards result navigation", async ({
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(title).toHaveValue("Unsaved work survives search");
   await expect(page).toHaveURL(/#admin/);
-  await input.click();
+  await searchInput(page);
   await expect(result).toBeVisible();
   await result.click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
@@ -199,7 +214,7 @@ test("Search returns to the first results and chat uses an embedded multiline co
     exact: true,
   });
   if (await openSearch.isVisible()) await openSearch.click();
-  const input = page.getByRole("textbox", { name: "Search all content" });
+  const input = await searchInput(page);
   await input.fill("Customer reference");
   const panel = page.locator('[data-slot="search-panel"]');
   const first = panel.getByRole("link", { name: /Customer reference/ }).first();

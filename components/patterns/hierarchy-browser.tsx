@@ -414,7 +414,25 @@ export function HierarchyBrowser({
   }
 
   useEffect(() => {
-    if (flat) return;
+    if (flat) {
+      if (!reveal || revealed.current === reveal.token) return;
+      const index = matches.findIndex((item) => item.id === reveal.id);
+      if (index < 0) return;
+      const targetPage = Math.floor(index / 25) + 1;
+      if (currentPage !== targetPage) {
+        setPage(targetPage);
+        return;
+      }
+      const frame = requestAnimationFrame(() => {
+        const target = Array.from(frameRef.current?.querySelectorAll<HTMLElement>("[data-hierarchy-record]") || [])
+          .find((element) => element.dataset.hierarchyRecord === reveal.id);
+        if (!target) return;
+        target.scrollIntoView({ block: "nearest", inline: "nearest" });
+        target.focus({ preventScroll: true });
+        revealed.current = reveal.token;
+      });
+      return () => cancelAnimationFrame(frame);
+    }
     const frame = requestAnimationFrame(() => {
       if (reveal && revealed.current !== reveal.token) {
         const row = rowRefs.current.get(reveal.id);
@@ -445,7 +463,7 @@ export function HierarchyBrowser({
       pendingRowFocus.current = null;
     });
     return () => cancelAnimationFrame(frame);
-  }, [branchId, flat, reveal, columnKey, items]);
+  }, [branchId, flat, reveal, columnKey, items, currentPage, matches]);
 
   function browse(id: string, focusRow?: string) {
     pendingBrowse.current = id;
@@ -667,6 +685,7 @@ export function HierarchyBrowser({
                           </TableCell>
                           <TableCell>
                             <RecordName
+                              data-hierarchy-record={item.id}
                               disabled={disabled}
                               onClick={() => void onOpen(item.id)}
                             >

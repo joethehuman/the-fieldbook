@@ -24,8 +24,11 @@ async function setup(page: Page, installed: boolean) {
     }, state);
   }
   await page.goto(installed ? "/admin" : "/#admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("link", { name: course.title || "Untitled", exact: true }).click();
   await expect(page.getByLabel("Lesson title", { exact: true })).toHaveAttribute("placeholder", "Untitled lesson");
+  await page.locator(".main-shell").evaluate(async (node) => {
+    await Promise.all(node.getAnimations().map((animation) => animation.finished.catch(() => {})));
+  });
 }
 
 async function withinOwner(target: Locator, owner: Locator) {
@@ -34,10 +37,12 @@ async function withinOwner(target: Locator, owner: Locator) {
   expect(control!.y + control!.height).toBeLessThanOrEqual(panel!.y + panel!.height - 12);
 }
 
-test("Outline and Details slide in both directions without remounting the lesson", async ({ page }, info) => {
+test("Outline and Details keep the canvas geometry and lesson instance when opening and closing", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"));
   const lesson = page.getByRole("textbox", { name: "Lesson title", exact: true });
   await lesson.evaluate((node) => { (node as HTMLElement).dataset.ui1MountProbe = "retained"; });
+  const canvas = page.locator(".editor-frame-canvas");
+  const canvasWidth = (await canvas.boundingBox())!.width;
   const phone = info.project.name.endsWith("phone");
   for (const side of ["outline", "details"]) {
     const toggle = page.getByRole("button", { name: side === "outline" ? /^Outline/ : /^Details/ });
@@ -54,7 +59,10 @@ test("Outline and Details slide in both directions without remounting the lesson
       }
       return sizes;
     }, { side, phone });
-    expect(Math.max(...opening) - opening[0]).toBeGreaterThan(4);
+    expect(Math.max(...opening)).toBeGreaterThan(0);
+    expect(Math.max(...opening) - Math.min(...opening)).toBeLessThan(2);
+    await expect(slot).toBeVisible();
+    expect((await canvas.boundingBox())!.width).toBeCloseTo(canvasWidth, 0);
     await expect(lesson).toHaveAttribute("data-ui1-mount-probe", "retained");
     await page.screenshot({ path: info.outputPath(`ui1-${side}-open.png`) });
     const closing = await toggle.evaluate(async (node, { side, phone }) => {
@@ -68,8 +76,8 @@ test("Outline and Details slide in both directions without remounting the lesson
       return sizes;
     }, { side, phone });
     expect(closing[0]).toBeGreaterThan(0);
-    expect(closing.some((size) => size > 0 && size < closing[0] - 2)).toBe(true);
     await expect(slot).toHaveCount(0);
+    expect((await canvas.boundingBox())!.width).toBeCloseTo(canvasWidth, 0);
     await expect(lesson).toHaveAttribute("data-ui1-mount-probe", "retained");
   }
 });
@@ -81,10 +89,9 @@ test("requirements smoothly reveal artwork within Details and course title withi
   const main = page.locator(".main-content");
   if (info.project.name.endsWith("desktop")) {
     expect((await main.boundingBox())!.x + (await main.boundingBox())!.width).toBe(2560);
-    expect((await page.locator(".editor").boundingBox())!.width).toBeLessThanOrEqual(1440);
+    expect((await page.getByRole("textbox", { name: "Title", exact: true }).boundingBox())!.width).toBeLessThanOrEqual(1440);
   }
-  const bounded = await page.locator(".editor").getAttribute("data-scroll-layout") === "workspace";
-  const owner = bounded ? details : main;
+  const owner = details.locator(':scope > [data-slot="scroll-region"]');
   await details.getByRole("button", { name: "Give artwork a short title of up to 40 characters", exact: true }).scrollIntoViewIfNeeded();
   await owner.evaluate((node) => {
     (window as unknown as { revealSamples: number[] }).revealSamples = [];
@@ -102,7 +109,7 @@ test("requirements smoothly reveal artwork within Details and course title withi
   await withinOwner(art, owner);
   const samples = await page.evaluate(() => (window as unknown as { revealSamples: number[] }).revealSamples);
   expect(new Set(samples).size).toBeGreaterThan(3);
-  if (bounded) expect(await main.evaluate((node) => node.scrollTop)).toBe(before);
+  expect(await main.evaluate((node) => node.scrollTop)).toBe(before);
   await owner.evaluate((node) => { node.scrollTop = 0; });
   await details.getByRole("button", { name: "Add a title", exact: true }).click();
   const title = page.getByRole("textbox", { name: "Title", exact: true });
@@ -121,12 +128,12 @@ test("a distant lesson requirement selects its canvas and scrolls the Outline to
   await details.getByRole("button", { name: "Lesson 20: add a title", exact: true }).click();
   const title = page.getByLabel("Lesson title", { exact: true });
   await expect(title).toBeFocused();
-  await expect(page.getByRole("button", { name: /^Outline.*Lesson 20 of 20/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Outline", exact: true })).toBeVisible();
+  await expect(page.getByText("Lesson 20 of 20", { exact: true })).toBeVisible();
   const toggle = page.getByRole("button", { name: /^Outline/ });
   if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
   const outline = page.getByRole("complementary", { name: "Course outline", exact: true });
-  const bounded = await page.locator(".editor").getAttribute("data-scroll-layout") === "workspace";
-  const owner = bounded ? outline : page.locator(".main-content");
+  const owner = outline.locator(':scope > [data-slot="scroll-region"]');
   const selected = outline.locator('[aria-current="step"]');
   await expect(selected).toContainText("Lesson 20");
   await expect.poll(() => owner.evaluate((node) => node.scrollTop)).toBeGreaterThan(100);
@@ -134,7 +141,7 @@ test("a distant lesson requirement selects its canvas and scrolls the Outline to
     const s = await selected.boundingBox(); const o = await owner.boundingBox();
     return !!s && !!o && s.y >= o.y && s.y + s.height <= o.y + o.height;
   }).toBe(true);
-  if (bounded) await expect(outline).toHaveAttribute("data-scroll-fade-before", "true");
+  await expect(owner).toHaveAttribute("data-scroll-fade-before", "true");
   if (info.project.name === "production-phone") await expect(page.getByRole("button", { name: /^Details/ })).toHaveAttribute("aria-expanded", "false");
   await page.screenshot({ path: info.outputPath("distant-lesson-outline.png") });
 });

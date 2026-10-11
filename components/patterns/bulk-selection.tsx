@@ -6,6 +6,7 @@ import { Checkbox } from "../ui/choice";
 import { Button } from "../ui/button";
 import { useToast } from "../ui/toast";
 import { ActionGroup } from "../ui/action-group";
+import { cn } from "@/lib/utils";
 import { SelectionSummary } from "./selection-summary";
 import { Alert } from "../ui/alert";
 import {
@@ -102,6 +103,7 @@ export function BulkSelectionBar({
   onClear,
   summaryControl,
   children,
+  className,
 }: {
   count: number;
   total: number;
@@ -110,10 +112,14 @@ export function BulkSelectionBar({
   onClear: () => void;
   summaryControl?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <div
-      className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border py-2"
+      className={cn(
+        "flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border py-2",
+        className,
+      )}
       role="region"
       aria-label="Selected items"
     >

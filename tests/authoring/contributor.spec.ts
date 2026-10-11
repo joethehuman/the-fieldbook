@@ -25,7 +25,7 @@ async function setup(page: Page, production: boolean, role: "contributor" | "adm
   data.deletedItems = [{ id: "deleted-user", entity: "user", name: "Deleted account secret", revision: 1, deletedAt: new Date().toISOString(), purgeAfter: new Date(Date.now() + 86400000).toISOString(), deletedBy: "Admin", purging: false }];
   if (production) {
     await setupAuthoringProvider(page, data);
-    await page.request.post("http://127.0.0.1:3130/fixture", { data: {
+    await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, { data: {
       role, settings: data.settings, groups: data.groups, curricula: data.curricula,
       teams: data.teams, users: data.users.map((u) => ({ ...u, auth_user_id: u.id, team_id: u.teamId, group_joined_at: {}, effective_group_joined_at: {} })),
       feedback: [{ id: "general", user_id: null, content_id: null, rating: "up", comment: "Contributor general feedback", updated_at: "2026-10-01" }],
@@ -91,13 +91,20 @@ test("contributors share publishing editors with four permitted destinations on 
     node.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
   ));
   await page.screenshot({ path: info.outputPath("contributor-editor.png"), fullPage: true });
-  await page.getByRole("button", { name: "Existing empty section", exact: true }).click();
+  await page.getByRole("button", { name: "Section", exact: true }).click();
+  await page.getByRole("option", { name: "Existing empty section", exact: true }).click();
   await page.getByRole("textbox", { name: "Short description", exact: true }).fill("Contributor publishing check.");
   await closeContentSettings(page);
   await page.getByRole("textbox", { name: "Doc content", exact: true }).fill("Contributor-written reference content.");
   await waitForDraftSaved(page);
+  const published = production ? page.waitForResponse(response => new URL(response.url()).pathname === "/api/content" && response.request().method() === "POST" && response.request().postDataJSON().publish === true) : null;
   await page.getByRole("button", { name: "Publish", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Published", exact: true })).toBeVisible();
+  if (production) {
+    const response = await published!;
+    expect(response.status()).toBe(200);
+    expect((await response.json()).publishedRevision).toBeGreaterThan(0);
+  }
+  await expect(page.locator('[data-slot="toast"]')).toHaveText("Doc published.");
   await returnToContent(page);
   await page.getByRole("button", { name: "Content", exact: true }).click();
   await page.getByRole("menuitem", { name: "Course", exact: true }).click();
@@ -130,19 +137,19 @@ test("contributor Update audience offers groups without team or Organization con
     .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const panel = page.getByRole("dialog", {
-    name: "Update audience",
+    name: "Update recommendations",
     exact: true,
   });
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("radio")).toHaveCount(0);
   await expect(panel.getByRole("checkbox", { name: /Team:/ })).toHaveCount(0);
   await expect(
-    panel.getByRole("checkbox", { name: /Group:/ }).first(),
+    panel.getByRole("button", { name: /^Add group:/ }).first(),
   ).toBeVisible();
   await panel
-    .getByRole("checkbox", { name: /Group:/ })
+    .getByRole("button", { name: /^Add group:/ })
     .first()
-    .check();
+    .click();
   await panel
     .getByRole("button", { name: "Apply to draft", exact: true })
     .click();

@@ -15,6 +15,7 @@ test("control pilot: label associations, native validation, loading and focus", 
   expect(
     await button.evaluate((el) => getComputedStyle(el).boxShadow),
   ).not.toBe("none");
+  await page.mouse.move(0, 0);
   const normal = await button.evaluate(
     (el) => getComputedStyle(el).backgroundColor,
   );
@@ -83,21 +84,22 @@ test("control pilot: label associations, native validation, loading and focus", 
     name: "Example installation name",
     exact: true,
   });
+  const form = name.locator("xpath=ancestor::form[1]");
   await name.focus();
   await page.keyboard.press("Tab");
   await expect(name).toHaveAttribute("aria-invalid", "true");
-  await page.getByRole("button", { name: "Save example", exact: true }).click();
+  await form.getByRole("button", { name: "Save example", exact: true }).click();
   await expect(name).toBeFocused();
   await name.fill("Example Academy");
   await expect(name).not.toHaveAttribute("aria-invalid", "true");
-  const save = page.getByRole("button", { name: "Save example", exact: true });
+  const save = form.getByRole("button", { name: "Save example", exact: true });
   const before = await save.boundingBox();
   await save.click();
   await expect(save).toBeDisabled();
   await expect(save).toHaveAttribute("aria-busy", "true");
   expect((await save.boundingBox())!.width).toBe(before!.width);
   await page.screenshot({ path: info.outputPath("loading.png") });
-  await expect(pilot.getByRole("status")).toHaveText(
+  await expect(pilot.getByRole("status").filter({ hasText: /^Example saved\.|^Saving the local example/ })).toHaveText(
     "Example saved. No installation settings changed.",
   );
   await expect(save).toBeEnabled();
@@ -171,7 +173,7 @@ test("branding pilot: validation, save, retained identity and responsive layout"
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText("Settings saved.");
+  await expect(page.locator('[data-slot="toast"]')).toHaveText("Settings saved.");
   await page.reload();
   // Administration intentionally returns to Content after a full reload.
   await expect(page.locator(".admin-layout")).toBeVisible();

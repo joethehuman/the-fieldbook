@@ -1,3 +1,4 @@
+import { withOrganizationTeam } from "../../lib/organization-team";
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -31,7 +32,7 @@ async function setup(page: Page, installed: boolean, manyCourses = false) {
   }));
   if (manyCourses)
     data.content.push(
-      ...Array.from({ length: 12 }, (_, i) => ({
+      ...Array.from({ length: 40 }, (_, i) => ({
         ...structuredClone(data.content[0]),
         id: `00000000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
         title: `Practice course ${String(i + 1).padStart(2, "0")}`,
@@ -82,6 +83,7 @@ async function setup(page: Page, installed: boolean, manyCourses = false) {
     effectiveGroupIds: undefined,
   }));
   data.progress = {};
+  data = withOrganizationTeam(data);
   data.governanceRevision = 10;
   let writes = 0,
     prepares = 0;
@@ -134,328 +136,85 @@ async function selectCourses(page: Page) {
       .getByRole("checkbox", { name: `Select ${name}`, exact: true })
       .check();
 }
-async function bulk(page: Page, name: string) {
+async function bulk(page: Page, command: string, title: string) {
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
-  await page.getByRole("menuitem", { name, exact: true }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Learning audience",
-    exact: true,
-  });
+  await page.getByRole("menuitem", { name: command, exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: title, exact: true });
   await expect(dialog).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(1);
   return dialog;
 }
+async function showPane(dialog: ReturnType<Page["getByRole"]>, right: boolean) {
+  const tabs = dialog.getByRole("group", { name: "Assignment lists", exact: true });
+  if (await tabs.isVisible()) await tabs.getByRole("button").nth(right ? 1 : 0).click();
+}
 
-test("course bulk Add/Remove uses the stable workflow and preserves other assignments", async ({
-  page,
-}, info) => {
-  const installed = info.project.name.startsWith("production"),
-    state = await setup(page, installed);
-  await selectCourses(page);
-  const dialog = await bulk(page, "Assign to teams or groups");
-  await dialog
-    .getByRole("searchbox", { name: "Find a team or group" })
-    .fill("Pilot");
-  await dialog
-    .getByRole("checkbox", {
-      name: "Assign directly to Group: Pilot",
-      exact: true,
-    })
-    .check();
-  await dialog
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toHaveCount(1);
-  expect(state.writes()).toBe(0);
-  await dialog.getByRole("button", { name: "← Back", exact: true }).click();
-  await expect(
-    dialog.getByRole("searchbox", { name: "Find a team or group" }),
-  ).toHaveValue("Pilot");
-  await expect(
-    dialog.getByRole("checkbox", {
-      name: "Assign directly to Group: Pilot",
-      exact: true,
-    }),
-  ).toBeChecked();
-  await dialog
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await page.screenshot({ path: info.outputPath("bulk-learning-review.png") });
-  await dialog
-    .getByRole("button", { name: "Save assignments", exact: true })
-    .click();
-  await expect(dialog).not.toBeVisible();
-  let saved = await state.read();
-  expect(
-    saved.groups.find((g) => g.id === "pilot")!.learningItems,
-  ).toHaveLength(2);
-  expect(saved.groups.find((g) => g.id === "ae")!.learningItems).toEqual([
-    { kind: "curriculum", id: "p" },
-  ]);
-  expect(
-    saved.teams!.find((team) => team.id === "sales")!.learningItems,
-  ).toHaveLength(1);
-  await selectCourses(page);
-  const remove = await bulk(page, "Remove team or group assignments");
-  await remove
-    .getByRole("checkbox", { name: "Group: Pilot", exact: true })
-    .check();
-  await remove
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await remove
-    .getByRole("button", { name: "Save assignments", exact: true })
-    .click();
-  await expect(remove).not.toBeVisible();
-  saved = await state.read();
-  expect(saved.groups.find((g) => g.id === "pilot")!.learningItems).toEqual([]);
-  expect(
-    saved.teams!.find((team) => team.id === "sales")!.learningItems,
-  ).toHaveLength(1);
-  if (installed) {
-    expect(state.writes()).toBe(2);
-    expect(state.prepares()).toBeGreaterThanOrEqual(2);
-  }
-});
-
-test("group course list scrolls without moving search, filters, pagination or modal actions", async ({
-  page,
-}, info) => {
+test("course bulk addition reviews once and preserves existing team and curriculum sources", async ({ page }, info) => {
   const installed = info.project.name.startsWith("production");
-  await setup(page, installed, true);
-  await section(page, "Groups");
-  await page
-    .getByRole("button", { name: "Account executives", exact: true })
-    .click();
-  await page
-    .getByRole("tab", { name: "Assigned Courses", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Assign Courses", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Assign Courses",
-    exact: true,
-  });
-  const results = dialog.locator('[data-slot="selection-results"]');
-  const search = dialog.getByRole("searchbox", {
-    name: "Find courses or curricula",
-    exact: true,
-  });
-  const geometry = () =>
-    dialog.evaluate((element) => {
-      const top = (selector: string) =>
-        element.querySelector(selector)?.getBoundingClientRect().top;
-      const body = element.querySelector<HTMLElement>(
-        '[data-slot="dialog-body"]',
-      )!;
-      const list = element.querySelector<HTMLElement>(
-        '[data-slot="selection-results"]',
-      )!;
-      return {
-        search: top('input[type="search"]'),
-        filters: top('[data-slot="collection-controls"]'),
-        pagination: top('nav[aria-label="Search results pages"]'),
-        footer: top('[data-slot="dialog-footer"]'),
-        bodyScroll: body.scrollTop,
-        bodyHeight: body.clientHeight,
-        bodyContent: body.scrollHeight,
-        resultsHeight: list.clientHeight,
-        resultsContent: list.scrollHeight,
-      };
-    });
-  await expect(results).toHaveAttribute("data-scroll-fade-after", "true");
-  await expect(results).toHaveAttribute("data-scroll-fade-before", "false");
-  const before = await geometry();
-  expect(before.bodyContent).toBeLessThanOrEqual(before.bodyHeight + 1);
-  expect(before.resultsContent).toBeGreaterThan(before.resultsHeight);
-  expect(
-    await results.evaluate(
-      (element) => (element as HTMLElement).offsetWidth - element.clientWidth,
-    ),
-  ).toBeGreaterThan(0);
-  if (!info.project.name.endsWith("phone"))
-    expect(
-      await results.evaluate((element) => {
-        const third = element.querySelectorAll('[data-slot="field"]')[2];
-        return (
-          third.getBoundingClientRect().bottom <=
-          element.getBoundingClientRect().bottom - 16
-        );
-      }),
-    ).toBe(true);
-  await page.screenshot({ path: info.outputPath("group-course-list-top.png") });
-  await results.hover();
-  await page.mouse.wheel(0, 150);
-  await expect(results).toHaveAttribute("data-scroll-fade-before", "true");
-  const after = await geometry();
-  expect(after.search).toBe(before.search);
-  expect(after.filters).toBe(before.filters);
-  expect(after.pagination).toBe(before.pagination);
-  expect(after.footer).toBe(before.footer);
-  expect(after.bodyScroll).toBe(0);
-  await page.screenshot({
-    path: info.outputPath("group-course-list-middle.png"),
-  });
-  await results.getByRole("checkbox").last().focus();
-  await expect(results).toHaveAttribute("data-scroll-fade-after", "false");
-  expect((await geometry()).bodyScroll).toBe(0);
-  await search.fill("Foundation course");
-  await expect(
-    results.getByRole("checkbox", { name: /^Foundation course\b/ }),
-  ).toHaveCount(1);
-  await expect(results).toHaveAttribute("data-scroll-fade-after", "false");
-  await expect(results).toHaveAttribute("data-scroll-fade-before", "false");
-  const single = await geometry();
-  await search.fill("no-matching-course");
-  await expect(results).toContainText(
-    "No content matches your search or filters.",
-  );
-  expect((await geometry()).resultsHeight).toBe(single.resultsHeight);
-  expect((await geometry()).footer).toBe(before.footer);
-  await page.screenshot({
-    path: info.outputPath("group-course-list-empty.png"),
-  });
-  if (info.project.name.endsWith("phone")) {
-    await page.setViewportSize({ width: 375, height: 500 });
-    await search.fill("");
-    await expect(results.getByRole("checkbox")).toHaveCount(10);
-    expect((await geometry()).resultsHeight).toBeGreaterThanOrEqual(128);
-    await results.getByRole("checkbox").last().focus();
-    await expect(results.getByRole("checkbox").last()).toBeInViewport();
-    await expect(
-      dialog.getByRole("button", { name: "Review changes", exact: true }),
-    ).toBeInViewport();
-    await page.screenshot({
-      path: info.outputPath("group-course-list-short-screen.png"),
-    });
-  }
-});
-
-test("group-context selection retains search on Back, guards discard, and reviews direct removal", async ({
-  page,
-}, info) => {
-  const installed = info.project.name.startsWith("production"),
-    state = await setup(page, installed);
-  await section(page, "Groups");
-  await page
-    .getByRole("button", { name: "Account executives", exact: true })
-    .click();
-  await page
-    .getByRole("tab", { name: "Assigned Courses", exact: true })
-    .click();
-  const trigger = page.getByRole("button", {
-    name: "Assign Courses",
-    exact: true,
-  });
-  await trigger.click();
-  const dialog = page.getByRole("dialog", {
-    name: "Assign Courses",
-    exact: true,
-  });
-  const search = dialog.getByRole("searchbox", {
-    name: "Find courses or curricula",
-    exact: true,
-  });
-  await search.fill("Discovery course");
-  await dialog.getByRole("checkbox", { name: /^Discovery course\b/ }).check();
-  await dialog
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toHaveCount(1);
-  await dialog.getByRole("button", { name: "← Back", exact: true }).click();
-  await expect(search).toHaveValue("Discovery course");
-  await dialog
-    .getByRole("button", { name: "Close audience editor", exact: true })
-    .click();
-  await expect(
-    dialog.getByRole("heading", { name: "Discard audience changes?" }),
-  ).toBeVisible();
-  await dialog
-    .getByRole("button", { name: "Keep editing", exact: true })
-    .click();
-  await expect(search).toHaveValue("Discovery course");
-  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await dialog
-    .getByRole("button", { name: "Discard changes", exact: true })
-    .click();
-  await expect(dialog).not.toBeVisible();
+  const state = await setup(page, installed);
+  const before = await state.read();
+  await selectCourses(page);
+  const dialog = await bulk(page, "Assign to teams or groups", "Add assignments");
+  await showPane(dialog, false);
+  await dialog.getByRole("searchbox", { name: "Find a team or group", exact: true }).fill("Pilot");
+  await dialog.getByRole("button", { name: "Add group: Pilot", exact: true }).click();
+  await dialog.getByRole("button", { name: "Review changes", exact: true }).click();
   expect(state.writes()).toBe(0);
-  await expect(trigger).toBeFocused();
-  await trigger.click();
-  await search.fill("Foundation course");
-  await dialog.getByRole("checkbox", { name: /^Foundation course\b/ }).check();
-  await dialog
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await expect(
-    dialog.getByText("No new course assignments.", { exact: true }),
-  ).toBeVisible();
-  await dialog
-    .getByRole("button", { name: "Save assignments", exact: true })
-    .click();
+  await dialog.getByRole("button", { name: "← Back", exact: true }).click();
+  await showPane(dialog, true);
+  await expect(dialog.getByRole("button", { name: "Remove group: Pilot", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Review changes", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save assignments", exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  await page
-    .getByRole("button", { name: "Remove Foundation course", exact: true })
-    .click();
-  await expect(dialog).toBeVisible();
-  await dialog
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await expect(
-    dialog.getByText("No new course assignments.", { exact: true }),
-  ).toBeVisible();
-  await expect(dialog.getByLabel("Audience changes")).toContainText(
-    "Foundation course",
-  );
-  await page.screenshot({ path: info.outputPath("group-learning-review.png") });
-  await dialog
-    .getByRole("button", { name: "Save assignments", exact: true })
-    .click();
-  await expect(dialog).not.toBeVisible();
-  const saved = await state.read();
-  expect(saved.groups.find((g) => g.id === "ae")!.learningItems).toEqual([
-    { kind: "curriculum", id: "p" },
+  const after = await state.read();
+  expect(after.groups.find(group => group.id === "pilot")!.learningItems).toEqual([
+    { kind: "course", id: before.content[0].id }, { kind: "course", id: before.content[1].id },
   ]);
-  expect(
-    saved.teams!.find((team) => team.id === "sales")!.learningItems,
-  ).toHaveLength(1);
-  if (installed) expect(state.writes()).toBe(2);
+  expect(after.groups.find(group => group.id === "ae")!.learningItems).toEqual(before.groups.find(group => group.id === "ae")!.learningItems);
+  expect(after.teams!.find(team => team.id === "sales")!.learningItems).toEqual(before.teams!.find(team => team.id === "sales")!.learningItems);
+  if (installed) expect(state.writes()).toBe(1);
 });
 
-test("curriculum bulk assignment uses the same modal and one save for overlapping playlists", async ({
-  page,
-}, info) => {
-  const installed = info.project.name.startsWith("production"),
-    state = await setup(page, installed);
+test("group transfer searches and scrolling retain choices until the installed or demo save", async ({ page }, info) => {
+  const state = await setup(page, info.project.name.startsWith("production"), true);
+  await section(page, "Groups");
+  await page.getByRole("link", { name: "Pilot", exact: true }).click();
+  await page.getByRole("tab", { name: "Assigned Courses", exact: true }).click();
+  await page.getByRole("button", { name: "Manage Courses", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Manage Courses", exact: true });
+  const available = dialog.getByRole("region", { name: "Available items", exact: true });
+  const search = available.getByRole("searchbox");
+  const list = available.getByLabel("Available results", { exact: true });
+  const footer = dialog.locator('[data-slot="dialog-footer"]');
+  const before = { search: await search.boundingBox(), footer: await footer.boundingBox() };
+  await expect.poll(() => list.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  await available.getByRole("button", { name: "Add Practice course 40", exact: true }).click();
+  expect({ search: await search.boundingBox(), footer: await footer.boundingBox() }).toEqual(before);
+  await search.fill("No matching title");
+  await expect(available.getByText("No matching items.", { exact: true })).toBeVisible();
+  await showPane(dialog, true);
+  await expect(dialog.getByRole("button", { name: "Remove Practice course 40", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Review changes", exact: true }).click();
+  await dialog.getByRole("button", { name: "← Back", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Remove Practice course 40", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Review changes", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save assignments", exact: true }).click();
+  expect((await state.read()).groups.find(group => group.id === "pilot")!.learningItems).toHaveLength(1);
+});
+
+test("curriculum bulk management preserves partial sources while assigning both playlists to a new group", async ({ page }, info) => {
+  const state = await setup(page, info.project.name.startsWith("production"));
   await section(page, "Curricula");
   for (const name of ["Foundation playlist", "Discovery playlist"])
-    await page
-      .getByRole("checkbox", { name: `Select ${name}`, exact: true })
-      .check();
-  const dialog = await bulk(page, "Assign to teams or groups");
-  await dialog
-    .getByRole("checkbox", {
-      name: "Assign directly to Group: Pilot",
-      exact: true,
-    })
-    .check();
-  await dialog
-    .getByRole("button", { name: "Review changes", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toHaveCount(1);
-  expect(state.writes()).toBe(0);
-  await dialog
-    .getByRole("button", { name: "Save assignments", exact: true })
-    .click();
-  await expect(dialog).not.toBeVisible();
-  const saved = await state.read();
-  expect(saved.groups.find((g) => g.id === "pilot")!.learningItems).toEqual([
-    { kind: "curriculum", id: "p" },
-    { kind: "curriculum", id: "q" },
+    await page.getByRole("checkbox", { name: `Select ${name}`, exact: true }).check();
+  const dialog = await bulk(page, "Manage Audience", "Manage Audience");
+  await showPane(dialog, false);
+  await dialog.getByRole("button", { name: "Add Pilot", exact: true }).click();
+  await dialog.getByRole("button", { name: "Review changes", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save assignments", exact: true }).click();
+  const after = await state.read();
+  expect(after.groups.find(group => group.id === "pilot")!.learningItems).toEqual([
+    { kind: "curriculum", id: "p" }, { kind: "curriculum", id: "q" },
   ]);
-  expect(saved.groups.find((g) => g.id === "ae")!.learningItems).toEqual([
-    { kind: "curriculum", id: "p" },
-  ]);
-  if (installed) expect(state.writes()).toBe(1);
+  expect(after.groups.find(group => group.id === "ae")!.learningItems).toEqual([{ kind: "curriculum", id: "p" }]);
 });

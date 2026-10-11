@@ -4,6 +4,7 @@ import type { Content, User } from "@/lib/types";
 import { data as dataStore } from "./data";
 import { requirePublisher, HttpError } from "./auth";
 import { contentSignature } from "@/lib/demo-publication";
+import { assertContentCategory } from "@/lib/content-categories";
 import { contentDraftSchema, contentSchema } from "./schemas";
 import {
   publishedUpdateFeedDate,
@@ -98,6 +99,16 @@ export async function saveContent(
       parsed.error.issues.map((i) => i.message).join(" "),
     );
   const c = parsed.data;
+  if (c.kind !== "doc" && c.category.trim()) {
+    const config = await dataStore().readSettings();
+    if (!config)
+      throw new HttpError(503, "Settings are unavailable. Try again.");
+    try {
+      assertContentCategory(c, config.settings);
+    } catch (error) {
+      throw new HttpError(400, (error as Error).message);
+    }
+  }
   if (options.renewUpdate && (c.kind !== "brief" || !publish))
     throw new HttpError(
       400,

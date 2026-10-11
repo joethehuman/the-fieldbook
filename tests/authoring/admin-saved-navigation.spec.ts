@@ -4,7 +4,6 @@ import { defaultSettings } from "../../lib/settings";
 import {
   authoringUser,
   setupAuthoringProvider,
-  syncAuthoringProvider,
 } from "./provider-fixture";
 
 async function section(page: Page, name: string) {
@@ -35,6 +34,9 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   } as typeof data.settings;
   if (production) {
     await setupAuthoringProvider(page, data);
+    const initial = await (await page.request.get("/api/admin/snapshot?scope=content")).json();
+    data.settings = initial.data.settings;
+    data.revision = initial.data.revision;
     await page.route("**/api/admin/snapshot?**", (route) =>
       route.fulfill({
         json: {
@@ -75,6 +77,21 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   await page.goto(production ? "/admin" : "/#admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Docs navigation");
+  await expect(page.getByRole("button", { name: "Save settings" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "New section", exact: true }).click();
+  const newSection = page.getByRole("dialog", {
+    name: "New section",
+    exact: true,
+  });
+  await newSection
+    .getByRole("textbox", { name: "New section name", exact: true })
+    .fill("Navigation fixture");
+  await newSection
+    .getByRole("button", { name: "Create section", exact: true })
+    .click();
+  await expect(newSection).toHaveCount(0);
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();
   await section(page, "Identity");
@@ -119,36 +136,11 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
     await confirmation.getByRole("button", { name: "Cancel" }).click();
     rejectSettings = false;
     await page.getByRole("button", { name: "Save settings" }).click();
-    await expect(page.locator(".settings-panel")).toContainText(
-      "Refresh and review the saved copy before applying more changes",
-    );
-    expect(settingsRequests).toBe(2);
+    await expect(page.getByText("Settings saved.")).toBeVisible();
+    expect(settingsRequests).toBe(3);
     await expect(name).toHaveValue("Unsaved installation name");
+    // An explicit retry is safe after a fresh read confirms the saved copy is unchanged.
 
-    // Failed writes require a fresh saved copy before another mutation.
-    await syncAuthoringProvider(page, data);
-    await page.getByRole("button", { name: "Discard changes" }).click();
-    await expect(
-      page.getByRole("status").filter({ hasText: "Unsaved changes" }),
-    ).toHaveCount(0);
-    await expect
-      .poll(() =>
-        page.evaluate(() => history.state?.__fieldbookNavigation?.kind),
-      )
-      .toBe("base");
-    await page.reload();
-    await expect(page.locator(".admin-layout")).toBeVisible();
-    await section(page, "Identity");
-    await name.fill("Unsaved installation name");
-    await Promise.all([
-      page.waitForResponse(
-        (response) =>
-          new URL(response.url()).pathname === "/api/settings" &&
-          response.request().method() === "POST" &&
-          response.status() === 200,
-      ),
-      page.getByRole("button", { name: "Save settings" }).click(),
-    ]);
   } else {
     await page.getByRole("button", { name: "Save settings" }).click();
   }

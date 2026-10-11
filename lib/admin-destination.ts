@@ -14,6 +14,7 @@ export const adminPaths = {
   "settings-identity": "settings/identity",
   "settings-links": "settings/external-links",
   "settings-docs": "settings/docs-navigation",
+  "settings-categories": "settings/categories",
   "settings-courses": "settings/due-dates",
   "settings-access": "settings/access",
   "settings-privacy": "settings/privacy",
@@ -225,6 +226,7 @@ export function adminScope(destination: AdminDestination): AdminScope {
   if (destination.tab === "progress") return "progress";
   if (destination.tab === "deleted") return "maintenance";
   if (destination.tab === "feedback") return "feedback";
+  if (destination.tab === "settings-categories") return "categories";
   if (destination.tab === "content" || destination.tab.startsWith("settings-"))
     return "content";
   return "governance";

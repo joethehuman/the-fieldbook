@@ -174,6 +174,14 @@ export function TeamProgress({
       ?.querySelector<HTMLButtonElement>(`[data-person-id="${personId}"]`)
       ?.focus({ preventScroll: true });
   }, [person]);
+  useLayoutEffect(() => {
+    if (!person) return;
+    const owner = scrollOwner();
+    if (owner) owner.scrollTop = 0;
+    host.current
+      ?.querySelector<HTMLElement>("[data-detail-title]")
+      ?.focus({ preventScroll: true });
+  }, [person?.u.id]);
   function back(restoring = false) {
     if (onDestinationChange && !restoring) {
       void onDestinationChange();
@@ -226,13 +234,6 @@ export function TeamProgress({
     setDetail(null);
     setError("");
     const epoch = ++detailEpoch.current;
-    requestAnimationFrame(() => {
-      const owner = scrollOwner();
-      if (owner) owner.scrollTop = 0;
-      host.current
-        ?.querySelector<HTMLElement>("[data-detail-title]")
-        ?.focus({ preventScroll: true });
-    });
     try {
       const next = data.progressReport
         ? await request(

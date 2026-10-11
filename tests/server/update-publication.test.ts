@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { saveContent } from "../../server/content";
 import { data as dataStore } from "../../server/data";
 import { seedContent } from "../../lib/seed";
+import { defaultSettings } from "../../lib/settings";
 import type { Content, User } from "../../lib/types";
 import type { DocumentRecord } from "../../server/ports/data";
 
@@ -35,6 +36,7 @@ test("publisher corrections preserve authoritative Update freshness; renewal is 
   };
   let writes = 0;
   Object.assign(store, {
+    readSettings: async () => ({ settings: defaultSettings }),
     findDocument: async () => row,
     saveDocument: async (write: any) => {
       assert.equal(write.expected, row.revision);

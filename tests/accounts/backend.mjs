@@ -482,6 +482,38 @@ createServer(async (req, res) => {
     // governance_revision. Reader freshness must come from cache invalidation.
     return send(res, { ok: true });
   }
+  // Model the existing fb_bulk_content metadata contract, including its two
+  // revision guards. Metadata moves preserve the distinct draft and published
+  // bodies and their publication revision relationship.
+  if (url.pathname === "/rest/v1/rpc/fb_bulk_content") {
+    const input = JSON.parse(body);
+    const row = documents.find((entry) => entry.id === input.p_id);
+    const actor = profile();
+    if (input.p_actor !== actor.id || !actor.active || !["admin", "contributor"].includes(actor.role))
+      return send(res, { code: "42501", message: "Publishing access is required" }, 403);
+    if (!row || row.deleted_at)
+      return send(res, { code: "P0001", message: "Content not found" }, 400);
+    if (row.revision !== input.p_expected)
+      return send(res, { code: "P0001", message: "Revision conflict" }, 400);
+    if (input.p_operation !== "metadata")
+      return send(res, { code: "P0001", message: "Unsupported content action" }, 400);
+    if (revision !== input.p_settings_expected)
+      return send(res, { code: "P0001", message: "Settings changed. Reload before moving content" }, 400);
+    const patch = input.p_patch || {};
+    if (!Object.hasOwn(patch, "category") || Object.keys(patch).some(key => !["category", "folder", "sectionId"].includes(key)))
+      return send(res, { code: "P0001", message: "Invalid metadata patch" }, 400);
+    const matches = snapshot => Object.entries(patch).every(([key, value]) => snapshot[key] === value);
+    if (matches(row.draft) && (!row.published || matches(row.published))) return send(res, "unchanged");
+    if (Object.hasOwn(patch, "sectionId")) {
+      patch.sectionOrder = 1 + Math.max(0, ...documents.flatMap(entry => [entry.draft, entry.published])
+        .filter(snapshot => snapshot?.sectionId === patch.sectionId).map(snapshot => snapshot.sectionOrder || 0));
+    }
+    row.draft = { ...row.draft, ...patch };
+    if (row.published) row.published = { ...row.published, ...patch };
+    if (row.published_revision === row.revision) row.published_revision++;
+    row.revision++;
+    return send(res, "changed");
+  }
   if (url.pathname === "/rest/v1/rpc/fb_save_document") {
     const input = JSON.parse(body);
     const index = documents.findIndex((row) => row.id === input.p_id);

@@ -1,3 +1,4 @@
+import { teamCommand } from "../helpers/team-navigation";
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 async function section(page: Page, name: string) {
@@ -12,13 +13,15 @@ async function section(page: Page, name: string) {
 }
 function fixture() {
   const data = freshWorkspace();
+  data.teams = data.teams!.filter(team => team.system === "organization" || team.id === "sales-team");
+  data.teams.find(team => team.id === "sales-team")!.name = "Sales team";
   data.teams!.push(
     { id: "child", name: "Child team", parentId: "sales-team" },
     { id: "grand", name: "Grandchild team", parentId: "child" },
-    { id: "other", name: "Other team" },
+    { id: "other", name: "Other team", parentId: data.settings!.organizationTeamId! },
   );
   data.users = [
-    ...data.users.filter((u) => ["demo-admin", "demo-manager"].includes(u.id)),
+    ...data.users.filter((u) => ["demo-admin", "demo-manager"].includes(u.id)).map(user => ({ ...user, teamId: undefined })),
     ...Array.from({ length: 498 }, (_, i) => ({
       id: `person-${i}`,
       name: `Person ${String(i).padStart(3, "0")}`,
@@ -62,9 +65,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await page.goto("/#admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Teams");
-  await page
-    .getByRole("button", { name: "Open Sales team", exact: true })
-    .click();
+  await teamCommand(page, "Sales team");
   await expect(
     page.getByText("150 people in this branch · 50 direct members · 1 subteam"),
   ).toBeVisible();
@@ -105,9 +106,8 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await expect(members.locator("tbody tr")).toHaveCount(1);
   await expect(members).toContainText("Grandchild team");
   await expect(members.getByRole("button", { name: /Remove/ })).toHaveCount(0);
-  await members
-    .getByRole("button", { name: "Manage Person 125's team" })
-    .click();
+  await members.getByRole("button", { name: "Actions for Person 125", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Manage team", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Grandchild team", exact: true }),
   ).toBeVisible();
@@ -175,9 +175,9 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await page
     .getByRole("searchbox", { name: "Find a member", exact: true })
     .fill("person150@example.test");
-  await page
-    .getByRole("button", { name: "Remove Person 150 from team", exact: true })
-    .click();
+  await members.getByRole("button", { name: "Actions for Person 150", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Remove from team", exact: true }).click();
+  await page.getByRole("dialog", { name: "Remove from team", exact: true }).getByRole("button", { name: "Apply changes", exact: true }).click();
   await expect(confirm).toHaveCount(0);
   await effects
     .getByRole("button", {
@@ -188,7 +188,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await expect(effects).toContainText("Person 150");
   await expect(effects).toContainText("Reporting access removed");
   await effects
-    .getByRole("button", { name: "Remove member", exact: true })
+    .getByRole("button", { name: "Remove members", exact: true })
     .click();
   await expect(members).toHaveCount(0);
   const removed = await saved(page);
@@ -198,9 +198,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   expect(removed.users.find((u) => u.id === "person-150")!.active).toBe(true);
   expect(removed.progress["person-150"]).toEqual(data.progress["person-150"]);
 
-  await page
-    .getByRole("button", { name: "Edit team details", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Edit team details", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(
     dialog.getByRole("button", { name: "Parent team", exact: true }),
@@ -222,10 +220,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
     ),
   ).toBe(true);
   await page.reload();
-  await section(page, "Teams");
-  await page
-    .getByRole("button", { name: "Open Sales renamed", exact: true })
-    .click();
+  await expect(page.getByRole("heading", { name: "Sales renamed", exact: true })).toBeVisible();
   await expect(
     page.getByText("151 people in this branch · 51 direct members · 1 subteam"),
   ).toBeVisible();
@@ -248,9 +243,7 @@ test("team detail retains browser search and optional selection on return", asyn
     exact: true,
   });
   await search.fill("Sales");
-  await page
-    .getByRole("button", { name: "Open Sales team", exact: true })
-    .click();
+  await teamCommand(page, "Sales team");
   await page
     .getByRole("button", { name: "Back to teams", exact: true })
     .click();
@@ -261,7 +254,7 @@ test("team detail retains browser search and optional selection on return", asyn
   await search.fill("");
   await expect(search).toHaveValue("");
   await expect(
-    page.getByRole("button", { name: "Open Other team", exact: true }),
+    page.getByRole("button", { name: "Actions for Other team", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Select multiple", exact: true }).click();
   const choice = page.getByRole("checkbox", {
@@ -269,9 +262,7 @@ test("team detail retains browser search and optional selection on return", asyn
     exact: true,
   });
   await choice.check();
-  await page
-    .getByRole("button", { name: "Open Sales team", exact: true })
-    .click();
+  await teamCommand(page, "Sales team");
   await page
     .getByRole("button", { name: "Back to teams", exact: true })
     .click();
@@ -290,6 +281,7 @@ test("new-team parent options stay anchored to the visible dialog and preserve c
   page,
 }, info) => {
   const data = freshWorkspace();
+  data.teams!.find(team => team.id === "sales-team")!.name = "Sales team";
   const rootId = data.teams!.find((team) => team.system === "organization")!.id;
   data.teams!.push(
     { id: "east", name: "East team", parentId: rootId },
@@ -373,16 +365,12 @@ test("new-team parent options stay anchored to the visible dialog and preserve c
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", {
-      name: "Browse New regional team subteams",
+      name: info.project.name === "phone" ? "New regional team" : "Browse New regional team subteams",
       exact: true,
     }),
   ).toBeFocused();
-  await expect(
-    page.getByRole("navigation", { name: "Teams path", exact: true }),
-  ).toContainText("Sales team");
-  await page
-    .getByRole("button", { name: "Open New regional team", exact: true })
-    .click();
+  await expect(page.locator('[data-slot="hierarchy-browser"]')).toContainText("Sales team");
+  await teamCommand(page, "New regional team");
   await expect(
     page.getByRole("heading", { name: "New regional team", exact: true }),
   ).toBeVisible();
@@ -410,12 +398,8 @@ test("a contributor manager has one cancelable review without changing their own
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Teams");
   const baseline = await saved(page);
-  await page
-    .getByRole("button", { name: "Open Sales team", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Edit team details", exact: true })
-    .click();
+  await teamCommand(page, "Sales team");
+  await page.getByRole("button", { name: "Edit team details", exact: true }).click();
   const editor = page.getByRole("dialog", {
     name: "Edit Sales team",
     exact: true,

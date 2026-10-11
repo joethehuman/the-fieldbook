@@ -224,7 +224,7 @@ test("learning groups: shared controls, save and reload", async ({
 test("admin menu scroll stays put while the new panel starts at the top", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop");
+  test.skip(testInfo.project.name !== "desktop", "This check sets its own desktop viewport dimensions.");
   await page.setViewportSize({ width: 1280, height: 400 });
   await admin(page);
   const nav = page.locator('[data-slot="admin-navigation"] [role="tablist"]');
@@ -300,10 +300,10 @@ test("short pages keep the shared shell fixed at both scroll limits", async ({
   ).toEqual(before);
 });
 
-test("scrollbars leave room beside Admin feedback controls and cards", async ({
+test("scrollbars leave room beside Admin feedback controls and table", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop");
+  test.skip(testInfo.project.name !== "desktop", "This check sets its own desktop viewport dimensions.");
   await page.setViewportSize({ width: 1280, height: 560 });
   const data = freshWorkspace();
   const item = data.content[0];
@@ -341,7 +341,7 @@ test("scrollbars leave room beside Admin feedback controls and cards", async ({
     )
     .toBeGreaterThanOrEqual(16);
   expect(
-    await distanceFromPanelEdge(panel.locator('[data-slot="card"]').first()),
+    await distanceFromPanelEdge(panel.getByRole("region", { name: "Feedback table", exact: true })),
   ).toBeGreaterThanOrEqual(16);
   await page.screenshot({
     path: testInfo.outputPath("feedback-scrollbar-clearance.png"),
@@ -528,7 +528,7 @@ test("course completion still works through shared choices and controls", async 
     }),
   ).toBeVisible();
   await page.getByRole("button", { name: /^Next lesson/ }).click();
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await page
     .getByRole("radio", { name: "The customer’s goal", exact: true })
     .check();
@@ -971,7 +971,9 @@ test("long feedback prompt wraps without crowding rating controls", async ({
   await expect(prompt).toBeVisible();
   const promptBox = await prompt.boundingBox();
   const ratingBox = await rating.boundingBox();
-  expect(promptBox!.x + promptBox!.width).toBeLessThanOrEqual(ratingBox!.x + 1);
+  const separated = promptBox!.x + promptBox!.width <= ratingBox!.x + 1 ||
+    promptBox!.y + promptBox!.height <= ratingBox!.y + 1;
+  expect(separated).toBe(true);
   const feedbackBox = await feedback.boundingBox();
   expect(feedbackBox!.x + feedbackBox!.width).toBeLessThanOrEqual(321);
   await prompt.click();

@@ -1,3 +1,4 @@
+import { recordSegment } from "../../lib/record-url";
 import { returnToContent } from "./editor-helpers";
 import { expect, test, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
@@ -71,7 +72,7 @@ async function setup(page: Page, production: boolean, role = "admin") {
   data.progress = {};
   if (production) {
     await setupAuthoringProvider(page, data);
-    await page.request.post("http://127.0.0.1:3130/fixture", {
+    await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, {
       data: {
         settings: data.settings,
         groups: data.groups,
@@ -111,10 +112,20 @@ async function section(page: Page, name: string) {
 function destination(production: boolean, path: string) {
   return production ? path : "/#" + path.slice(1);
 }
+function canonical(path: string, production: boolean) {
+  const records: [string, string][] = [
+    [docId, "URL writing fixture"], [courseId, "URL course fixture"],
+    [groupId, "URL learning group"], [teamId, "URL team"], [curriculumId, "URL curriculum"],
+    [production ? authoringUser.id : "demo-admin", production ? "Synthetic Admin" : "Oliver Anderson"],
+  ];
+  for (const [id, title] of records)
+    path = path.replace(`/${id}/`, `/${recordSegment(id, title)}/`).replace(new RegExp(`/${id}$`), `/${recordSegment(id, title)}`);
+  return path;
+}
 async function at(page: Page, production: boolean, path: string) {
-  await expect
-    .poll(() => new URL(page.url())[production ? "pathname" : "hash"])
-    .toBe(production ? path : "#" + path.slice(1));
+  const expected = canonical(path, production);
+  await expect.poll(() => new URL(page.url())[production ? "pathname" : "hash"])
+    .toBe(production ? expected : "#" + expected.slice(1));
 }
 
 test("core Admin pages keep clean destinations on refresh and browser history", async ({
@@ -161,7 +172,7 @@ test("content editors reopen the saved draft and preserve the dedicated workspac
   await page
     .getByRole("row")
     .filter({ hasText: "URL writing fixture" })
-    .getByRole("button", { name: "Edit", exact: true })
+    .getByRole("link", { name: "URL writing fixture", exact: true })
     .click();
   const path = `/admin/content/${docId}/edit`;
   await at(page, production, path);
@@ -178,7 +189,7 @@ test("content editors reopen the saved draft and preserve the dedicated workspac
   await returnToContent(page);
   await at(page, production, "/admin/content");
   await page.goBack();
-  await at(page, production, path);
+  await at(page, production, `/admin/content/${recordSegment(docId, "A saved URL draft")}/edit`);
   await expect(title).toHaveValue("A saved URL draft");
 });
 

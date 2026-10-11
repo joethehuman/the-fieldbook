@@ -118,7 +118,7 @@ export function AssignmentTransfer({
   return (
     <div ref={root} className="flex min-h-0 flex-1 flex-col gap-3">
       <div
-        className="flex shrink-0 gap-2 md:hidden"
+        className="grid shrink-0 grid-cols-2 gap-2 md:hidden"
         role="group"
         aria-label="Assignment lists"
       >
@@ -130,7 +130,7 @@ export function AssignmentTransfer({
             key={key}
             type="button"
             variant={pane === key ? "default" : "outline"}
-            className="flex-1"
+            className="w-full min-w-0 whitespace-normal [overflow-wrap:anywhere]"
             aria-pressed={pane === key}
             aria-controls={`${id}-${key}`}
             onClick={() => setPane(key)}
@@ -188,7 +188,7 @@ export function AssignmentTransfer({
                   className="shrink-0 text-sm font-semibold outline-none"
                 >
                   {label}{" "}
-                  <span className="font-normal text-muted-foreground">
+                  <span className="font-normal tabular-nums text-muted-foreground">
                     · {all.length}
                   </span>
                 </h3>

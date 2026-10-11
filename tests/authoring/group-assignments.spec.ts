@@ -46,28 +46,20 @@ test("installed Content prepares the full audience and saves only after final as
     return route.fulfill({ json: { revision: 13 } });
   });
   await page.goto("/admin");
-  await page
-    .getByRole("row")
-    .filter({ hasText: "Assignment preparation" })
-    .getByRole("button", { name: "Assign", exact: true })
-    .click();
+  await page.getByRole("row").filter({ hasText: "Assignment preparation" }).getByRole("button", { name: /^Actions for/ }).click();
+  await page.getByRole("menuitem", { name: "Assign to teams or groups", exact: true }).click();
   const picker = page.getByRole("dialog", {
-    name: "Course audience",
+    name: "Course assignments",
     exact: true,
   });
   await expect(picker).toBeVisible();
   expect(prepares).toBeGreaterThan(0);
-  await picker
-    .getByRole("checkbox", {
-      name: "Assign directly to Group: Pilot",
-      exact: true,
-    })
-    .check();
+  await picker.getByRole("button", { name: "Add group: Pilot", exact: true }).click();
   await picker
     .getByRole("button", { name: "Review changes", exact: true })
     .click();
   const review = page.getByRole("dialog", {
-    name: "Course audience",
+    name: "Course assignments",
     exact: true,
   });
   await expect(review).toBeVisible();
@@ -76,11 +68,8 @@ test("installed Content prepares the full audience and saves only after final as
   await review.getByRole("button", { name: "← Back", exact: true }).click();
   await expect(picker).toBeVisible();
   await expect(
-    picker.getByRole("checkbox", {
-      name: "Assign directly to Group: Pilot",
-      exact: true,
-    }),
-  ).toBeChecked();
+    picker.getByRole("button", { name: "Remove group: Pilot", exact: true }),
+  ).toBeVisible();
   await picker
     .getByRole("button", { name: "Review changes", exact: true })
     .click();

@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { addDays, todayUTC } from "../../lib/learning";
 async function section(page: Page, name: string) {
+  await expect(page.locator(".admin-layout")).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
