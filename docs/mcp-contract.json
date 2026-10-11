@@ -823,7 +823,7 @@
     },
     {
       "name": "update_content",
-      "description": "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. Markdown supports editor formatting, images and links; lessons use videoUrl. Published content stays unchanged. Course audiences use manage_course_assignment; contributors cannot reorder Docs or create sections.",
+      "description": "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. Markdown supports editor formatting, images and links; lessons use videoUrl. Published content stays unchanged. Course audiences use manage_course_assignment; contributors choose existing sections and categories and cannot reorder Docs or create sections or categories.",
       "capability": "content:write",
       "annotations": {
         "readOnlyHint": false,

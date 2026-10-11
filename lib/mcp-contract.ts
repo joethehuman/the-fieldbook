@@ -91,7 +91,7 @@ export const mcpContract = {
   ),
   update_content: tool(
     "content:write",
-    "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. Markdown supports editor formatting, images and links; lessons use videoUrl. Published content stays unchanged. Course audiences use manage_course_assignment; contributors cannot reorder Docs or create sections.",
+    "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. Markdown supports editor formatting, images and links; lessons use videoUrl. Published content stays unchanged. Course audiences use manage_course_assignment; contributors choose existing sections and categories and cannot reorder Docs or create sections or categories.",
     {
       content: contentDraftSchema,
       expected_revision: z.number().int().positive(),
