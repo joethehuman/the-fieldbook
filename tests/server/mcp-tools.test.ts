@@ -71,6 +71,86 @@ async function call(
   };
 }
 
+test("MCP placement permits existing destinations and unfinished drafts, with creation reserved for administrators", async () => {
+  const store = data(), original = { ...store };
+  try {
+    for (const role of ["admin", "contributor"] as const) {
+      for (const saved of [false, true]) for (const empty of [false, true]) {
+        const settings = {
+          ...defaultSettings,
+          docCategoryOrder: [],
+          docSections: saved && !empty ? [{ id: "destination", name: "Existing" }] : [],
+          ...(saved ? { contentCategories: { course: empty ? [] : ["Existing"], brief: empty ? [] : ["Existing"] } } : {}),
+        };
+        const docs = new Map<string, DocumentRecord>();
+        const existing = empty ? [] : ["doc", "course", "brief"].map((kind, index) => ({
+          id: id(900 + index), kind, category: "Existing", folder: "", title: "Existing content", status: "published",
+        }));
+        let writes = 0;
+        Object.assign(store, {
+          readConfiguration: async () => ({ settings, groups: [], teams: [], curricula: [], revision: 1, governance_revision: 1 }),
+          readSettings: async () => ({ settings }),
+          listDraftIndex: async () => [...existing, ...[...docs.values()].map((row) => row.draft)],
+          findDocument: async (key: string) => docs.get(key) || null,
+          findReadyMedia: async () => [],
+          saveDocument: async (write: any) => {
+            const old = docs.get(write.id);
+            const result = { id: write.id, draft: write.draft, published: write.publish ? write.draft : old?.published || null,
+              revision: (old?.revision || 0) + 1, published_revision: write.publish ? (old?.revision || 0) + 1 : null,
+              updated_at: write.draft.updatedAt };
+            writes++;
+            docs.set(write.id, result);
+            return result;
+          },
+        });
+        const session = await connect({ ...user, role });
+        try {
+          const options = await call(session.client, "get_authoring_options");
+          assert.equal(options.error, false);
+          assert.deepEqual(options.value.courseCategories, empty ? [] : ["Existing"]);
+          assert.deepEqual(options.value.updateCategories, empty ? [] : ["Existing"]);
+          for (const kind of ["doc", "course", "brief"] as const) {
+            const context = `${role}, ${kind}, saved=${saved}, empty=${empty}`;
+            const blank = await call(session.client, "create_content", { content: { kind } });
+            assert.equal(blank.error, false, context);
+            assert.equal(blank.value.category, "", context);
+            const beforePublish = writes;
+            const unpublished = await call(session.client, "publish_content", { id: blank.value.id, expected_revision: 1 });
+            assert.equal(unpublished.error, true, context);
+            assert.equal(writes, beforePublish, context);
+            if (!empty) {
+              const placed = await call(session.client, "create_content", { content: {
+                kind, title: "Placement check", summary: "Useful content", category: "Existing", body: "Reference text.",
+                ...(kind === "doc" ? { sectionId: saved ? "destination" : "legacy:Existing:" } : {}),
+                ...(kind === "course" ? { lessons: [{ id: "lesson", title: "Lesson", body: "Lesson text." }] } : {}),
+              } });
+              assert.equal(placed.error, false, context);
+              assert.equal((await call(session.client, "publish_content", { id: placed.value.id, expected_revision: 1 })).error, false, context);
+              if (kind !== "doc" && saved) {
+                settings.contentCategories![kind] = [];
+                const beforeStale = writes;
+                const stale = await call(session.client, "update_content", { content: placed.value, expected_revision: 2 });
+                assert.equal(stale.error, true, context);
+                assert.equal(writes, beforeStale, context);
+                settings.contentCategories![kind] = ["Existing"];
+              }
+            }
+            const beforeInvented = writes;
+            const invented = await call(session.client, "create_content", { content: { kind, category: "New" } });
+            const blocked = role === "contributor" || (kind !== "doc" && saved);
+            assert.equal(invented.error, blocked, context);
+            if (blocked) assert.equal(writes, beforeInvented, context);
+          }
+        } finally {
+          await session.close();
+        }
+      }
+    }
+  } finally {
+    Object.assign(store, original);
+  }
+});
+
 test("SDK advertises the executable contract, role-filtered tools and truthful manual guidance", async () => {
   process.env.FIELDBOOK_URL = "https://fieldbook.example";
   process.env.FIELDBOOK_OWNER_EMAIL = "owner@example.test";

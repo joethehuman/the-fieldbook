@@ -7,7 +7,7 @@ import { adminSnapshot } from "../../server/admin-snapshot";
 import { settingsSchema } from "../../server/schemas";
 import { defaultSettings } from "../../lib/settings";
 import { seedContent } from "../../lib/seed";
-import type { User } from "../../lib/types";
+import type { Content, User } from "../../lib/types";
 
 const admin: User = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -28,6 +28,75 @@ const settings = {
   organizationTeamId: "organization",
   contentCategories: { course: ["Source", "Empty"], brief: ["Source"] },
 };
+
+test("placement saves and publication enforce both roles across empty, legacy and saved destinations", async () => {
+  const store = data(), original = { ...store };
+  try {
+    for (const kind of ["doc", "course", "brief"] as const) {
+      for (const saved of [false, true]) for (const empty of [false, true]) {
+        const config = {
+          ...defaultSettings,
+          docCategoryOrder: [],
+          docSections: saved && !empty ? [{ id: "destination", name: "Existing" }] : [],
+          ...(saved ? { contentCategories: { course: empty ? [] : ["Existing"], brief: empty ? [] : ["Existing"] } } : {}),
+        };
+        const existing: Content = {
+          ...seedContent.find((item) => item.kind === kind)!,
+          id: source.id, category: "Existing", folder: "", sectionId: undefined,
+          groups: [], assignments: [], updateTeams: [], sectionOrder: undefined,
+          title: "Placement check", summary: "A useful summary.", body: "Draft text.",
+          lessons: kind === "course" ? [{ id: "lesson", title: "Lesson", body: "Lesson text." }] : [],
+          questions: [], coverImageUrl: undefined, cardArt: undefined,
+        };
+        let writes = 0;
+        Object.assign(store, {
+          readSettings: async () => ({ settings: config }),
+          listDraftIndex: async () => empty ? [] : [existing],
+          findDocument: async () => null,
+          findReadyMedia: async () => [],
+          saveDocument: async (write: any) => {
+            writes++;
+            return { id: write.id, draft: write.draft, published: write.publish ? write.draft : null,
+              revision: 1, published_revision: write.publish ? 1 : null, updated_at: write.draft.updatedAt };
+          },
+        });
+        for (const actor of [admin, contributor]) {
+          const context = `${kind}, saved=${saved}, empty=${empty}, ${actor.role}`;
+          const blank = { ...existing, category: "", status: "draft" as const };
+          const draft = await saveContent(actor, blank, 0);
+          assert.equal(draft.category, "", context);
+          const beforePublish = writes;
+          await assert.rejects(() => saveContent(actor, blank, 0, true), { status: 400 }, context);
+          assert.equal(writes, beforePublish, context);
+          const placed = { ...existing, ...(kind === "doc" ? { sectionId: saved ? "destination" : "legacy:Existing:" } : {}) };
+          if (!empty) {
+            const result = await saveContent(actor, placed, 0, true);
+            assert.equal(result.category, "Existing", context);
+            assert.equal(result.publishedRevision, 1, context);
+          } else if (saved || actor.role === "contributor") {
+            await assert.rejects(() => saveContent(actor, placed, 0, true), /existing Docs section|no longer available/, context);
+          }
+          const invented = { ...existing, category: "New", sectionId: undefined };
+          const beforeInvented = writes;
+          if (actor.role === "contributor" || (kind !== "doc" && saved)) {
+            await assert.rejects(() => saveContent(actor, invented, 0), /existing Docs section|no longer available/, context);
+            assert.equal(writes, beforeInvented, context);
+          } else {
+            assert.equal((await saveContent(actor, invented, 0)).category, "New", context);
+          }
+        }
+        // Saved empty lists remain authoritative even if stale content carries a deleted label.
+        if (saved && empty && kind !== "doc") {
+          store.listDraftIndex = async () => [{ ...existing, revision: 1, published_revision: null, updated_at: existing.updatedAt }];
+          await assert.rejects(() => saveContent(contributor, existing, 0), /no longer available/);
+        }
+        assert.deepEqual(config.contentCategories, saved ? { course: empty ? [] : ["Existing"], brief: empty ? [] : ["Existing"] } : undefined);
+      }
+    }
+  } finally {
+    Object.assign(store, original);
+  }
+});
 
 test("category schema validates names independently for each content type", () => {
   assert(settingsSchema.safeParse(settings).success);

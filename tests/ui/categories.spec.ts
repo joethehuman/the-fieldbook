@@ -66,6 +66,52 @@ async function save(page: Page) {
   ).not.toBeVisible();
 }
 
+for (const large of [false, true]) {
+  test(`${large ? "long" : "short"} category item lists let wheel scrolling continue to the page`, async ({ page }) => {
+    const state = await fixture(page, large, 30);
+    const name = state.settings!.contentCategories!.course[0];
+    await page.getByRole("button", { name: `Expand ${name}`, exact: true }).click();
+    const region = page.getByRole("region", { name: `Items in ${name}`, exact: true });
+    const table = page.getByLabel(`Scrollable items in ${name}`, { exact: true });
+    const pageScroll = () => table.evaluate((element) => {
+      let owner = element.parentElement;
+      while (owner && !/(auto|scroll)/.test(getComputedStyle(owner).overflowY)) owner = owner.parentElement;
+      return (owner || document.scrollingElement!).scrollTop;
+    });
+    await table.scrollIntoViewIfNeeded();
+    const before = await pageScroll();
+    await table.hover();
+    await page.mouse.wheel(0, 250);
+    if (large) {
+      await expect.poll(() => table.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+      expect(await pageScroll()).toBe(before);
+      await table.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+      // Begin a fresh wheel gesture at the lower edge of the bounded list.
+      await region.getByRole("searchbox").hover();
+      await table.hover();
+      await page.mouse.wheel(0, 300);
+    }
+    await expect.poll(pageScroll).toBeGreaterThan(before);
+    if (large) {
+      await region.getByRole("searchbox").fill("Example course 01");
+      await expect(table.locator("tbody tr")).toHaveCount(1);
+      await table.scrollIntoViewIfNeeded();
+      const filtered = await pageScroll();
+      await table.hover();
+      await page.mouse.wheel(0, 300);
+      await expect.poll(pageScroll).toBeGreaterThan(filtered);
+    }
+    await table.scrollIntoViewIfNeeded();
+    await table.evaluate((element) => { element.scrollTop = 0; });
+    const upward = await pageScroll();
+    expect(upward).toBeGreaterThan(0);
+    await region.getByRole("searchbox").hover();
+    await table.hover();
+    await page.mouse.wheel(0, -250);
+    await expect.poll(pageScroll).toBeLessThan(upward);
+  });
+}
+
 test("create, keep changes across type tabs, save, and permanently delete an empty category", async ({
   page,
 }, info) => {

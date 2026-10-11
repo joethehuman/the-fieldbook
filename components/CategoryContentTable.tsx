@@ -186,7 +186,7 @@ export function CategoryContentTable({
           data-scroll-fade-before="false"
           data-scroll-fade-after={fade.edges.after}
           aria-label={`Scrollable items in ${name}`}
-          className="scroll-fade max-h-[calc(2.5rem+5*(var(--control-height)+1rem+1px)+2px)] overflow-auto overscroll-contain rounded-none border-0 [scrollbar-gutter:stable] [--scroll-fade-depth:var(--scroll-fade-size)]"
+          className="scroll-fade max-h-[calc(2.5rem+5*(var(--control-height)+1rem+1px)+2px)] overflow-auto overscroll-x-contain rounded-none border-0 [scrollbar-gutter:stable] [--scroll-fade-depth:var(--scroll-fade-size)]"
         >
           <DataTable
             layout="categoryItems"

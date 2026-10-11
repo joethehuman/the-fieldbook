@@ -30,6 +30,21 @@ function fixture() {
   return { data, actor: data.users.find((item) => item.role === "admin")! };
 }
 
+test("legacy placement restricts contributors to existing categories without changing administrator creation", () => {
+  for (const kind of ["course", "brief"] as const) {
+    const existing = [{ id: "source", kind, category: "Existing" }];
+    const chosen = { kind, category: " existing " };
+    assertContentCategory(chosen, {}, existing);
+    assert.equal(chosen.category, "Existing");
+    assert.throws(() => assertContentCategory({ kind, category: "New" }, {}, existing), /no longer available/);
+    assert.throws(() => assertContentCategory({ kind, category: "Existing" }, {}, []), /no longer available/);
+    assert.throws(() => assertContentCategory({ kind, category: "Existing" }, { contentCategories: { course: [], brief: [] } }, existing), /no longer available/);
+    assertContentCategory({ kind, category: "" }, {}, []);
+    assertContentCategory({ kind, category: "New" }, {});
+    assert.deepEqual(existing, [{ id: "source", kind, category: "Existing" }]);
+  }
+});
+
 test("separate category lists retain empty names, reject duplicate names, and preserve legacy reader order", () => {
   const { data } = fixture();
   data.settings!.contentCategories!.course.push("Empty category");

@@ -738,7 +738,8 @@ export default function Fieldbook() {
             onSaveContent={async (content, intent, options) => {
               try {
                 const before = loadWorkspace();
-                assertContentCategory(content, before.settings || {});
+                assertContentCategory(content, before.settings || {},
+                  user.role === "contributor" ? before.content : undefined);
                 const previous = before.content.find(
                   (item) => item.id === content.id,
                 );

@@ -131,14 +131,16 @@ export function assertCategoriesCanBeRemoved(
 export function assertContentCategory(
   content: Pick<Content, "kind" | "category">,
   settings: Pick<SiteSettings, "contentCategories">,
+  /** Contributors must choose a destination already present on legacy content. */
+  existing?: CategoryPlacement[],
 ) {
   if (
     content.kind === "doc" ||
     !content.category.trim() ||
-    !settings.contentCategories
+    (!settings.contentCategories && existing === undefined)
   )
     return;
-  const name = settings.contentCategories[content.kind].find(
+  const name = availableCategories(existing || [], content.kind, settings).find(
     (item) => categoryKey(item) === categoryKey(content.category),
   );
   if (!name)
