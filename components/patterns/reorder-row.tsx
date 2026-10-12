@@ -41,6 +41,7 @@ export function ReorderRow({
     >
       {icon ? (
         <div
+          data-slot="reorder-heading"
           className={cn(
             "grid min-w-0 items-start gap-x-2",
             variant === "flat" &&
@@ -54,11 +55,15 @@ export function ReorderRow({
             {handle}
           </div>
           {selection && (
-            <div className="col-start-2 row-start-1 flex h-control items-center justify-center">
+            <div
+              data-slot="reorder-selection"
+              className="col-start-2 row-start-1 flex h-control items-center justify-center"
+            >
               {selection}
             </div>
           )}
           <div
+            data-slot="reorder-identity"
             className={cn(
               "row-start-1 flex min-w-0 items-start gap-2",
               selection
@@ -73,7 +78,10 @@ export function ReorderRow({
             >
               {icon}
             </span>
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-1.5 text-copy leading-6">
+            <div
+              data-slot="reorder-label"
+              className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-1.5 text-copy leading-6"
+            >
               <div
                 data-slot="reorder-title"
                 className="min-w-0 [overflow-wrap:anywhere]"
@@ -85,7 +93,9 @@ export function ReorderRow({
                   data-slot="reorder-detail"
                   className="inline-flex min-h-6 min-w-0 max-w-full flex-wrap items-center gap-2 text-xs text-muted-foreground @min-[20rem]:h-6"
                 >
-                  <span aria-hidden="true">·</span>
+                  <span data-slot="reorder-separator" aria-hidden="true">
+                    ·
+                  </span>
                   {detail}
                 </small>
               )}

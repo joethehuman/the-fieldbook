@@ -62,6 +62,8 @@
   --control-radius: 0.625rem;
   --control-height: 2.25rem;
   --control-height-sm: 2rem;
+  --control-height-standard: var(--control-height);
+  --control-height-sm-standard: var(--control-height-sm);
   --type-label: 0.875rem;
   --type-label-leading: 1.25rem;
   --type-compact: 0.875rem;

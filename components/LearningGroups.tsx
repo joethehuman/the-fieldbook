@@ -1047,7 +1047,16 @@ export default function LearningGroups({
             variant="page"
             title={<h2>Groups</h2>}
             description="Assign learning to teams directly. Use groups to combine teams and individual people into a custom audience."
-          />
+          >
+            <Button
+              type="button"
+              disabled={busy || needsConversion}
+              onClick={() => open({ kind: "create", name: "", original: "" })}
+            >
+              <Plus aria-hidden="true" />
+              Create group
+            </Button>
+          </SectionHeader>
           <CollectionControls
             filters={indexFilters}
             onClear={clearIndexFilters}
@@ -1066,16 +1075,6 @@ export default function LearningGroups({
                   </option>
                 ))}
               </SortPicker>
-            }
-            primaryAction={
-              <Button
-                type="button"
-                disabled={busy || needsConversion}
-                onClick={() => open({ kind: "create", name: "", original: "" })}
-              >
-                <Plus aria-hidden="true" />
-                Create group
-              </Button>
             }
             search={
               <FormField label="Find a group" visuallyHiddenLabel>
@@ -1181,7 +1180,9 @@ export default function LearningGroups({
                     const links = groupTeamLinks(candidate),
                       direct = data.users.filter((person) =>
                         person.groups.includes(candidate.id),
-                      ).length;
+                      ).length,
+                      people = membersOf(candidate).length,
+                      courses = courseCount(candidate);
                     return (
                       <TableRow key={candidate.id}>
                         <TableCell>
@@ -1237,12 +1238,15 @@ export default function LearningGroups({
                             )}
                             {!links.length && !direct && "No members yet"}
                           </RecordMeta>
+                          <RecordMeta data-slot="group-record-counts" className="hidden">
+                            People {people} · Courses {courses}
+                          </RecordMeta>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {membersOf(candidate).length}
+                          {people}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {courseCount(candidate)}
+                          {courses}
                         </TableCell>
                         <TableCell>
                           <ItemActions

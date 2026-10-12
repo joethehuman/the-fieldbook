@@ -515,7 +515,31 @@ export default function Curricula({
                 Create reusable course lists, then add them to teams or groups.
               </>
             }
-          />
+          >
+            <Button
+              type="button"
+              onClick={() => {
+                if (onDestinationChange) {
+                  void onDestinationChange(undefined, true);
+                  return;
+                }
+                const draft: Curriculum = {
+                  id: crypto.randomUUID(),
+                  name: "",
+                  description: "",
+                  courseIds: [],
+                  status: "draft",
+                };
+                savedCurriculum.current = draft;
+                setEditing(draft);
+                destination.reveal();
+                setNotice("");
+              }}
+            >
+              <Plus aria-hidden="true" />
+              Create curriculum
+            </Button>
+          </SectionHeader>
           <CollectionControls
             search={
               <FormField
@@ -530,31 +554,6 @@ export default function Curricula({
                   placeholder="Find curricula"
                 />
               </FormField>
-            }
-            actions={
-              <Button
-                type="button"
-                onClick={() => {
-                  if (onDestinationChange) {
-                    void onDestinationChange(undefined, true);
-                    return;
-                  }
-                  const draft: Curriculum = {
-                    id: crypto.randomUUID(),
-                    name: "",
-                    description: "",
-                    courseIds: [],
-                    status: "draft",
-                  };
-                  savedCurriculum.current = draft;
-                  setEditing(draft);
-                  destination.reveal();
-                  setNotice("");
-                }}
-              >
-                <Plus aria-hidden="true" />
-                Create curriculum
-              </Button>
             }
             sort={
               <SortPicker label="Sort curricula" value={sort} onValueChange={setSort}>

@@ -202,7 +202,8 @@ test("team selection is independent of row menus and browsing", async ({
   page,
 }, info) => {
   await start(page, "teams");
-  await page.getByRole("button", { name: "Select multiple", exact: true }).click();
+  if (info.project.name !== "phone")
+    await page.getByRole("button", { name: "Select multiple", exact: true }).click();
   const row = page.locator('table[data-layout="teamDirectory"] tbody tr').first();
   const check = row.getByRole("checkbox");
   await check.check();

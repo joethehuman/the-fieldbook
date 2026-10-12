@@ -228,7 +228,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
 
 test("team detail retains browser search and optional selection on return", async ({
   page,
-}) => {
+}, info) => {
   const data = fixture();
   await page.addInitScript((workspace) => {
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
@@ -256,7 +256,8 @@ test("team detail retains browser search and optional selection on return", asyn
   await expect(
     page.getByRole("button", { name: "Actions for Other team", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Select multiple", exact: true }).click();
+  if (info.project.name !== "phone")
+    await page.getByRole("button", { name: "Select multiple", exact: true }).click();
   const choice = page.getByRole("checkbox", {
     name: "Select Sales team",
     exact: true,
@@ -267,13 +268,15 @@ test("team detail retains browser search and optional selection on return", asyn
     .getByRole("button", { name: "Back to teams", exact: true })
     .click();
   await expect(choice).toBeChecked();
-  await expect(
-    page.getByRole("button", { name: "Done selecting", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page
-    .getByRole("button", { name: "Done selecting", exact: true })
-    .click();
-  await expect(choice).toHaveCount(0);
+  if (info.project.name !== "phone") {
+    await expect(
+      page.getByRole("button", { name: "Done selecting", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Done selecting", exact: true }).click();
+    await expect(choice).toHaveCount(0);
+  } else {
+    await expect(page.getByRole("button", { name: "Done selecting", exact: true })).toHaveCount(0);
+  }
   expect((await saved(page)).users).toEqual(baseline.users);
 });
 

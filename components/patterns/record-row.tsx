@@ -20,7 +20,12 @@ export function RecordName({
   );
   const title = typeof children === "string" ? children : undefined;
   const content = (
-    <span className="line-clamp-2 [overflow-wrap:anywhere] group-data-[sizing=content]/table:line-clamp-none">{children}</span>
+    <span
+      data-slot="record-name"
+      className="line-clamp-2 [overflow-wrap:anywhere] group-data-[sizing=content]/table:line-clamp-none"
+    >
+      {children}
+    </span>
   );
   if (href)
     return (
@@ -73,7 +78,11 @@ export function RecordMeta({
 }: ComponentProps<"div">) {
   return (
     <div
-      className={cn("mt-1 truncate text-xs text-muted-foreground group-data-[sizing=content]/table:whitespace-normal group-data-[sizing=content]/table:overflow-visible group-data-[sizing=content]/table:text-clip", className)}
+      data-slot="record-meta"
+      className={cn(
+        "mt-1 truncate text-xs text-muted-foreground group-data-[sizing=content]/table:whitespace-normal group-data-[sizing=content]/table:overflow-visible group-data-[sizing=content]/table:text-clip",
+        className,
+      )}
       {...props}
     >
       {children}

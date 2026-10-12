@@ -67,12 +67,18 @@ export default function SiteSettingsPanel({
       logoUrl?: string;
     };
     const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
+    const askAi = withoutLogo.askAi
+      ? { ...defaultAskAiSettings, ...withoutLogo.askAi }
+      : section === "ai"
+        ? { ...defaultAskAiSettings, enabled: !production }
+        : undefined;
+    // Old browser-local demo settings may predate the illustrative model picker.
+    const loadedAi = !production && askAi && !askAi.model
+      ? { ...askAi, model: "demo/primary", router: "demo" }
+      : askAi;
     return {
       ...defaultSettings, ...withoutLogo,
-      ...(withoutLogo.askAi ? { askAi: { ...defaultAskAiSettings, ...withoutLogo.askAi } } : {}),
-      ...(section === "ai" && !withoutLogo.askAi ? {
-        askAi: { ...defaultAskAiSettings, enabled: !production },
-      } : {}),
+      ...(loadedAi ? { askAi: loadedAi } : {}),
     };
   };
   const [settings, setSettings] = useState(() => loadedSettings(data)),

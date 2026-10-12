@@ -61,6 +61,7 @@ export function CollectionControls({
         className="flex min-w-0 flex-wrap items-center gap-3"
       >
         <div
+          data-slot="collection-search"
           className={
             primaryAction
               ? "min-w-0 flex-1 basis-32"
@@ -69,7 +70,15 @@ export function CollectionControls({
         >
           {search}
         </div>
-        {primaryAction || (!secondaryRow && secondary)}
+        {primaryAction ? (
+          <div data-slot="collection-actions" className="contents">
+            {primaryAction}
+          </div>
+        ) : !secondaryRow ? (
+          <div data-slot="collection-secondary-row" className="contents">
+            {secondary}
+          </div>
+        ) : null}
       </div>
       {(primaryAction || secondaryRow) && (children || sort || actions) && (
         <div

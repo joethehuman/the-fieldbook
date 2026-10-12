@@ -368,7 +368,7 @@ test("Demo Admin controls stay local; saved off state restores basic search", as
     .getByRole("combobox", { name: "Primary model", exact: true })
     .click();
   await page
-    .getByRole("option", { name: "Example primary model", exact: true })
+    .getByRole("option", { name: "Gavin’s XL MAXIMUS Demo", exact: true })
     .click();
   await page
     .getByRole("combobox", { name: "Fallback model", exact: true })

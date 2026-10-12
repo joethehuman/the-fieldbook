@@ -212,14 +212,16 @@ test("section expansion reveals direct Docs and subsections together while child
     return {
       checkboxOffset: Math.abs(checkbox.top + checkbox.height / 2 - firstLineCenter),
       iconOffset: Math.abs(icon.top + icon.height / 2 - firstLineCenter),
+      checkboxTitleOffset: Math.abs(checkbox.top + checkbox.height / 2 - titleBox.top - titleBox.height / 2),
+      iconTitleOffset: Math.abs(icon.top + icon.height / 2 - titleBox.top - titleBox.height / 2),
       inlineMetadata: detail.left > titleBox.right && Math.abs(detail.top + detail.height / 2 - firstLineCenter) < 1,
       height: row.getBoundingClientRect().height,
       overflow: row.scrollWidth - row.clientWidth,
     };
   }));
   for (const row of alignment) {
-    expect(row.checkboxOffset).toBeLessThan(1);
-    expect(row.iconOffset).toBeLessThan(1);
+    expect(info.project.name === "phone" ? row.checkboxTitleOffset : row.checkboxOffset).toBeLessThan(1);
+    expect(info.project.name === "phone" ? row.iconTitleOffset : row.iconOffset).toBeLessThan(1);
     if (info.project.name !== "phone") {
       expect(row.inlineMetadata).toBe(true);
       expect(row.height).toBeLessThanOrEqual(54);
