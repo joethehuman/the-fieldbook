@@ -53,6 +53,7 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
     if (!editor || disabled) return false;
     const domSelection = window.getSelection();
     const surface = editor.getRootElement();
+    if (surface?.closest("[data-table-cell-selection]")) return false;
     if (!domSelection?.rangeCount || domSelection.isCollapsed || !surface) return false;
     const selected = domSelection.getRangeAt(0).cloneRange();
     const editableAt = (node: Node) => (node instanceof Element ? node : node.parentElement)?.closest('[contenteditable="true"]');
@@ -157,12 +158,14 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
     };
     document.addEventListener("selectionchange", update);
     document.addEventListener("pointerup", update);
+    document.addEventListener("fieldbook-table-selection-change", update);
     const unregister = editor?.registerUpdateListener(update);
     update(); // Capture an existing native range when switching nested editors.
     return () => {
       cancelAnimationFrame(pending);
       document.removeEventListener("selectionchange", update);
       document.removeEventListener("pointerup", update);
+      document.removeEventListener("fieldbook-table-selection-change", update);
       unregister?.();
     };
   }, [editor, snapshot, phone, nativeSelection]);

@@ -55,12 +55,14 @@ export function WritingBlockActions({
   label,
   disabled,
   onEdit,
+  onSelectBlock,
   onRemove,
   onParagraph,
 }: {
   label: string;
   disabled?: boolean;
   onEdit?: () => void;
+  onSelectBlock?: () => void;
   onRemove: () => void;
   onParagraph?: (direction: "before" | "after") => void;
 }) {
@@ -98,6 +100,11 @@ export function WritingBlockActions({
             if (acted.current) event.preventDefault();
           }}
         >
+          {onSelectBlock && (
+            <DropdownMenuItem onSelect={() => run(onSelectBlock)}>
+              Select {label.toLowerCase()}
+            </DropdownMenuItem>
+          )}
           {onEdit && (
             <DropdownMenuItem onSelect={() => run(onEdit)}>
               <Pencil className="size-4" />

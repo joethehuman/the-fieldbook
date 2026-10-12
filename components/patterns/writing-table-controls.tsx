@@ -29,6 +29,7 @@ import {
 } from "../ui/dropdown-menu";
 import { WritingBlockActions, blockActions } from "./writing-block-actions";
 import { useWritingInteraction } from "./writing-interaction";
+import { WritingTableSelection } from "./writing-table-selection";
 
 type Axis = "row" | "column";
 type Box = { left: number; top: number; width: number; height: number };
@@ -85,8 +86,8 @@ function GutterActions({
         - origin.left + frame.scrollLeft - 44;
       position(anchor.current, {
         left: Math.max(4, left),
-        // With no outside gutter, use the table's top control space instead of its first cell.
-        top: (tableBounds ? left < 4 ? bounds.top + 4 : tableBounds.top : bounds.top)
+        // Table actions share the top gutter, leaving row controls and all cell text clear.
+        top: (tableBounds ? tableBounds.top - 40 : bounds.top)
           - origin.top + frame.scrollTop,
       });
     };
@@ -484,6 +485,7 @@ function TableControls({
         <WritingBlockActions
           label="Table"
           {...blockActions(editor, nodeKey)}
+          onSelectBlock={() => host.dispatchEvent(new CustomEvent("fieldbook-select-table", { bubbles: true }))}
           onRemove={() =>
             change((node) => {
               node.selectPrevious();
@@ -794,6 +796,6 @@ function WritingTableControls({ initialWidths, onRootEditor, onWidthsChange }: {
 }
 export const writingTableControlsPlugin = (initialWidths: (number[] | null)[], onRootEditor: (editor: LexicalEditor | null) => void, onWidthsChange: (widths: (number[] | null)[]) => void) => realmPlugin({
   init(realm) {
-    realm.pub(addComposerChild$, () => <WritingTableControls initialWidths={initialWidths} onRootEditor={onRootEditor} onWidthsChange={onWidthsChange} />);
+    realm.pub(addComposerChild$, () => <><WritingTableSelection /><WritingTableControls initialWidths={initialWidths} onRootEditor={onRootEditor} onWidthsChange={onWidthsChange} /></>);
   },
 });

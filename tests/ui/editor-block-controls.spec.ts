@@ -18,7 +18,7 @@ async function actions(page: Page, name: string) {
   await button.click();
 }
 
-test("table handles sit on the grid edges and drag shows origin and destination", async ({
+test("table handles stay outside cells and drag shows origin and destination", async ({
   page,
 }, info) => {
   const errors: string[] = [];
@@ -39,7 +39,7 @@ test("table handles sit on the grid edges and drag shows origin and destination"
     .first()
     .boundingBox();
   const handle = await row.boundingBox();
-  expect(Math.abs(handle!.x + handle!.width / 2 - cell!.x)).toBeLessThan(2);
+  expect(Math.abs(handle!.x + handle!.width - cell!.x)).toBeLessThan(2);
   expect(
     Math.abs(handle!.y + handle!.height / 2 - cell!.y - cell!.height / 2),
   ).toBeLessThan(2);
@@ -50,7 +50,8 @@ test("table handles sit on the grid edges and drag shows origin and destination"
     .nth(1)
     .boundingBox();
   const grip = await column.boundingBox();
-  expect(Math.abs(grip!.y + grip!.height / 2 - header!.y)).toBeLessThan(2);
+  expect(grip!.y + grip!.height).toBeLessThanOrEqual(header!.y);
+  expect(header!.y - grip!.y - grip!.height).toBeLessThanOrEqual(8);
   const last = await table.locator("tbody tr").last().boundingBox();
   await page.mouse.move(
     handle!.x + handle!.width / 2,
