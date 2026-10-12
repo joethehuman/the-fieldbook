@@ -25,7 +25,6 @@ import type {
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Content } from "@/lib/types";
 import { PendingChangesBar } from "./patterns/pending-changes-bar";
-import { SettingsSection } from "./patterns/settings-section";
 import { CollectionControls } from "./patterns/collection-controls";
 import { SearchField } from "./patterns/search-field";
 import { ReorderRow } from "./patterns/reorder-row";
@@ -37,7 +36,9 @@ import {
   CategoryContentTable,
   CategorySelectionBar,
 } from "./CategoryContentTable";
-import { EmptyState } from "./patterns/layout";
+import { EmptyState, SectionHeader } from "./patterns/layout";
+import { Card, CardContent } from "./ui/card";
+import { FieldGroup } from "./ui/field";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { SelectField } from "./ui/select";
@@ -213,130 +214,147 @@ export function CategorySettingsPanel({
   const active = dirty || busy || !!error;
   return (
     <div className="settings-panel min-w-0">
-      <PendingChangesBar
-        active={active}
-        feedback={
-          error ? (
-            <Alert
-              variant="destructive"
-              role="alert"
-              onDismiss={() => setError("")}
-            >
-              {error}
-            </Alert>
-          ) : undefined
-        }
-        actions={
-          dirty || busy ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => {
-                  setSettings(baseline.current);
-                  setMoves([]);
-                  setError("");
-                }}
-              >
-                Discard changes
-              </Button>
-              <Button type="button" loading={busy} onClick={() => void save()}>
-                {busy ? "Saving…" : "Save settings"}
-              </Button>
-            </>
-          ) : null
-        }
-      >
-        {busy ? "Saving changes…" : dirty ? "Unsaved changes" : null}
-      </PendingChangesBar>
-      <SettingsSection
-        id="settings-categories"
-        title={<h2>Categories</h2>}
+      <SectionHeader
+        variant="page"
+        title={<h2 id="settings-categories-heading">Categories</h2>}
         description="Use categories to organize courses and updates."
-        measure="full"
-        className={active ? "rounded-t-none border-t-0" : undefined}
-      >
-        <Tabs
-          value={tab}
-          onValueChange={(value) => setTab(value as CategoryKind)}
+      />
+      <div className="min-w-0">
+        <PendingChangesBar
+          active={active}
+          feedback={
+            error ? (
+              <Alert
+                variant="destructive"
+                role="alert"
+                onDismiss={() => setError("")}
+              >
+                {error}
+              </Alert>
+            ) : undefined
+          }
+          actions={
+            dirty || busy ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    setSettings(baseline.current);
+                    setMoves([]);
+                    setError("");
+                  }}
+                >
+                  Discard changes
+                </Button>
+                <Button
+                  type="button"
+                  loading={busy}
+                  onClick={() => void save()}
+                >
+                  {busy ? "Saving…" : "Save settings"}
+                </Button>
+              </>
+            ) : null
+          }
         >
-          <TabsList aria-label="Category type">
-            {kinds.map((kind) => (
-              <TabsTrigger key={kind} value={kind} disabled={busy}>
-                {labels[kind]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {kinds.map((kind) => (
-            <TabsContent key={kind} value={kind}>
-              <p className="mb-4 max-w-prose text-copy text-muted-foreground">
-                {kind === "course"
-                  ? "Reorder categories to change their order on the Courses page. Curricula always appear at the bottom."
-                  : "Update categories are listed alphabetically. They do not change the order of the Updates feed."}
-              </p>
-              <CategoryList
-                controls={
-                  <>
-                    <div
-                      data-slot="section-actions"
-                      className="flex flex-wrap items-center gap-2"
-                    >
-                      <Button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => {
-                          setNewName("");
-                          setCreateError("");
-                          setCreate(true);
-                        }}
-                      >
-                        <Plus aria-hidden="true" />
-                        Create category
-                      </Button>
-                    </div>
-                    <CollectionControls
-                      search={
-                        <SearchField>
-                          <Input
-                            type="search"
-                            value={queries[kind]}
-                            onChange={(event) =>
-                              setQueries((current) => ({
-                                ...current,
-                                [kind]: event.target.value,
-                              }))
+          {busy ? "Saving changes…" : dirty ? "Unsaved changes" : null}
+        </PendingChangesBar>
+        <Card
+          id="settings-categories"
+          data-settings-section
+          aria-labelledby="settings-categories-heading"
+          className={`p-0 sm:p-0 ${active ? "rounded-t-none border-t-0" : ""}`}
+        >
+          <CardContent>
+            <FieldGroup
+              disabled={busy}
+              aria-labelledby="settings-categories-heading"
+            >
+              <Tabs
+                value={tab}
+                onValueChange={(value) => setTab(value as CategoryKind)}
+              >
+                <TabsList aria-label="Category type">
+                  {kinds.map((kind) => (
+                    <TabsTrigger key={kind} value={kind} disabled={busy}>
+                      {labels[kind]}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {kinds.map((kind) => (
+                  <TabsContent key={kind} value={kind}>
+                    <p className="mb-4 text-copy text-muted-foreground">
+                      {kind === "course"
+                        ? "Reorder categories to change their order on the Courses page. Curricula always appear at the bottom."
+                        : "Update categories are listed alphabetically. They do not change the order of the Updates feed."}
+                    </p>
+                    <CategoryList
+                      controls={
+                        <>
+                          <div
+                            data-slot="section-actions"
+                            className="flex flex-wrap items-center gap-2"
+                          >
+                            <Button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => {
+                                setNewName("");
+                                setCreateError("");
+                                setCreate(true);
+                              }}
+                            >
+                              <Plus aria-hidden="true" />
+                              Create category
+                            </Button>
+                          </div>
+                          <CollectionControls
+                            search={
+                              <SearchField>
+                                <Input
+                                  type="search"
+                                  value={queries[kind]}
+                                  onChange={(event) =>
+                                    setQueries((current) => ({
+                                      ...current,
+                                      [kind]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="Search categories…"
+                                  aria-label={`Search ${kind === "course" ? "course" : "update"} categories`}
+                                  disabled={busy}
+                                />
+                              </SearchField>
                             }
-                            placeholder="Search categories…"
-                            aria-label={`Search ${kind === "course" ? "course" : "update"} categories`}
-                            disabled={busy}
                           />
-                        </SearchField>
+                          {kind === "course" && queries[kind].trim() && (
+                            <p className="text-copy text-muted-foreground">
+                              Clear search to reorder categories.
+                            </p>
+                          )}
+                        </>
                       }
+                      kind={kind}
+                      categories={settings.contentCategories}
+                      drafts={drafts}
+                      published={published}
+                      busy={busy}
+                      query={queries[kind]}
+                      onClearSearch={() =>
+                        setQueries((current) => ({ ...current, [kind]: "" }))
+                      }
+                      onChange={update}
+                      onMove={(ids, category) => stage(ids, kind, category)}
                     />
-                    {kind === "course" && queries[kind].trim() && (
-                      <p className="text-copy text-muted-foreground">
-                        Clear search to reorder categories.
-                      </p>
-                    )}
-                  </>
-                }
-                kind={kind}
-                categories={settings.contentCategories}
-                drafts={drafts}
-                published={published}
-                busy={busy}
-                query={queries[kind]}
-                onClearSearch={() =>
-                  setQueries((current) => ({ ...current, [kind]: "" }))
-                }
-                onChange={update}
-                onMove={(ids, category) => stage(ids, kind, category)}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
-      </SettingsSection>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </FieldGroup>
+          </CardContent>
+        </Card>
+      </div>
       <Dialog open={create} onOpenChange={setCreate}>
         <DialogContent>
           <DialogTitle>
@@ -534,7 +552,22 @@ function CategoryList({
       });
     }
   }
-  const invalid = categoryItems(drafts, published, kind, undefined, categories);
+  // Unassigned unfinished drafts belong in Content. Keep stale/restored
+  // placements and published records available here for category repair.
+  const publishedIds = new Set(published.map((item) => item.id));
+  const invalid = categoryItems(
+    drafts,
+    published,
+    kind,
+    undefined,
+    categories,
+  ).filter(
+    (item) =>
+      item.category.trim() ||
+      item.publishedRevision ||
+      item.status === "published" ||
+      publishedIds.has(item.id),
+  );
   return (
     <div
       ref={listRoot}
@@ -582,7 +615,10 @@ function CategoryList({
           ]}
         />
       </CategoryControls>
-      <ul aria-label={`${labels[kind]} categories`} className="grid">
+      <ul
+        aria-label={`${labels[kind]} categories`}
+        className={kind === "course" ? "doc-order-list" : "grid"}
+      >
         {visibleNames.map((name) => {
           const index = names.indexOf(name);
           const items = categoryItems(drafts, published, kind, name),
@@ -596,7 +632,7 @@ function CategoryList({
           return (
             <ReorderRow
               key={name}
-              variant="flat"
+              variant={kind === "course" ? "card" : "flat"}
               data-category={name}
               data-selected={selectedNames.includes(name)}
               data-dragging={reorder.active === name}
@@ -723,7 +759,13 @@ function CategoryList({
               }
             >
               {open && items.length > 0 && (
-                <div className="mt-3 min-w-0 pb-3 ps-2 sm:ps-8">
+                <div
+                  className={
+                    kind === "course"
+                      ? "mt-3 min-w-0 border-t border-border pt-3"
+                      : "mt-3 min-w-0 pb-3 ps-2 sm:ps-8"
+                  }
+                >
                   <CategoryContentTable
                     name={name}
                     items={items}

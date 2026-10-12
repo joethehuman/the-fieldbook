@@ -10,7 +10,7 @@ import {
 import { saveCategorySettings } from "@/lib/category-settings-save";
 import { applyDemoBulk } from "@/lib/bulk-actions";
 
-/** The real panel, including fifty categories, a large category and a draft. */
+/** The real panel, including long lists, categorized drafts and stale placements. */
 export function CategoryExamples() {
   const [data, setData] = useState(() => {
     const workspace = freshWorkspace();
@@ -38,6 +38,20 @@ export function CategoryExamples() {
       ...initial.settings!,
       contentCategories: categories,
     };
+    initial.content.push(
+      ...[
+        ["categorized", course.category, "Categorized draft course"],
+        ["unassigned", "", "Unassigned draft course"],
+        ["restored", "Removed category", "Restored draft course"],
+      ].map(([id, category, title]) => ({
+        ...course,
+        id: `category-example-${id}-draft`,
+        category,
+        title,
+        status: "draft" as const,
+        publishedRevision: null,
+      })),
+    );
     return initial;
   });
   return (
