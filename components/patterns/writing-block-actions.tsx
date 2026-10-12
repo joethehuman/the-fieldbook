@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  Copy,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -55,12 +56,14 @@ export function WritingBlockActions({
   label,
   disabled,
   onEdit,
+  onCopyBlock,
   onRemove,
   onParagraph,
 }: {
   label: string;
   disabled?: boolean;
   onEdit?: () => void;
+  onCopyBlock?: () => void;
   onRemove: () => void;
   onParagraph?: (direction: "before" | "after") => void;
 }) {
@@ -98,6 +101,12 @@ export function WritingBlockActions({
             if (acted.current) event.preventDefault();
           }}
         >
+          {onCopyBlock && (
+            <DropdownMenuItem onSelect={() => run(onCopyBlock)}>
+              <Copy className="size-4" />
+              Copy {label.toLowerCase()}
+            </DropdownMenuItem>
+          )}
           {onEdit && (
             <DropdownMenuItem onSelect={() => run(onEdit)}>
               <Pencil className="size-4" />

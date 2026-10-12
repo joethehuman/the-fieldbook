@@ -21,6 +21,7 @@ import {
 } from "lexical";
 import { MAX_SAVED_TABLE_COLUMN_WIDTH, MAX_TABLE_COLUMN_WIDTH, MIN_TABLE_COLUMN_WIDTH, moveTablePart, setTableColumnWidths, tableColumnWidths } from "@/lib/writing-table";
 import { Button } from "../ui/button";
+import { Alert } from "../ui/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,7 @@ import {
 } from "../ui/dropdown-menu";
 import { WritingBlockActions, blockActions } from "./writing-block-actions";
 import { useWritingInteraction } from "./writing-interaction";
+import { WritingTableSelection } from "./writing-table-selection";
 
 type Axis = "row" | "column";
 type Box = { left: number; top: number; width: number; height: number };
@@ -85,8 +87,8 @@ function GutterActions({
         - origin.left + frame.scrollLeft - 44;
       position(anchor.current, {
         left: Math.max(4, left),
-        // With no outside gutter, use the table's top control space instead of its first cell.
-        top: (tableBounds ? left < 4 ? bounds.top + 4 : tableBounds.top : bounds.top)
+        // Table actions share the top gutter, leaving row controls and all cell text clear.
+        top: (tableBounds ? tableBounds.top - 40 : bounds.top)
           - origin.top + frame.scrollTop,
       });
     };
@@ -157,6 +159,15 @@ function TableControls({
   const [resizing, setResizing] = useState<number | null>(null);
   const [fade, setFade] = useState({ left: false, right: false });
   const [announcement, setAnnouncement] = useState("");
+  const [copyFailure, setCopyFailure] = useState(0);
+  useEffect(() => {
+    const result = (event: Event) => {
+      const copied = (event as CustomEvent<{ copied: boolean }>).detail.copied;
+      setCopyFailure(current => copied ? 0 : current + 1);
+    };
+    host.addEventListener("fieldbook-copy-table-result", result);
+    return () => host.removeEventListener("fieldbook-copy-table-result", result);
+  }, [host]);
   const gesture = useRef<(() => void) | null>(null);
   const fadeRef = useRef<HTMLSpanElement>(null);
   const resizePreview = useRef(false);
@@ -484,6 +495,7 @@ function TableControls({
         <WritingBlockActions
           label="Table"
           {...blockActions(editor, nodeKey)}
+          onCopyBlock={() => host.dispatchEvent(new CustomEvent("fieldbook-copy-table", { bubbles: true }))}
           onRemove={() =>
             change((node) => {
               node.selectPrevious();
@@ -492,6 +504,9 @@ function TableControls({
           }
         />
       </GutterActions>
+      {copyFailure > 0 && <Alert className="mt-3" role="alert" dismissKey={copyFailure}>
+        Copy failed. Select the table and copy it manually.
+      </Alert>}
       {(["row", "column"] as const).flatMap((axis) =>
         geometry[axis === "row" ? "rows" : "columns"].map(
           (box, index, items) => (
@@ -794,6 +809,6 @@ function WritingTableControls({ initialWidths, onRootEditor, onWidthsChange }: {
 }
 export const writingTableControlsPlugin = (initialWidths: (number[] | null)[], onRootEditor: (editor: LexicalEditor | null) => void, onWidthsChange: (widths: (number[] | null)[]) => void) => realmPlugin({
   init(realm) {
-    realm.pub(addComposerChild$, () => <WritingTableControls initialWidths={initialWidths} onRootEditor={onRootEditor} onWidthsChange={onWidthsChange} />);
+    realm.pub(addComposerChild$, () => <><WritingTableSelection /><WritingTableControls initialWidths={initialWidths} onRootEditor={onRootEditor} onWidthsChange={onWidthsChange} /></>);
   },
 });

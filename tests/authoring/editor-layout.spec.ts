@@ -18,6 +18,7 @@ async function open(
   prepare?: (item: Content) => void,
   prepareWorkspace?: (state: ReturnType<typeof freshWorkspace>) => void,
   source = false,
+  preserveSavedDemo = false,
 ) {
   if ((page.viewportSize()?.width || 0) >= 1280) await page.setViewportSize({ width: 1600, height: page.viewportSize()!.height });
   let state = withPublishedSnapshots(freshWorkspace());
@@ -72,10 +73,11 @@ async function open(
       return route.fulfill({ json: saved });
     });
   } else
-    await page.addInitScript((data) => {
-      localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
+    await page.addInitScript(({ data, preserve }) => {
+      if (!preserve || !localStorage.getItem("fieldbook.workspace.v1"))
+        localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
       sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
-    }, state);
+    }, { data: state, preserve: preserveSavedDemo });
   await page.goto(installed ? `/admin/content/${item.id}/edit` : "/#admin");
   if (!installed)
     await page.getByRole("link", { name: item.title, exact: true }).click();
@@ -152,7 +154,7 @@ for (const kind of ["doc", "brief", "course"] as const)
     await expect(preferred).toHaveAttribute("aria-expanded", "false");
   });
 
-test("balanced phone gutters keep table actions beside authored cells", async ({ page }, info) => {
+test("balanced phone gutters keep table actions above the row controls", async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, info.project.name.startsWith("production"), "doc", 2, (item) => {
     item.body = "| First column | Second column |\n| --- | --- |\n| Value | Another value |\n\n" + item.body;
@@ -165,12 +167,52 @@ test("balanced phone gutters keep table actions beside authored cells", async ({
   const button = (await actions.boundingBox())!;
   const table = (await host.locator("table").boundingBox())!;
   expect(button.x + button.width).toBeLessThanOrEqual(table.x - 4);
-  expect(button.y).toBeCloseTo(table.y, 0);
+  expect(button.y + button.height).toBeLessThanOrEqual(table.y);
+  const row = (await page.getByRole("button", { name: "Row 1 actions and drag handle", exact: true }).boundingBox())!;
+  expect(button.y + button.height).toBeLessThanOrEqual(row.y);
   await actions.click();
   await expect(page.getByRole("menuitem", { name: "Remove table", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.screenshot({ path: info.outputPath("phone-table-actions.png") });
 });
+
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: rectangular table paste saves complete cells and survives refresh`, async ({ page }, info) => {
+    const tableBody = "| First | Second |\n| --- | --- |\n| **One** | A |\n| Two | B |\n\n";
+    const fixture = await open(page, info.project.name.startsWith("production"), kind, 2, item => {
+      if (kind === "course") item.lessons[0].body = tableBody + item.lessons[0].body;
+      else item.body = tableBody + item.body;
+    }, undefined, false, true);
+    const table = page.locator(".writing-table-block table");
+    const cells = table.locator('tbody tr :is(th,td):not([data-tool-cell])');
+    await table.scrollIntoViewIfNeeded();
+    const start = (await cells.nth(2).boundingBox())!, end = (await cells.nth(4).boundingBox())!;
+    await page.mouse.move(start.x + 12, start.y + start.height / 2); await page.mouse.down();
+    await page.mouse.move(end.x + 30, end.y + end.height / 2, { steps: 12 }); await page.mouse.up();
+    await expect(page.locator("[data-writing-cell-selected]")).toHaveCount(2);
+    const copied = await page.evaluate(() => {
+      const data = new DataTransfer();
+      document.activeElement!.dispatchEvent(new ClipboardEvent("copy", { bubbles: true, cancelable: true, clipboardData: data }));
+      return Object.fromEntries(Array.from(data.types, type => [type, data.getData(type)]));
+    });
+    expect(copied["text/plain"]).toBe("One\nTwo");
+    await page.keyboard.press("Escape");
+    await cells.first().locator('[contenteditable="true"]').click();
+    await page.evaluate(data => {
+      const clipboard = new DataTransfer();
+      Object.entries(data).forEach(([type, value]) => clipboard.setData(type, value));
+      document.activeElement!.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: clipboard }));
+    }, copied);
+    await expect(cells.first().locator("strong")).toHaveText("One");
+    await expect(cells.nth(2)).toHaveText("Two");
+    await waitForDraftSaved(page);
+    const saved = (await fixture.read()).content[0];
+    expect(kind === "course" ? saved.lessons[0].body : saved.body).toMatch(/\| \*\*One\*\*/);
+    await page.reload();
+    await expect(cells.first().locator("strong")).toHaveText("One");
+    await expect(cells.nth(2)).toHaveText("Two");
+  });
+}
 
 test("writing buttons follow phone width and portrait touch-tablet orientation", async ({ page }, info) => {
   await page.setViewportSize({ width: 1024, height: 1366 });
