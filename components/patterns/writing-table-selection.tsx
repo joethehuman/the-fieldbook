@@ -411,7 +411,6 @@ export function WritingTableSelection() {
     root.addEventListener("copy", copy, true);
     root.addEventListener("cut", copy, true);
     root.addEventListener("paste", paste, true);
-    root.addEventListener("fieldbook-select-table", selectTable);
     root.addEventListener("fieldbook-copy-table", copyTable);
     window.addEventListener("blur", cancel);
     return () => {
@@ -427,7 +426,6 @@ export function WritingTableSelection() {
       root.removeEventListener("copy", copy, true);
       root.removeEventListener("cut", copy, true);
       root.removeEventListener("paste", paste, true);
-      root.removeEventListener("fieldbook-select-table", selectTable);
       root.removeEventListener("fieldbook-copy-table", copyTable);
       window.removeEventListener("blur", cancel);
     };

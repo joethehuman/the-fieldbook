@@ -495,7 +495,6 @@ function TableControls({
         <WritingBlockActions
           label="Table"
           {...blockActions(editor, nodeKey)}
-          onSelectBlock={() => host.dispatchEvent(new CustomEvent("fieldbook-select-table", { bubbles: true }))}
           onCopyBlock={() => host.dispatchEvent(new CustomEvent("fieldbook-copy-table", { bubbles: true }))}
           onRemove={() =>
             change((node) => {

@@ -84,7 +84,7 @@ test("returning a drag to its starting cell restores ordinary text selection", a
   expect(await page.evaluate(() => document.getSelection()?.toString())).toBeTruthy();
 });
 
-test("Select table and keyboard extension copy every cell, including a recent edit", async ({ page }, info) => {
+test("keyboard select-all and extension copy every cell, including a recent edit", async ({ page }, info) => {
   await open(page);
   await cells(page).nth(3).locator('[contenteditable="true"]').fill("Recently edited");
   await drag(page, 3, info.project.use.viewport!.width < 700 ? 9 : 10);
@@ -94,10 +94,6 @@ test("Select table and keyboard extension copy every cell, including a recent ed
   expect(copied.data["text/plain"]).toContain("Recently edited");
   expect(copied.data["text/html"]).toContain("<table ");
   expect(copied.data["text/html"]).not.toContain("contenteditable");
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Table actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Select table", exact: true }).click();
-  await expect(selected(page)).toHaveCount(12);
   await page.keyboard.press("Escape");
   await drag(page, 3, 6);
   await page.keyboard.press("Shift+ArrowDown");
@@ -133,8 +129,9 @@ test("pasting a rectangle fills cells, grows the table, and undoes in one step",
 
 test("copying the whole table into prose creates a rich table with one undo", async ({ page }) => {
   await open(page);
-  await page.getByRole("button", { name: "Table actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Select table", exact: true }).click();
+  await drag(page, 3, 6);
+  await page.keyboard.press("ControlOrMeta+a");
+  await expect(selected(page)).toHaveCount(12);
   const copied = await clipboard(page, "copy");
   const paragraph = page.locator('.writing-content > p').filter({ hasText: "Triple-click this paragraph" });
   await paragraph.click();
@@ -219,6 +216,9 @@ test("Copy table copies all cells and recent edits through the shared copy handl
     };
   });
   await page.getByRole("button", { name: "Table actions", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Copy table", "Write before table", "Write after table", "Remove table",
+  ]);
   await page.getByRole("menuitem", { name: "Copy table", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-slot="toast"]')).toHaveText("Table copied.");

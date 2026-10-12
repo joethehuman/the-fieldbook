@@ -56,7 +56,6 @@ export function WritingBlockActions({
   label,
   disabled,
   onEdit,
-  onSelectBlock,
   onCopyBlock,
   onRemove,
   onParagraph,
@@ -64,7 +63,6 @@ export function WritingBlockActions({
   label: string;
   disabled?: boolean;
   onEdit?: () => void;
-  onSelectBlock?: () => void;
   onCopyBlock?: () => void;
   onRemove: () => void;
   onParagraph?: (direction: "before" | "after") => void;
@@ -103,11 +101,6 @@ export function WritingBlockActions({
             if (acted.current) event.preventDefault();
           }}
         >
-          {onSelectBlock && (
-            <DropdownMenuItem onSelect={() => run(onSelectBlock)}>
-              Select {label.toLowerCase()}
-            </DropdownMenuItem>
-          )}
           {onCopyBlock && (
             <DropdownMenuItem onSelect={() => run(onCopyBlock)}>
               <Copy className="size-4" />
