@@ -92,7 +92,7 @@ test("Select table and keyboard extension copy every cell, including a recent ed
   await expect(selected(page)).toHaveCount(12);
   const copied = await clipboard(page, "copy");
   expect(copied.data["text/plain"]).toContain("Recently edited");
-  expect(copied.data["text/html"]).toContain("<table>");
+  expect(copied.data["text/html"]).toContain("<table ");
   expect(copied.data["text/html"]).not.toContain("contenteditable");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Table actions", exact: true }).click();
@@ -195,4 +195,83 @@ test("switching to read-only clears the table selection and its edit handlers", 
   await expect(selected(page)).toHaveCount(0);
   await expect(cells(page).nth(3).locator('[contenteditable="false"]')).toHaveCount(1);
   await expect(cells(page).nth(3)).toContainText("Documentation");
+});
+
+test("Copy table copies all cells and recent edits through the shared copy handler", async ({ page }) => {
+  await open(page);
+  const edited = cells(page).nth(4).locator('[contenteditable="true"]');
+  await edited.click();
+  await expect(edited).toBeFocused();
+  await edited.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.keyboard.press("ControlOrMeta+a");
+  await expect.poll(() => page.evaluate(() => document.getSelection()?.toString())).toBe("Enablement");
+  await edited.pressSequentially("Recent edit");
+  await expect(cells(page).nth(4)).toHaveText("Recent edit");
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { write: async () => { throw new DOMException("Use event copying", "NotAllowedError"); } } });
+    document.execCommand = command => {
+      if (command !== "copy") return false;
+      const data = new DataTransfer();
+      const event = new ClipboardEvent("copy", { bubbles: true, cancelable: true, clipboardData: data });
+      document.activeElement!.dispatchEvent(event);
+      (window as Window & { tableClipboard?: Record<string, string> }).tableClipboard = Object.fromEntries(Array.from(data.types, type => [type, data.getData(type)]));
+      return event.defaultPrevented;
+    };
+  });
+  await page.getByRole("button", { name: "Table actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Copy table", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator('[data-slot="toast"]')).toHaveText("Table copied.");
+  await expect(selected(page)).toHaveCount(12);
+  const copied = await page.evaluate(() => (window as Window & { tableClipboard?: Record<string, string> }).tableClipboard!);
+  expect(copied["text/plain"]).toBe("Area\tOwner\tNext step\nDocumentation\tRecent edit\tConfirm the source\n\t\t\nCustomer follow-up\tAccount team\tKeep the next decision and its context visible");
+  const table = JSON.parse(copied[MIME]).table;
+  expect(table.children).toHaveLength(4);
+  expect(table.children.every((row: { children: unknown[] }) => row.children.length === 3)).toBe(true);
+  expect(table.children[1].children[0].children[0].type).toBe("strong");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+});
+
+test("Copy table's standard clipboard API retains formatting and saved column layout", async ({ page }) => {
+  await open(page);
+  const resize = page.getByRole("separator", { name: "Resize column 1", exact: true });
+  await resize.focus(); await page.keyboard.press("ArrowRight");
+  await page.evaluate(() => {
+    document.execCommand = () => false;
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      write: async (items: ClipboardItem[]) => {
+        const html = await items[0].getType("text/html");
+        const plain = await items[0].getType("text/plain");
+        (window as Window & { tableClipboard?: Record<string, string> }).tableClipboard = { "text/html": await html.text(), "text/plain": await plain.text() };
+      },
+    } });
+  });
+  await page.getByRole("button", { name: "Table actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Copy table", exact: true }).click();
+  await expect(page.locator('[data-slot="toast"]')).toHaveText("Table copied.");
+  const copied = await page.evaluate(() => (window as Window & { tableClipboard?: Record<string, string> }).tableClipboard!);
+  expect(copied["text/html"]).toContain("data-fieldbook-table=");
+  const paragraph = page.locator('.writing-content > p').filter({ hasText: "Triple-click this paragraph" });
+  await paragraph.click(); await page.keyboard.press("End");
+  await clipboard(page, "paste", copied);
+  await expect(page.locator('#writing table')).toHaveCount(2);
+  await expect(page.locator('#writing table').last().locator("strong")).toHaveText("Documentation");
+  const markdown = (await downloadMarkdown(page)).body;
+  const widths = JSON.parse(markdown.match(/fieldbook-table-widths:v1 (\[[^\n]*\])/)![1]);
+  expect(widths[1]).toEqual(widths[0]);
+});
+
+test("blocked Copy table leaves a full selection and an honest manual-copy fallback", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => {
+    // Returning true without dispatching a copy event must not produce a success toast.
+    document.execCommand = () => true;
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { write: async () => { throw new DOMException("Clipboard blocked", "NotAllowedError"); } } });
+  });
+  await page.getByRole("button", { name: "Table actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Copy table", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Copy failed. Select the table and copy it manually." })).toBeVisible();
+  await expect(page.locator('[data-slot="toast"]')).toHaveCount(0);
+  await expect(selected(page)).toHaveCount(12);
+  expect((await clipboard(page, "copy")).data["text/plain"]).toContain("Area\tOwner\tNext step");
 });

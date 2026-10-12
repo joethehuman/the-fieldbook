@@ -21,6 +21,7 @@ import {
 } from "lexical";
 import { MAX_SAVED_TABLE_COLUMN_WIDTH, MAX_TABLE_COLUMN_WIDTH, MIN_TABLE_COLUMN_WIDTH, moveTablePart, setTableColumnWidths, tableColumnWidths } from "@/lib/writing-table";
 import { Button } from "../ui/button";
+import { Alert } from "../ui/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -158,6 +159,15 @@ function TableControls({
   const [resizing, setResizing] = useState<number | null>(null);
   const [fade, setFade] = useState({ left: false, right: false });
   const [announcement, setAnnouncement] = useState("");
+  const [copyFailure, setCopyFailure] = useState(0);
+  useEffect(() => {
+    const result = (event: Event) => {
+      const copied = (event as CustomEvent<{ copied: boolean }>).detail.copied;
+      setCopyFailure(current => copied ? 0 : current + 1);
+    };
+    host.addEventListener("fieldbook-copy-table-result", result);
+    return () => host.removeEventListener("fieldbook-copy-table-result", result);
+  }, [host]);
   const gesture = useRef<(() => void) | null>(null);
   const fadeRef = useRef<HTMLSpanElement>(null);
   const resizePreview = useRef(false);
@@ -486,6 +496,7 @@ function TableControls({
           label="Table"
           {...blockActions(editor, nodeKey)}
           onSelectBlock={() => host.dispatchEvent(new CustomEvent("fieldbook-select-table", { bubbles: true }))}
+          onCopyBlock={() => host.dispatchEvent(new CustomEvent("fieldbook-copy-table", { bubbles: true }))}
           onRemove={() =>
             change((node) => {
               node.selectPrevious();
@@ -494,6 +505,9 @@ function TableControls({
           }
         />
       </GutterActions>
+      {copyFailure > 0 && <Alert className="mt-3" role="alert" dismissKey={copyFailure}>
+        Copy failed. Select the table and copy it manually.
+      </Alert>}
       {(["row", "column"] as const).flatMap((axis) =>
         geometry[axis === "row" ? "rows" : "columns"].map(
           (box, index, items) => (

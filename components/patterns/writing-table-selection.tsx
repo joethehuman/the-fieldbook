@@ -19,6 +19,8 @@ import {
 } from "@/lib/writing-table-selection";
 import { useWritingInteraction } from "./writing-interaction";
 import { normalizeWritingSelection } from "./writing-selection-boundaries";
+import { useToast } from "../ui/toast";
+import { tableColumnWidths } from "@/lib/writing-table";
 
 type TableTarget = { key: string; host: HTMLElement; table: HTMLTableElement };
 type TableSelection = TableTarget & { anchor: CellPoint; focus: CellPoint };
@@ -47,6 +49,7 @@ export function WritingTableSelection() {
     rootEditor$, readOnly$, exportVisitors$, jsxComponentDescriptors$, jsxIsAvailable$,
   );
   const activate = usePublisher(activeEditor$);
+  const notify = useToast();
   const [announcement, setAnnouncement] = useState("");
   const [interacting, setInteracting] = useState(false);
   useWritingInteraction(interacting);
@@ -59,6 +62,8 @@ export function WritingTableSelection() {
     let gesture: { target: TableTarget; anchor: CellPoint; native: NativePoint | null; pointer: number; crossed: boolean } | null = null;
     let suppressClick = false, scrollFrame = 0, updateFrame = 0, focusFrame = 0;
     let pointer = { x: 0, y: 0 };
+    let disposed = false;
+    let copyEventHandled = false;
 
     const targetFor = (element: Element | null): TableTarget | null => {
       const host = element?.closest<HTMLElement>('[data-lexical-decorator="true"]:has(table)');
@@ -232,18 +237,29 @@ export function WritingTableSelection() {
     const nativeSelection = () => {
       if (selection && document.getSelection()?.rangeCount) document.getSelection()?.removeAllRanges();
     };
-    const copy = (event: ClipboardEvent) => {
-      if (!selection || !event.clipboardData) return;
-      const table = snapshot(selection);
-      if (!table) return;
-      const rectangle = cellRectangle(selection.anchor, selection.focus);
+    const clipboardData = (target: TableTarget, rectangle: CellRectangle) => {
+      const table = snapshot(target);
+      if (!table) return null;
       const slice = selectedTable(table, rectangle);
+      const internal = JSON.stringify({ version: 1, table: slice });
       const html = document.createElement("table");
-      const rows = tableCells(selection.table);
+      // Standard HTML clipboard data also retains layout when custom MIME types are unavailable.
+      html.setAttribute("data-fieldbook-table", encodeURIComponent(internal));
+      const widths = tableColumnWidths(slice);
+      if (widths) {
+        const columns = document.createElement("colgroup");
+        widths.forEach(width => { const column = document.createElement("col"); column.style.width = `${width}px`; columns.append(column); });
+        html.append(columns);
+        html.style.width = `${widths.reduce((sum, width) => sum + width, 0)}px`;
+        html.style.tableLayout = "fixed";
+      }
+      const rows = tableCells(target.table);
       for (let row = rectangle.top; row <= rectangle.bottom; row++) {
         const tr = html.insertRow();
         for (let column = rectangle.left; column <= rectangle.right; column++) {
           const clone = rows[row][column].cloneNode(true) as HTMLTableCellElement;
+          const align = table.align?.[column];
+          if (align) clone.style.textAlign = align;
           [clone, ...Array.from(clone.querySelectorAll("*"))].forEach(element => {
             Array.from(element.attributes).forEach(attribute => {
               if (["contenteditable", "class", "tabindex", "role"].includes(attribute.name) || attribute.name.startsWith("data-") || attribute.name.startsWith("aria-")) element.removeAttribute(attribute.name);
@@ -252,9 +268,19 @@ export function WritingTableSelection() {
           tr.append(clone);
         }
       }
-      event.clipboardData.setData(TABLE_CLIPBOARD_TYPE, JSON.stringify({ version: 1, table: slice }));
-      event.clipboardData.setData("text/plain", tableClipboardText(slice));
-      event.clipboardData.setData("text/html", html.outerHTML);
+      return {
+        [TABLE_CLIPBOARD_TYPE]: internal,
+        "text/plain": tableClipboardText(slice),
+        "text/html": html.outerHTML,
+      };
+    };
+    const copy = (event: ClipboardEvent) => {
+      if (!selection || !event.clipboardData) return;
+      const rectangle = cellRectangle(selection.anchor, selection.focus);
+      const data = clipboardData(selection, rectangle);
+      if (!data) return;
+      Object.entries(data).forEach(([type, value]) => event.clipboardData!.setData(type, value));
+      copyEventHandled = true;
       event.preventDefault(); event.stopImmediatePropagation();
       if (event.type === "cut") change(selection, table => clearTableCells(table, rectangle));
     };
@@ -337,6 +363,37 @@ export function WritingTableSelection() {
       const cells = tableCells(target.table);
       if (cells[0]?.length) select({ ...target, anchor: { row: 0, column: 0 }, focus: { row: cells.length - 1, column: cells[0].length - 1 } });
     };
+    const copyTable = async (event: Event) => {
+      selectTable(event);
+      const current = selection;
+      if (!current) return;
+      const result = (copied: boolean) => {
+        if (disposed) return;
+        current.host.dispatchEvent(new CustomEvent("fieldbook-copy-table-result", { detail: { copied } }));
+        if (copied) notify("Table copied.");
+        else setAnnouncement("Copy failed. Select the table and copy it manually.");
+      };
+      const data = clipboardData(current, cellRectangle(current.anchor, current.focus));
+      if (!data) { result(false); return; }
+      try {
+        await navigator.clipboard.write([new ClipboardItem({
+          "text/plain": new Blob([data["text/plain"]], { type: "text/plain" }),
+          "text/html": new Blob([data["text/html"]], { type: "text/html" }),
+        })]);
+        result(true);
+      } catch {
+        if (disposed) return;
+        if (selection !== current || !current.host.isConnected) { result(false); return; }
+        // Legacy copying needs a native range to route the event to this editor.
+        // The command's return value alone can report success with an empty clipboard.
+        copyEventHandled = false;
+        const native = document.createRange(); native.selectNode(current.host);
+        document.getSelection()?.removeAllRanges(); document.getSelection()?.addRange(native);
+        try { result(document.execCommand("copy") && copyEventHandled); }
+        catch { result(false); }
+        finally { document.getSelection()?.removeAllRanges(); }
+      }
+    };
     const unregister = editor.registerUpdateListener(() => {
       cancelAnimationFrame(updateFrame);
       updateFrame = requestAnimationFrame(() => {
@@ -355,8 +412,10 @@ export function WritingTableSelection() {
     root.addEventListener("cut", copy, true);
     root.addEventListener("paste", paste, true);
     root.addEventListener("fieldbook-select-table", selectTable);
+    root.addEventListener("fieldbook-copy-table", copyTable);
     window.addEventListener("blur", cancel);
     return () => {
+      disposed = true;
       unregister(); cancel(); cancelAnimationFrame(updateFrame); cancelAnimationFrame(focusFrame);
       document.removeEventListener("pointerdown", down, true);
       document.removeEventListener("pointermove", move, true);
@@ -369,9 +428,10 @@ export function WritingTableSelection() {
       root.removeEventListener("cut", copy, true);
       root.removeEventListener("paste", paste, true);
       root.removeEventListener("fieldbook-select-table", selectTable);
+      root.removeEventListener("fieldbook-copy-table", copyTable);
       window.removeEventListener("blur", cancel);
     };
-  }, [editor, disabled, visitors, descriptors, jsx, activate]);
+  }, [editor, disabled, visitors, descriptors, jsx, activate, notify]);
 
   return <span className="sr-only" role="status">{announcement}</span>;
 }

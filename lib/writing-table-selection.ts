@@ -160,6 +160,13 @@ export function tableFromHtml(value: string): WritingTable | null {
   if (!value || value.length > MAX_CLIPBOARD_LENGTH) return null;
   const element = new DOMParser().parseFromString(value, "text/html").querySelector("table");
   if (!element || element.querySelector("table")) return null;
+  const metadata = element.getAttribute("data-fieldbook-table");
+  if (metadata) {
+    try {
+      const table = decodeTableClipboard(decodeURIComponent(metadata));
+      if (table) return table;
+    } catch { /* Invalid metadata falls back to the ordinary HTML table. */ }
+  }
   const contents = (node: Node): Inline[] => {
     if (node.nodeType === Node.TEXT_NODE) return [{ type: "text", value: node.textContent || "" }];
     if (!(node instanceof Element) || ["SCRIPT", "STYLE"].includes(node.tagName)) return [];
