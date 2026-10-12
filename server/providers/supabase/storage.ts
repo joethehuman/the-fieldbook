@@ -17,7 +17,7 @@ export const supabaseStorage: StoragePort = {
       const endpoint = new URL(url);
       if (/^[a-z0-9]+\.supabase\.co$/.test(endpoint.hostname))
         endpoint.hostname = endpoint.hostname.replace(".supabase.co", ".storage.supabase.co");
-      endpoint.pathname = "/storage/v1/upload/resumable/sign";
+      endpoint.pathname = `${endpoint.pathname.replace(/\/$/, "")}/storage/v1/upload/resumable/sign`;
       return {
         protocol: "tus",
         url: endpoint.toString(),

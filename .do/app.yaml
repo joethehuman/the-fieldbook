@@ -2,6 +2,10 @@
 # Select component sizes and instance counts in App Platform before creating it.
 name: fieldbook
 region: sfo
+# A custom hostname is required by DO to disable edge caching.
+domains:
+  - domain: YOUR_APP_DOMAIN
+    type: PRIMARY
 disable_edge_cache: true
 vpc:
   id: YOUR_VPC_UUID
@@ -21,6 +25,8 @@ services:
         value: ${APP_URL}
       - key: FIELDBOOK_OWNER_EMAIL
         value: YOUR_OWNER_EMAIL
+      - key: FIELDBOOK_BUILD_REVISION
+        value: ${_self.COMMIT_HASH}
       - key: NEXT_PUBLIC_SUPABASE_URL
         value: ${APP_URL}/backend
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
@@ -68,6 +74,12 @@ jobs:
         scope: RUN_TIME
 ingress:
   rules:
+    - match:
+        path:
+          prefix: /.well-known/oauth-authorization-server
+      component:
+        name: backend-gateway
+        preserve_path_prefix: true
     - match:
         path:
           prefix: /backend

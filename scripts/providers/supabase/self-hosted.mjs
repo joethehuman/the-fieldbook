@@ -2,7 +2,9 @@
  * may delegate HTTP cleanup scheduling to its hosting platform instead of pg_net. */
 export function selfHostedMigration(source, filename) {
   // The installer owns the transaction across the complete migration set.
-  source = source.replace(/^begin;\s*$/gim, "").replace(/^commit;\s*$/gim, "");
+  source = source
+    .replace(/^begin;[ \t]*\r?\n/im, "")
+    .replace(/\r?\ncommit;[ \t]*\s*$/i, "");
   if (filename !== "20261006061752_initial_install.sql") {
     if (/\b(?:net\.http_post|cron\.schedule)\b/.test(source))
       throw new Error(

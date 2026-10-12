@@ -105,6 +105,7 @@ async function main() {
       "UPDATE public.fb_cleanup_config SET endpoint=$1 WHERE id=true",
       [`${origin.origin}/api/internal/purge-deleted`],
     );
+    await client.query("SELECT pg_notify('pgrst', 'reload schema')");
     await client.query("COMMIT");
     console.log(
       "Self-hosted database setup complete. Configure an hourly POST to /api/internal/purge-deleted using this backend's worker secret. Verify a successful run before using deletion recovery.",

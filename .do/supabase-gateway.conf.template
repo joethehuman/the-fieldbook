@@ -8,6 +8,13 @@ server {
         add_header Content-Type text/plain;
     }
 
+    # RFC 8414 inserts discovery before the issuer's /backend/auth/v1 path.
+    location = /.well-known/oauth-authorization-server/backend/auth/v1 {
+        proxy_pass ${FIELDBOOK_SUPABASE_INTERNAL_URL}/auth/v1/.well-known/oauth-authorization-server;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
     # Studio and infrastructure administration are not exposed by this gateway.
     # Supabase's API authentication and storage authorization remain in force.
     location ~ ^/(auth/v1|rest/v1|storage/v1|\.well-known)(/|$) {

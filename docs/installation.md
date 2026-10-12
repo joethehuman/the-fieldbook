@@ -103,7 +103,7 @@ Choose resource sizes for your expected workload in DigitalOcean. Configure spen
 
 1. Create an isolated installation using the [DO Supabase Marketplace image](https://docs.digitalocean.com/products/marketplace/catalog/supabase/). Follow its managed-database setup with PostgreSQL 17 or later. The `service_role` database role must have `BYPASSRLS`; keep this privileged role and its API key server-only.
 2. Keep the Supabase API reachable through the installation's private network. Restrict database trusted sources to the Supabase server. Keep Studio and infrastructure administration private.
-3. Wait for Auth and Storage to initialize. If Storage cannot verify the database certificate, mount the cluster's CA certificate into its container and set `NODE_EXTRA_CA_CERTS` to that path. Preserve certificate verification.
+3. Wait for Auth and Storage to initialize. On the new, unused backend, run [.do/prepare-supabase-backend.sql](../.do/prepare-supabase-backend.sql) as the cluster administrator, then restart Auth and Storage. It configures their schema paths and Storage's standard role permissions. If the Marketplace bootstrap placed Auth's migration ledger in `public`, it preserves that history in `auth`. It refuses a backend with users or an installed Fieldbook schema. If Storage cannot verify the database certificate, mount the cluster's CA certificate into its container and set `NODE_EXTRA_CA_CERTS` to that path. Preserve certificate verification.
 4. For media stored in Spaces, configure Supabase Storage's [S3 backend](https://supabase.com/docs/guides/self-hosting/self-hosted-s3) with your private bucket, region endpoint and bucket-scoped credentials. The bucket stays private; Fieldbook uses the Storage API to issue upload and read permissions. This preserves its existing upload interface.
 
 ### Configure App Platform
@@ -114,11 +114,11 @@ The app contains:
 
 - **Fieldbook:** the standalone Next.js application built by [Dockerfile](../Dockerfile).
 - **Backend gateway:** [Dockerfile.supabase-gateway](../Dockerfile.supabase-gateway) exposes Supabase API routes through App Platform's HTTPS address. `/backend` routes to this component; Studio is not exposed. Its `FIELDBOOK_SUPABASE_INTERNAL_URL` points to the private Supabase API.
-- **Cleanup:** a scheduled job that posts to the installed cleanup endpoint hourly. See the database setup below for its credential.
+- **Cleanup:** a scheduled job built by [Dockerfile.cleanup](../Dockerfile.cleanup) that posts to the installed cleanup endpoint hourly. See the database setup below for its credential.
 
 Configure the same installation variables as the Vercel recipe, using `FIELDBOOK_HOST=node`. With the example gateway, `NEXT_PUBLIC_SUPABASE_URL` is `https://YOUR-APP-HOST/backend` and `FIELDBOOK_URL` is `https://YOUR-APP-HOST`. App Platform's `${APP_URL}` binding can supply these values. Supply public Supabase values during both build and runtime; Next.js embeds public environment values at build time. Server-only keys must be secret environment variables.
 
-Keep the app connected to the backend VPC. Disable App Platform edge caching for this recipe so authenticated responses and streamed AI/MCP responses pass through correctly. For a preview, set `FIELDBOOK_ENVIRONMENT=preview` and `FIELDBOOK_PREVIEW_SUPABASE_URL` to the exact isolated HTTPS backend URL. Hosted Supabase previews can continue using `FIELDBOOK_PREVIEW_SUPABASE_REF`.
+Keep the app connected to the backend VPC. Use a custom hostname and disable App Platform edge caching so authenticated responses and streamed AI/MCP responses pass through correctly. Add the hostname's CNAME at your existing DNS provider using the target returned by DO; domain registration and nameservers can stay with their current provider. DO requires a custom hostname for this caching setting. For a preview, set `FIELDBOOK_ENVIRONMENT=preview` and `FIELDBOOK_PREVIEW_SUPABASE_URL` to the exact isolated HTTPS backend URL. Hosted Supabase previews can continue using `FIELDBOOK_PREVIEW_SUPABASE_REF`.
 
 ### Install the application schema
 
@@ -138,7 +138,7 @@ Read the new backend's `fb_cleanup_config.secret` through an authorized database
 
 Configure Google in self-hosted Supabase Auth using its version-matched environment settings. The Google redirect URI is the public backend callback, for example `https://YOUR-APP-HOST/backend/auth/v1/callback`. Auth's Site URL is `FIELDBOOK_URL`; allow `FIELDBOOK_URL/auth/callback` as its application redirect. Sign in as `FIELDBOOK_OWNER_EMAIL` to create the first administrator.
 
-For MCP, enable Supabase's OAuth server and client-registration support, set its authorization path to `/oauth/consent`, configure asymmetric signing keys and enable Fieldbook's `fb_access_token_hook` as the custom access-token hook. The OAuth issuer must match the public backend's `/auth/v1` address. Verify discovery, authorization, refresh, revocation and Fieldbook's connection permissions with the clients you intend to use.
+For MCP, enable Supabase's OAuth server and client-registration support, set its authorization path to `/oauth/consent`, configure asymmetric signing keys and enable Fieldbook's `fb_access_token_hook` as the custom access-token hook. The OAuth issuer must match the public backend's `/auth/v1` address. With the Marketplace Kong gateway, add the definitions in [.do/supabase-oauth-routes.yaml](../.do/supabase-oauth-routes.yaml) under its existing `services` list and restart Kong. These endpoints rely on Supabase Auth's client and session authentication. Keep the other API and administration routes protected. The App Platform gateway also serves the standard discovery path for the `/backend/auth/v1` issuer. Verify discovery, authorization, refresh, revocation and Fieldbook's connection permissions with the clients you intend to use.
 
 For DO inference, configure:
 

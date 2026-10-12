@@ -3,6 +3,20 @@ import assert from "node:assert/strict";
 import { GET } from "../../app/auth/sign-in/route";
 import { SIGN_IN_RETURN_COOKIE } from "../../server/sign-in";
 
+const savedEnvironment = { ...process.env };
+test.beforeEach(() => {
+  Object.assign(process.env, {
+    FIELDBOOK_HOST: "node",
+    FIELDBOOK_URL: "https://fieldbook.example",
+    FIELDBOOK_OWNER_EMAIL: "owner@example.test",
+  });
+  delete process.env.VERCEL;
+  delete process.env.VERCEL_ENV;
+});
+test.afterEach(() => {
+  process.env = { ...savedEnvironment };
+});
+
 test("sign-in hides the return path while remembering docs, query and anchor", () => {
   const next = "/docs?topic=setup#google";
   const response = GET(

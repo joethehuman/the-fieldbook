@@ -5,6 +5,7 @@ import { installation } from "@server/installation";
 import { safeNext } from "@server/redirect";
 import { SIGN_IN_RETURN_COOKIE } from "@server/sign-in";
 import { signInFailure } from "@server/sign-in-failure";
+import { errorResponse } from "@server/errors";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const jar = await cookies();
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
     url.searchParams.get("next") ?? jar.get(SIGN_IN_RETURN_COOKIE)?.value,
     "/",
   );
-  let origin = url.origin;
+  let origin: string | undefined;
   try {
     origin = installation().origin;
     const code = url.searchParams.get("code");
@@ -28,6 +29,8 @@ export async function GET(req: Request) {
     jar.delete(SIGN_IN_RETURN_COOKIE);
     return Response.redirect(new URL(next, origin));
   } catch (e) {
-    return signInFailure(origin, next, e);
+    return origin
+      ? signInFailure(origin, next, e)
+      : errorResponse(e, "auth/callback");
   }
 }

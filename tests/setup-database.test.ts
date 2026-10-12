@@ -8,6 +8,74 @@ import { selfHostedMigration } from "../scripts/providers/supabase/self-hosted.m
 const version = "20261006061752";
 const guard = setupGuardSql([version]);
 
+const authPreparation = readFileSync(
+  new URL("../.do/prepare-supabase-backend.sql", import.meta.url),
+  "utf8",
+);
+async function unusedSelfHostedAuth() {
+  const database = new PGlite();
+  await database.exec(`
+    create role supabase_auth_admin;
+    create role supabase_storage_admin;
+    create role anon;
+    create role authenticated;
+    create role service_role;
+    create schema auth;
+    create schema storage;
+    create table auth.users(id integer);
+    create table auth.schema_migrations(version text primary key);
+    create table public.schema_migrations(version text primary key);
+    alter table public.schema_migrations owner to supabase_auth_admin;
+    insert into public.schema_migrations values('20260121000000');
+  `);
+  return database;
+}
+test("self-hosted Auth preparation preserves vendor migration history in its own schema", async () => {
+  const database = await unusedSelfHostedAuth();
+  try {
+    await database.exec(authPreparation);
+    assert.deepEqual(
+      (await database.query("select version from auth.schema_migrations")).rows,
+      [{ version: "20260121000000" }],
+    );
+    assert.deepEqual(
+      (
+        await database.query(
+          "select to_regclass('public.schema_migrations') ledger",
+        )
+      ).rows,
+      [{ ledger: null }],
+    );
+    await database.exec(guard);
+  } finally {
+    await database.close();
+  }
+});
+test("self-hosted Auth preparation refuses users and unrelated migration ledgers", async () => {
+  for (const existing of [
+    "insert into auth.users values(7)",
+    "alter table public.schema_migrations owner to postgres",
+    "insert into auth.schema_migrations values('20260101000000')",
+  ]) {
+    const database = await unusedSelfHostedAuth();
+    try {
+      await database.exec(existing);
+      await assert.rejects(
+        database.exec(authPreparation),
+        /new, unused|Unexpected migration ledger/,
+      );
+      await database.exec("rollback");
+      assert.deepEqual(
+        (await database.query("select version from public.schema_migrations"))
+          .rows,
+        [{ version: "20260121000000" }],
+      );
+    } finally {
+      await database.close();
+    }
+  }
+});
+
 test("self-hosted setup preserves the application baseline and delegates only HTTP scheduling", () => {
   const filename = "20261006061752_initial_install.sql";
   const source = readFileSync(

@@ -4,6 +4,8 @@ import { signInFailure } from "@server/sign-in-failure";
 import { startSignIn } from "@server/identity";
 import { installation } from "@server/installation";
 import { safeNext } from "@server/redirect";
+import { requestMatchesOrigin } from "@server/deployment";
+import { errorResponse } from "@server/errors";
 export async function GET(req: Request) {
   const requestUrl = new URL(req.url);
   const cookieStore = await cookies();
@@ -12,10 +14,11 @@ export async function GET(req: Request) {
       cookieStore.get(SIGN_IN_RETURN_COOKIE)?.value,
     "/",
   );
+  let origin: string | undefined;
   try {
-    const origin = installation().origin;
+    origin = installation().origin;
     // PKCE cookies must be set on the same host that receives the callback.
-    if (requestUrl.origin !== origin) {
+    if (!requestMatchesOrigin(req, origin)) {
       return Response.redirect(
         `${origin}/auth/login?next=${encodeURIComponent(next)}`,
       );
@@ -25,6 +28,8 @@ export async function GET(req: Request) {
     );
     return Response.redirect(destination);
   } catch (e) {
-    return signInFailure(requestUrl.origin, next, e);
+    return origin
+      ? signInFailure(origin, next, e)
+      : errorResponse(e, "auth/login");
   }
 }
