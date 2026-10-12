@@ -274,23 +274,30 @@ test("optional existing selection, explicit named creation, save flow and retain
   const picker = page.getByRole("combobox", {
     name: "Learning group for guests",
   });
+  const createGroup = page.getByRole("button", { name: "Create group", exact: true });
+  await expect(createGroup).toBeVisible();
+  await shot(page, info, "no-group-selected");
   await picker.focus();
   await page.keyboard.press("Enter");
   await page.getByRole("option", { name: "Visitors", exact: true }).click();
+  await expect(createGroup).toHaveCount(0);
   expect((await f.getData()).settings.guestGroupId).toBeNull();
   await save(page);
   expect((await f.getData()).settings.guestGroupId).toBe("visitors");
   await shot(page, info, "existing-selected");
-  await page
-    .getByRole("button", { name: "Create guest group", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toContainText("Create guest group");
+  await select(page, "Learning group for guests", "None — no personalized recommendations.");
+  await expect(createGroup).toBeVisible();
+  await createGroup.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toContainText("Create group");
   await page
     .getByRole("textbox", { name: "Group name", exact: true })
     .fill("Public readers");
   await shot(page, info, "create-dialog");
   await page.getByRole("button", { name: "Create group", exact: true }).click();
   await expect(picker).toContainText("Public readers");
+  await expect(createGroup).toHaveCount(0);
+  await expect(picker).toBeFocused();
   const created = (await f.getData()).groups.find(
     (g: any) => g.name === "Public readers",
   );
@@ -316,6 +323,7 @@ test("deleted group is visible to admin and can be cleared without requiring a r
   await expect(
     page.getByText(/The selected group is unavailable/),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create group", exact: true })).toBeVisible();
   await shot(page, info, "unavailable");
   await select(
     page,
@@ -324,6 +332,7 @@ test("deleted group is visible to admin and can be cleared without requiring a r
   );
   await save(page);
   expect((await f.getData()).settings.guestGroupId).toBeNull();
+  await expect(page.getByRole("button", { name: "Create group", exact: true })).toBeVisible();
   await f.unchangedPeople();
 });
 
@@ -489,7 +498,7 @@ test("settings and group failures preserve edits, successful retry and pending d
   await section(page, "Access");
   f.fail("governance");
   await page
-    .getByRole("button", { name: "Create guest group", exact: true })
+    .getByRole("button", { name: "Create group", exact: true })
     .click();
   await page
     .getByRole("textbox", { name: "Group name", exact: true })
@@ -501,6 +510,7 @@ test("settings and group failures preserve edits, successful retry and pending d
   await expect(
     page.getByRole("combobox", { name: "Learning group for guests" }),
   ).toContainText("None");
+  await expect(page.getByRole("button", { name: "Create group", exact: true })).toBeVisible();
   expect(
     (await f.getData()).groups.some((g: any) => g.name === "New guests"),
   ).toBe(false);
