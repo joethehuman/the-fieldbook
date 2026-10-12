@@ -4,7 +4,7 @@ Choose the release you want to run. Read its release information for configurati
 
 ## Application updates
 
-Bring the selected release into the branch Vercel deploys from your own repository. From your local copy, replace the placeholders with the release tag and your deployment branch:
+Bring the selected release into your deployment branch. From your local copy, replace the placeholders with the release tag and your deployment branch:
 
 ```sh
 git fetch https://github.com/joethehuman/the-fieldbook.git tag RELEASE_TAG
@@ -15,7 +15,7 @@ git push origin YOUR_DEPLOYMENT_BRANCH
 
 Resolve any conflicts with your custom changes before pushing.
 
-A push to the configured production branch starts Vercel's deployment. Afterward, check the changed behavior in your installation and note the deployed release or commit. A separate preview is available if you want to try the update first.
+A push to the configured production branch starts Vercel's deployment. On DigitalOcean, use your configured source integration's deployment trigger or deploy the latest commit from App Platform. With the app spec's public `git` source, request a new deployment after pushing; updating the app specification alone can reuse an earlier source revision. Verify the deployment's source commit and `/fieldbook-build.json`, then check the changed behavior in your installation. A separate preview is available if you want to try the update first.
 
 If the release has no new database migrations, no database command is needed. Fresh installations apply the SQL files shipped with the selected source version, beginning with `20261006061752_initial_install.sql`. Existing installations apply only their pending migrations.
 
@@ -23,7 +23,7 @@ If the release has no new database migrations, no database command is needed. Fr
 
 New SQL files in `supabase/migrations/` are applied separately from application deployment. Follow the release's compatibility and deployment order. Use a maintenance window only if the change requires one. Choose backups or a rehearsal according to the change and the data you need to protect.
 
-From a local copy of the target release, use the pinned CLI without installing it globally:
+For hosted Supabase, use the pinned CLI from a local copy of the target release without installing it globally:
 
 ```sh
 npx --yes supabase@2.119.0 --agent no --output-format text login --no-browser
@@ -35,6 +35,8 @@ npx --yes supabase@2.119.0 --agent no --output-format text db push --linked
 Confirm the project reference and pending migrations before applying them. An application build does not migrate the database. Never run `supabase db reset --linked` or the fresh-install setup command against an installation with data. Stop and read the error if a migration fails.
 
 After the update, check the affected features and existing records. Keep the deployed version and migration record available for the next update.
+
+For the self-hosted DigitalOcean backend, connect through an authorized database administrator connection and review the pending release migrations against the managed cluster. Apply only those migrations and record their versions in `supabase_migrations.schema_migrations`. Preserve external cleanup scheduling; migrations that introduce `pg_net` or database HTTP schedules need a compatible host job. The fresh-install command and backend preparation SQL refuse configured or used installations and are not upgrade commands. Follow each release's self-hosted compatibility instructions before applying a database change.
 
 ## Rollback
 

@@ -118,6 +118,8 @@ The app contains:
 
 Configure the same installation variables as the Vercel recipe, using `FIELDBOOK_HOST=node`. With the example gateway, `NEXT_PUBLIC_SUPABASE_URL` is `https://YOUR-APP-HOST/backend` and `FIELDBOOK_URL` is `https://YOUR-APP-HOST`. App Platform's `${APP_URL}` binding can supply these values. Supply public Supabase values during both build and runtime; Next.js embeds public environment values at build time. Server-only keys must be secret environment variables.
 
+For the Marketplace Kong configuration, use its `.env` `ANON_KEY` as Fieldbook's public Supabase key and `SERVICE_ROLE_KEY` as its server key. Keep the server key private. The gateway restores `/backend` in resumable upload redirects as well as routing ordinary API requests. Verify a transfer larger than 6 MiB before relying on video uploads.
+
 Keep the app connected to the backend VPC. Use a custom hostname and disable App Platform edge caching so authenticated responses and streamed AI/MCP responses pass through correctly. Add the hostname's CNAME at your existing DNS provider using the target returned by DO; domain registration and nameservers can stay with their current provider. DO requires a custom hostname for this caching setting. For a preview, set `FIELDBOOK_ENVIRONMENT=preview` and `FIELDBOOK_PREVIEW_SUPABASE_URL` to the exact isolated HTTPS backend URL. Hosted Supabase previews can continue using `FIELDBOOK_PREVIEW_SUPABASE_REF`.
 
 ### Install the application schema

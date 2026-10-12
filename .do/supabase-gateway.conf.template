@@ -23,6 +23,9 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Supabase Storage's resumable Location uses Kong's /storage/v1 prefix.
+        # Restore this recipe's public /backend mount for the next upload chunk.
+        proxy_redirect ~^https?://[^/]+(/storage/v1/.*)$ https://$host/backend$1;
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
