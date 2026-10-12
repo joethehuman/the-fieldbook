@@ -1,6 +1,6 @@
 # Install The Fieldbook
 
-The supported setup is Next.js on Vercel, hosted Supabase for database, authentication and private media, and Google sign-in. You need your own GitHub, Vercel, Supabase and Google Cloud accounts, plus Node.js 22 on your computer to run database setup. A custom domain is optional.
+The Vercel recipe uses hosted Supabase for database, authentication and private media, and Google sign-in. The [DigitalOcean recipe](#digitalocean-app-platform) uses App Platform, managed PostgreSQL, self-hosted Supabase and optional DO inference. Each operator supplies their own accounts. Use Node.js 22 and pnpm 10.17.1 for setup. A custom domain is optional.
 
 ## 1. Get the source and create a Supabase project
 
@@ -92,3 +92,62 @@ Deleted content and accounts have a 30-day recovery window, followed by hourly p
 - **Previews:** optional. Use a separate Supabase project and Google configuration. Vercel detects preview deployments automatically; set `FIELDBOOK_PREVIEW_SUPABASE_REF` to that backend's reference alongside its credentials. The app checks that its URL matches the declared reference. Keep production credentials out of previews.
 - **Local development:** copy `.env.example` to `.env.local` with a dedicated development backend. Set `FIELDBOOK_URL=http://127.0.0.1:3000` and allow that origin's `/auth/callback` in Supabase. Run `pnpm install --frozen-lockfile` and `pnpm dev`.
 - **Demo:** `pnpm dev:demo` runs fictional browser-local data without a backend. It is a separate optional app and does not provision an installation.
+
+## DigitalOcean App Platform
+
+This recipe keeps Supabase's Auth, database API and Storage services while running them on DigitalOcean. It uses a Marketplace Supabase server, DO managed PostgreSQL and an App Platform gateway that exposes only the backend API. Fieldbook continues to use the Supabase provider implementation. It does not require a Supabase Cloud subscription.
+
+Choose resource sizes for your expected workload in DigitalOcean. Configure spend alerts before creating paid resources. Inference prepaid balances can stop inference when exhausted; other infrastructure continues accruing charges. Review credits, both prepaid balances and auto-reload settings. Spending controls and temporary deployment restrictions belong in your account and operating configuration.
+
+### Prepare the backend
+
+1. Create an isolated installation using the [DO Supabase Marketplace image](https://docs.digitalocean.com/products/marketplace/catalog/supabase/). Follow its managed-database setup with PostgreSQL 17 or later. The `service_role` database role must have `BYPASSRLS`; keep this privileged role and its API key server-only.
+2. Keep the Supabase API reachable through the installation's private network. Restrict database trusted sources to the Supabase server. Keep Studio and infrastructure administration private.
+3. Wait for Auth and Storage to initialize. If Storage cannot verify the database certificate, mount the cluster's CA certificate into its container and set `NODE_EXTRA_CA_CERTS` to that path. Preserve certificate verification.
+4. For media stored in Spaces, configure Supabase Storage's [S3 backend](https://supabase.com/docs/guides/self-hosting/self-hosted-s3) with your private bucket, region endpoint and bucket-scoped credentials. The bucket stays private; Fieldbook uses the Storage API to issue upload and read permissions. This preserves its existing upload interface.
+
+### Configure App Platform
+
+Use [.do/app.yaml](../.do/app.yaml) as the app specification. Replace the repository, deployment branch, VPC, private backend address and credentials with your own settings. Select component sizes and instance counts before creating the app. Review automatic deployment settings for your chosen source connection.
+
+The app contains:
+
+- **Fieldbook:** the standalone Next.js application built by [Dockerfile](../Dockerfile).
+- **Backend gateway:** [Dockerfile.supabase-gateway](../Dockerfile.supabase-gateway) exposes Supabase API routes through App Platform's HTTPS address. `/backend` routes to this component; Studio is not exposed. Its `FIELDBOOK_SUPABASE_INTERNAL_URL` points to the private Supabase API.
+- **Cleanup:** a scheduled job that posts to the installed cleanup endpoint hourly. See the database setup below for its credential.
+
+Configure the same installation variables as the Vercel recipe, using `FIELDBOOK_HOST=node`. With the example gateway, `NEXT_PUBLIC_SUPABASE_URL` is `https://YOUR-APP-HOST/backend` and `FIELDBOOK_URL` is `https://YOUR-APP-HOST`. App Platform's `${APP_URL}` binding can supply these values. Supply public Supabase values during both build and runtime; Next.js embeds public environment values at build time. Server-only keys must be secret environment variables.
+
+Keep the app connected to the backend VPC. Disable App Platform edge caching for this recipe so authenticated responses and streamed AI/MCP responses pass through correctly. For a preview, set `FIELDBOOK_ENVIRONMENT=preview` and `FIELDBOOK_PREVIEW_SUPABASE_URL` to the exact isolated HTTPS backend URL. Hosted Supabase previews can continue using `FIELDBOOK_PREVIEW_SUPABASE_REF`.
+
+### Install the application schema
+
+The self-hosted installer uses the released migrations and delegates HTTP cleanup scheduling to the host. It leaves the released baseline file unchanged. It requires Supabase's initialized Auth and Storage schemas and refuses an existing configured installation, records or unrelated application tables.
+
+From the matching source checkout, install locked dependencies, then set `FIELDBOOK_SETUP_DATABASE_URL`, `FIELDBOOK_SETUP_DATABASE_CA` (the cluster CA certificate path) and `FIELDBOOK_URL` in a private environment file. Run from a location authorized by the database's trusted sources:
+
+```sh
+node --env-file=.env.local scripts/setup-self-hosted.mjs
+```
+
+Confirm the displayed target by typing `SETUP`. The installer applies the schema and records migration versions in one transaction. It does not reset a data-bearing database. The original `setup-database.mjs` command remains the hosted Supabase setup path.
+
+Read the new backend's `fb_cleanup_config.secret` through an authorized database connection and store it as the cleanup job's server-only `FIELDBOOK_CLEANUP_SECRET`. Never put it in public source. Configure the hourly job and verify a successful run; this backend does not use `pg_net` to schedule HTTP cleanup.
+
+### Configure sign-in, MCP and inference
+
+Configure Google in self-hosted Supabase Auth using its version-matched environment settings. The Google redirect URI is the public backend callback, for example `https://YOUR-APP-HOST/backend/auth/v1/callback`. Auth's Site URL is `FIELDBOOK_URL`; allow `FIELDBOOK_URL/auth/callback` as its application redirect. Sign in as `FIELDBOOK_OWNER_EMAIL` to create the first administrator.
+
+For MCP, enable Supabase's OAuth server and client-registration support, set its authorization path to `/oauth/consent`, configure asymmetric signing keys and enable Fieldbook's `fb_access_token_hook` as the custom access-token hook. The OAuth issuer must match the public backend's `/auth/v1` address. Verify discovery, authorization, refresh, revocation and Fieldbook's connection permissions with the clients you intend to use.
+
+For DO inference, configure:
+
+```text
+FIELDBOOK_AI_ROUTER=digitalocean
+DIGITALOCEAN_MODEL_ACCESS_KEY=YOUR_SERVER_ONLY_MODEL_ACCESS_KEY
+DIGITALOCEAN_AI_MODELS=YOUR_TOOL_CAPABLE_TEXT_MODEL_IDS
+```
+
+Use a model access key with appropriate model permissions. Declare compatible text model IDs separated by commas; Fieldbook verifies their presence in the inference catalog. The catalog does not expose tool capabilities, pricing or privacy assurances, so review them in DigitalOcean. In Ask AI settings, select the DO model and set fallback to None. Router choice is independent of hosting; Vercel AI Gateway remains available through `FIELDBOOK_AI_ROUTER=vercel`.
+
+Before admitting users, verify real sign-in, publishing, learner progress, private uploads and reads, a source-cited AI answer if enabled, MCP permissions if enabled, and an accepted cleanup run. See [upgrading](upgrading.md) for existing installations. Application deployment does not apply database changes.

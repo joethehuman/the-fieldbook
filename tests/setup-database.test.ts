@@ -1,10 +1,54 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { setupGuardSql } from "../scripts/setup-database.mjs";
+import { selfHostedMigration } from "../scripts/providers/supabase/self-hosted.mjs";
 
 const version = "20261006061752";
 const guard = setupGuardSql([version]);
+
+test("self-hosted setup preserves the application baseline and delegates only HTTP scheduling", () => {
+  const filename = "20261006061752_initial_install.sql";
+  const source = readFileSync(
+    new URL(`../supabase/migrations/${filename}`, import.meta.url),
+    "utf8",
+  );
+  const rendered = selfHostedMigration(source, filename);
+  assert.doesNotMatch(
+    rendered,
+    /create extension if not exists pg_(cron|net)|cron\.schedule|net\.http_post|^begin;|^commit;/m,
+  );
+  assert.match(rendered, /create table public\."fb_cleanup_config"/);
+  assert.match(rendered, /fb_access_token_hook/);
+  assert.match(rendered, /insert into storage\.buckets/);
+  assert.throws(
+    () =>
+      selfHostedMigration(
+        source.replace(
+          "-- The installer connects this schedule to the deployed worker endpoint.",
+          "-- Unknown scheduling section.",
+        ),
+        filename,
+      ),
+    /not recognized/,
+  );
+  assert.throws(
+    () =>
+      selfHostedMigration(
+        "select net.http_post('https://example.test');",
+        "20261013000000_schedule.sql",
+      ),
+    /reviewed self-hosted/,
+  );
+  assert.equal(
+    selfHostedMigration(
+      "begin;\nselect 1;\ncommit;\n",
+      "20261013000000_example.sql",
+    ).trim(),
+    "select 1;",
+  );
+});
 
 async function unfinishedProject() {
   const pg = new PGlite();

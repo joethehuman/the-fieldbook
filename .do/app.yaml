@@ -1,0 +1,80 @@
+# Replace the source, VPC and backend settings for your own installation.
+# Select component sizes and instance counts in App Platform before creating it.
+name: fieldbook
+region: sfo
+disable_edge_cache: true
+vpc:
+  id: YOUR_VPC_UUID
+services:
+  - name: fieldbook
+    git:
+      repo_clone_url: https://github.com/YOUR_OWNER/the-fieldbook.git
+      branch: YOUR_DEPLOYMENT_BRANCH
+    dockerfile_path: Dockerfile
+    http_port: 8080
+    envs:
+      - key: FIELDBOOK_APP_KIND
+        value: installed
+      - key: FIELDBOOK_HOST
+        value: node
+      - key: FIELDBOOK_URL
+        value: ${APP_URL}
+      - key: FIELDBOOK_OWNER_EMAIL
+        value: YOUR_OWNER_EMAIL
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: ${APP_URL}/backend
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        value: YOUR_SUPABASE_PUBLIC_KEY
+      - key: SUPABASE_SECRET_KEY
+        value: YOUR_SUPABASE_SERVER_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: FIELDBOOK_AI_ROUTER
+        value: digitalocean
+      - key: DIGITALOCEAN_AI_MODELS
+        value: YOUR_TOOL_CAPABLE_TEXT_MODEL_IDS
+      - key: DIGITALOCEAN_MODEL_ACCESS_KEY
+        value: YOUR_SERVER_ONLY_MODEL_ACCESS_KEY
+        type: SECRET
+        scope: RUN_TIME
+  - name: backend-gateway
+    git:
+      repo_clone_url: https://github.com/YOUR_OWNER/the-fieldbook.git
+      branch: YOUR_DEPLOYMENT_BRANCH
+    dockerfile_path: Dockerfile.supabase-gateway
+    http_port: 8080
+    health_check:
+      http_path: /health
+    envs:
+      - key: FIELDBOOK_SUPABASE_INTERNAL_URL
+        value: http://YOUR_PRIVATE_SUPABASE_HOST:8000
+jobs:
+  - name: cleanup
+    git:
+      repo_clone_url: https://github.com/YOUR_OWNER/the-fieldbook.git
+      branch: YOUR_DEPLOYMENT_BRANCH
+    dockerfile_path: Dockerfile.cleanup
+    kind: SCHEDULED
+    schedule:
+      cron: "17 * * * *"
+      time_zone: UTC
+    run_command: node scripts/run-cleanup.mjs
+    envs:
+      - key: FIELDBOOK_URL
+        value: ${APP_URL}
+      - key: FIELDBOOK_CLEANUP_SECRET
+        value: YOUR_BACKEND_WORKER_SECRET
+        type: SECRET
+        scope: RUN_TIME
+ingress:
+  rules:
+    - match:
+        path:
+          prefix: /backend
+      component:
+        name: backend-gateway
+    - match:
+        path:
+          prefix: /
+      component:
+        name: fieldbook

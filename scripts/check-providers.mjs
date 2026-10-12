@@ -29,7 +29,9 @@ function inspect(directory) {
     if (name.startsWith("server/providers/")) continue;
     const source = readFileSync(path, "utf8");
     if (
-      /["'](?:@supabase\/|@vercel\/(?:analytics|speed-insights))/.test(source)
+      /["'](?:@supabase\/|@ai-sdk\/openai-compatible|@vercel\/(?:analytics|speed-insights))/.test(
+        source,
+      )
     )
       violations.push(`${name}: provider SDK import`);
     if (
@@ -39,7 +41,11 @@ function inspect(directory) {
       )
     )
       violations.push(`${name}: AI Gateway SDK import`);
-    if (/\b(?:AI_GATEWAY_API_KEY|VERCEL_OIDC_TOKEN)\b/.test(source))
+    if (
+      /\b(?:AI_GATEWAY_API_KEY|VERCEL_OIDC_TOKEN|DIGITALOCEAN_MODEL_ACCESS_KEY|DIGITALOCEAN_AI_MODELS)\b/.test(
+        source,
+      )
+    )
       violations.push(`${name}: AI credential outside its provider adapter`);
     if (/\bdb\s*\(/.test(source))
       violations.push(`${name}: provider query client`);

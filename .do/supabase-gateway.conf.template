@@ -1,0 +1,26 @@
+server {
+    listen 8080;
+    server_name _;
+    client_max_body_size 0;
+
+    location = /health {
+        return 200 'ready';
+        add_header Content-Type text/plain;
+    }
+
+    # Studio and infrastructure administration are not exposed by this gateway.
+    # Supabase's API authentication and storage authorization remain in force.
+    location ~ ^/(auth/v1|rest/v1|storage/v1|\.well-known)(/|$) {
+        proxy_pass ${FIELDBOOK_SUPABASE_INTERNAL_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        return 404;
+    }
+}

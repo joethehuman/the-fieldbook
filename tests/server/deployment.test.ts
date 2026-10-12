@@ -91,3 +91,33 @@ test("address headers are trusted only by the selected hosting implementation", 
     process.env = saved;
   }
 });
+
+test("self-hosted previews require their exact declared HTTPS API URL", () => {
+  const saved = process.env;
+  process.env = {
+    NODE_ENV: "test",
+    FIELDBOOK_HOST: "node",
+    FIELDBOOK_ENVIRONMENT: "preview",
+    FIELDBOOK_URL: "https://preview.example.test",
+    FIELDBOOK_OWNER_EMAIL: "owner@example.test",
+    NEXT_PUBLIC_SUPABASE_URL: "https://preview.example.test/backend",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "synthetic",
+    SUPABASE_SECRET_KEY: "synthetic",
+    FIELDBOOK_PREVIEW_SUPABASE_URL: "https://preview.example.test/backend/",
+  };
+  try {
+    assert.equal(env().url, "https://preview.example.test/backend");
+    for (const declared of [
+      "https://production.example.test",
+      "https://preview.example.test/other",
+      "http://preview.example.test/backend",
+      "invalid",
+      "https://user:password@preview.example.test/backend",
+    ]) {
+      process.env.FIELDBOOK_PREVIEW_SUPABASE_URL = declared;
+      assert.throws(env, /isolated/);
+    }
+  } finally {
+    process.env = saved;
+  }
+});
