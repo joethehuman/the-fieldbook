@@ -84,6 +84,8 @@ export default function SiteSettingsPanel({
   const [settings, setSettings] = useState(() => loadedSettings(data)),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
+  const selectedGuestGroup = data.groups.find((g) => g.id === settings.guestGroupId);
+  const guestGroupPicker = useRef<HTMLButtonElement>(null);
   const saveBase = useRef(data);
   const savedSettings = useRef(settings);
   const [docMoves, setDocMoves] = useState<DocNavigationMove[]>([]);
@@ -543,6 +545,7 @@ export default function SiteSettingsPanel({
               </FieldDescription>
               <FormField label="Learning group for guests">
                 <SelectField
+                  ref={guestGroupPicker}
                   value={
                     settings.guestGroupId
                       ? `group:${settings.guestGroupId}`
@@ -560,9 +563,7 @@ export default function SiteSettingsPanel({
                     None — no personalized recommendations.
                   </option>
                   {settings.guestGroupId &&
-                    !data.groups.some(
-                      (g) => g.id === settings.guestGroupId,
-                    ) && (
+                    !selectedGuestGroup && (
                       <option value={`group:${settings.guestGroupId}`}>
                         Unavailable group — choose another
                       </option>
@@ -577,64 +578,68 @@ export default function SiteSettingsPanel({
               <FieldDescription id="guest-recommendations-status">
                 {!settings.guestGroupId
                   ? "Your library is public. Select a group to recommend content to guests."
-                  : !data.groups.some((g) => g.id === settings.guestGroupId)
+                  : !selectedGuestGroup
                     ? "The selected group is unavailable. Choose another group or None; guests currently have no personalized recommendations."
                     : "Save settings to apply this selection. Published content stays available to everyone."}
               </FieldDescription>
-              <ActionGroup>
-                <Button
-                  type="button"
-                  disabled={busy}
-                  onClick={async () => {
-                    const name = (
-                      await prompt("Group name", "Guests", {
-                        title: "Create guest group",
-                        description:
-                          "Create a learning group, then save settings to use it for guest recommendations.",
-                        submitLabel: "Create group",
-                      })
-                    )?.trim();
-                    if (!name) return;
-                    if (
-                      name.length > 80 ||
-                      data.groups.some(
-                        (g) => g.name.toLowerCase() === name.toLowerCase(),
-                      )
-                    ) {
-                      setNotice(
-                        "Use a unique group name of 80 characters or fewer.",
-                      );
-                      return;
-                    }
-                    setBusy(true);
-                    setNotice("");
-                    const id = crypto.randomUUID();
-                    try {
-                      await onChange({
-                        ...data,
-                        groups: [
-                          ...data.groups,
-                          { id, name, learningItems: [], teamIds: [] },
-                        ],
-                      });
-                      setSettings((current) => ({
-                        ...current,
-                        guestGroupId: id,
-                      }));
-                      setNotice(
-                        `${name} created and selected. Save settings to use it for guests. Add courses and updates in Groups.`,
-                      );
-                    } catch (error) {
-                      setNotice((error as Error).message);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  <Plus aria-hidden="true" />
-                  Create guest group
-                </Button>
-              </ActionGroup>
+              {!selectedGuestGroup && (
+                <ActionGroup>
+                  <Button
+                    type="button"
+                    variant="link"
+                    disabled={busy}
+                    onClick={async () => {
+                      const name = (
+                        await prompt("Group name", "Guests", {
+                          title: "Create group",
+                          description:
+                            "Create a learning group, then save settings to use it for guest recommendations.",
+                          submitLabel: "Create group",
+                        })
+                      )?.trim();
+                      if (!name) return;
+                      if (
+                        name.length > 80 ||
+                        data.groups.some(
+                          (g) => g.name.toLowerCase() === name.toLowerCase(),
+                        )
+                      ) {
+                        setNotice(
+                          "Use a unique group name of 80 characters or fewer.",
+                        );
+                        return;
+                      }
+                      setBusy(true);
+                      setNotice("");
+                      const id = crypto.randomUUID();
+                      try {
+                        await onChange({
+                          ...data,
+                          groups: [
+                            ...data.groups,
+                            { id, name, learningItems: [], teamIds: [] },
+                          ],
+                        });
+                        setSettings((current) => ({
+                          ...current,
+                          guestGroupId: id,
+                        }));
+                        requestAnimationFrame(() => guestGroupPicker.current?.focus());
+                        setNotice(
+                          `${name} created and selected. Save settings to use it for guests. Add courses and updates in Groups.`,
+                        );
+                      } catch (error) {
+                        setNotice((error as Error).message);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    <Plus aria-hidden="true" />
+                    Create group
+                  </Button>
+                </ActionGroup>
+              )}
             </FieldGroup>
           )}
           <FormField label="New learner accounts">
