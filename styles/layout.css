@@ -38,6 +38,7 @@
   }
   .sidebar-heading .logo {
     font-size: 1.125rem;
+    padding-inline-start: 10px;
   }
   .logo {
     color: var(--foreground);
