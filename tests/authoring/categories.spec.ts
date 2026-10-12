@@ -14,6 +14,20 @@ test("installed category controls count actual rows and save settings through th
     contentCategories: categoryLists(data.content),
   };
   const course = data.content.find((item) => item.kind === "course")!;
+  for (const [index, category, title] of [
+    [1, "", "Unassigned installed draft"],
+    [2, course.category, "Categorized installed draft"],
+    [3, "Removed category", "Restored installed draft"],
+  ] as const) {
+    data.content.push({
+      ...course,
+      id: `00000000-0000-4000-8000-00000000999${index}`,
+      category,
+      title,
+      status: "draft",
+      publishedRevision: null,
+    });
+  }
   const items = data.content.filter(
     (item) => item.kind === "course" && item.category === course.category,
   );
@@ -22,6 +36,18 @@ test("installed category controls count actual rows and save settings through th
   await expect(
     page.getByRole("heading", { name: "Categories", exact: true }),
   ).toBeVisible();
+  const card = page.locator("#settings-categories");
+  const heading = await page.getByRole("heading", { name: "Categories", exact: true }).boundingBox();
+  const surface = await card.boundingBox();
+  expect(heading!.y + heading!.height).toBeLessThan(surface!.y);
+  if (info.project.name === "production-phone") {
+    const row = page.locator('[data-slot="reorder-row"]').first();
+    const count = await row.locator('[data-slot="reorder-detail"]').boundingBox();
+    const checkbox = await row.getByRole("checkbox").boundingBox();
+    expect(Math.abs(count!.x - checkbox!.x)).toBeLessThanOrEqual(1);
+  }
+  await expect(page.getByText("Unassigned installed draft", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Restored installed draft", { exact: true })).toBeVisible();
   const bulk = page.getByRole("button", {
     name: "Categories bulk actions",
     exact: true,
@@ -59,6 +85,7 @@ test("installed category controls count actual rows and save settings through th
     name: `Items in ${course.category} bulk actions`,
     exact: true,
   });
+  await expect(section.getByRole("row").filter({ hasText: "Categorized installed draft" })).toContainText("Draft");
   await section
     .getByRole("checkbox", { name: `Select ${items[0].title}`, exact: true })
     .check();
@@ -97,6 +124,19 @@ test("installed category controls count actual rows and save settings through th
   await dialog
     .getByRole("button", { name: "Create category", exact: true })
     .click();
+  // Check the border join in normal flow, before the sticky header detaches
+  // from the card as the page scrolls through its expanded contents.
+  await card.evaluate((element) => {
+    let owner = element.parentElement;
+    while (owner && !/(auto|scroll)/.test(getComputedStyle(owner).overflowY)) owner = owner.parentElement;
+    if (owner) owner.scrollTop = 0;
+    else window.scrollTo(0, 0);
+  });
+  await expect.poll(async () => {
+    const pending = await page.locator('[data-slot="pending-changes-bar"]').boundingBox();
+    const surface = await card.boundingBox();
+    return Math.abs(surface!.y - pending!.y - pending!.height);
+  }).toBeLessThanOrEqual(1);
   // Staging does not write settings until the administrator chooses Save.
   let snapshot = await (
     await page.request.get("/api/admin/snapshot?scope=categories")

@@ -1379,6 +1379,10 @@
       min-height: 0;
       gap: 0;
     }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-heading"]:has(> [data-slot="reorder-selection"]) [data-slot="reorder-detail"] {
+      grid-column: 2 / -2;
+      margin-inline-start: var(--reorder-selection-inset, 0px);
+    }
     .admin-panel[data-admin-collection="true"] [data-slot="reorder-separator"] {
       display: none;
     }
@@ -1454,6 +1458,10 @@
     }
     .admin-panel[data-admin-collection="true"] [data-slot="reorder-selection"] {
       width: var(--control-height);
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-heading"] {
+      /* The visible 1rem checkbox is centered inside its wider touch column. */
+      --reorder-selection-inset: calc((var(--control-height) - 1rem) / 2);
     }
     body:has(.admin-panel) :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
       min-height: 2.75rem;

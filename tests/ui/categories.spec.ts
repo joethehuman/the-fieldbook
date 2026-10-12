@@ -66,6 +66,84 @@ async function save(page: Page) {
   ).not.toBeVisible();
 }
 
+test("category heading sits outside the joined settings surface and guidance wraps to available width", async ({ page }, info) => {
+  const state = await fixture(page);
+  const heading = page.getByRole("heading", { name: "Categories", exact: true });
+  const card = page.locator("#settings-categories");
+  const guidance = page.getByText("Reorder categories to change their order on the Courses page. Curricula always appear at the bottom.", { exact: true });
+  const headingBounds = await heading.boundingBox();
+  const cardBounds = await card.boundingBox();
+  expect(headingBounds!.y + headingBounds!.height).toBeLessThan(cardBounds!.y);
+  const textSize = await guidance.evaluate((element) => ({
+    width: element.getBoundingClientRect().width,
+    available: element.parentElement!.getBoundingClientRect().width,
+    height: element.getBoundingClientRect().height,
+    line: parseFloat(getComputedStyle(element).lineHeight),
+  }));
+  expect(Math.abs(textSize.available - textSize.width)).toBeLessThanOrEqual(1);
+  if (info.project.name === "desktop") expect(textSize.height).toBe(textSize.line);
+  if (info.project.name === "phone") expect(textSize.height).toBeGreaterThan(textSize.line);
+
+  const name = state.settings!.contentCategories!.course[0];
+  await page.getByRole("button", { name: `Reorder ${name}`, exact: true }).press("ArrowDown");
+  const pending = page.locator('[data-slot="pending-changes-bar"]');
+  await expect(pending).toBeVisible();
+  await expect.poll(async () => {
+    const bar = await pending.boundingBox();
+    const surface = await card.boundingBox();
+    return Math.abs(surface!.y - bar!.y - bar!.height);
+  }).toBeLessThanOrEqual(1);
+  const barBounds = await pending.boundingBox();
+  const activeBounds = await card.boundingBox();
+  expect(barBounds!.x).toBe(activeBounds!.x);
+  expect(barBounds!.width).toBe(activeBounds!.width);
+  await page.screenshot({ path: info.outputPath("category-joined-save-header.png"), fullPage: true });
+  await page.getByRole("button", { name: "Discard changes", exact: true }).click();
+  await expect(pending).not.toBeVisible();
+});
+
+for (const kind of ["course", "brief"] as const) {
+  test(`${kind} categories omit unassigned drafts and retain categorized drafts and stale placement repair`, async ({ page }) => {
+    const state = await fixture(page);
+    const source = state.content.find((item) => item.kind === kind)!;
+    const suffix = kind === "course" ? "1" : "2";
+    for (const [index, category, title] of [
+      [1, "", "Unassigned draft"],
+      [2, source.category, "Categorized draft"],
+      [3, "Removed category", "Restored draft"],
+    ] as const) {
+      state.content.push({
+        ...source,
+        id: `00000000-0000-4000-8000-000000000${suffix}${index}0`,
+        category,
+        title,
+        status: "draft",
+        publishedRevision: null,
+      });
+    }
+    await page.evaluate((workspace) => localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace)), state);
+    await page.reload();
+    if (kind === "brief") await page.getByRole("tab", { name: "Updates", exact: true }).click();
+    const repair = page.getByRole("region", { name: "Items in items needing a category", exact: true });
+    await expect(repair.getByText("Restored draft", { exact: true })).toBeVisible();
+    await expect(page.getByText("Unassigned draft", { exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: `Expand ${source.category}`, exact: true }).click();
+    const category = page.getByRole("region", { name: `Items in ${source.category}`, exact: true });
+    await expect(category.getByRole("row").filter({ hasText: "Categorized draft" })).toContainText("Draft");
+    await repair.getByRole("button", { name: "Actions for Restored draft", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Move to category…", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("combobox", { name: "Destination category", exact: true }).click();
+    await page.getByRole("option", { name: source.category, exact: true }).click();
+    await dialog.getByRole("button", { name: "Move items", exact: true }).click();
+    await expect(repair).toHaveCount(0);
+    await save(page);
+    const after = await saved(page);
+    expect(after.content.find((item: any) => item.title === "Unassigned draft" && item.kind === kind).category).toBe("");
+    expect(after.content.find((item: any) => item.title === "Restored draft" && item.kind === kind).category).toBe(source.category);
+  });
+}
+
 for (const large of [false, true]) {
   test(`${large ? "long" : "short"} category item lists let wheel scrolling continue to the page`, async ({ page }) => {
     const state = await fixture(page, large, 30);
@@ -462,12 +540,18 @@ test("large categories have bounded searchable tables, select-all and individual
     (item) => item.kind === "course" && item.category === name,
   ).length;
   await expect(table.locator("tbody tr")).toHaveCount(count);
-  const dimensions = await viewport.evaluate((element) => ({
-    height: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-    header: element.querySelector("thead")!.getBoundingClientRect().height,
-    row: element.querySelector("tbody tr")!.getBoundingClientRect().height,
-  }));
+  const dimensions = await viewport.evaluate((element) => {
+    // Use the typical row height: long titles wrap, and collapsed table borders
+    // can make the final row half a pixel shorter than the other rows.
+    const heights = Array.from(element.querySelectorAll("tbody tr"),
+      (row) => row.getBoundingClientRect().height).sort((a, b) => a - b);
+    return {
+      height: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      header: element.querySelector("thead")!.getBoundingClientRect().height,
+      row: heights[Math.floor(heights.length / 2)],
+    };
+  });
   expect(dimensions.height).toBeLessThanOrEqual(
     dimensions.header + dimensions.row * 5 + 2,
   );
