@@ -724,6 +724,13 @@ export default function ComponentCatalog() {
                 onSignIn={() => {}}
                 onFeedback={async () => {}}
               />
+              <AccountMenu
+                initials="AE"
+                name="Alex Edwards"
+                description="Account Executive"
+                onSwitchDemoProfile={() => notify("Example demo profile switch.")}
+                onFeedback={async () => {}}
+              />
             </div>
           </div>
           <StatusActions

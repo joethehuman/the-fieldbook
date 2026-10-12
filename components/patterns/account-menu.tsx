@@ -284,8 +284,8 @@ export function AccountMenu({
         {onSwitchDemoProfile && (
           <Button
             type="button"
-            variant="ghost"
-            className="sidebar-account-secondary col-span-full justify-start"
+            variant="default"
+            className="sidebar-account-secondary col-span-full justify-self-center"
             onClick={onSwitchDemoProfile}
           >
             <ArrowLeftRight className="size-4" aria-hidden="true" />
