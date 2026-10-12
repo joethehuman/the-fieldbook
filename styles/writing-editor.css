@@ -551,7 +551,9 @@
 .writing-table-column { transform: translate(-50%, -100%); }
 .writing-table-row .writing-table-grip { justify-content: flex-end; padding-inline-end: var(--space-1); }
 .writing-table-column .writing-table-grip { align-items: flex-end; padding-block-end: var(--space-1); }
-.writing-editor [data-writing-cell-selected] { background: var(--accent); box-shadow: inset 0 0 0 2px var(--ring); }
+.writing-editor .writing-content [data-lexical-decorator="true"] table :is(td, th):not([data-tool-cell])[data-active="true"] { outline: 2px solid var(--ring); outline-offset: -1px; }
+.writing-editor .writing-content [data-lexical-decorator="true"] table :is(td, th):not([data-tool-cell])[data-writing-cell-selected] { background: var(--selected); box-shadow: none; }
+.writing-editor .writing-content [data-lexical-decorator="true"][data-table-cell-selection] table :is(td, th):not([data-tool-cell])[data-active="true"] { outline: none; }
 .writing-editor [data-table-cell-selection] { user-select: none; }
 .writing-table-resizer { position: absolute; z-index: 2; width: 16px; height: 28px; transform: translate(-50%, -50%); cursor: grab; touch-action: none; border: 0; background: transparent; display: grid; place-items: center; }
 .writing-table-resizer:is(:active, [data-resizing="true"]) { cursor: grabbing; }
