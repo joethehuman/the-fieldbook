@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 
@@ -89,77 +89,128 @@ for (const width of [320, 390, 430]) {
   });
 }
 
-test("phone hierarchy aligns controls with titles and counts with row menus; portals retain touch sizing", async ({
-  browser,
-  baseURL,
-}) => {
-  const context = await browser.newContext({
-    baseURL,
-    viewport: { width: 320, height: 900 },
-    hasTouch: true,
-    isMobile: true,
-  });
-  const page = await context.newPage();
-  await context.addInitScript(() =>
-    sessionStorage.setItem("fieldbook.profile.v1", "demo-admin"),
-  );
-  await page.goto("/#admin/settings/categories");
-  for (const route of ["categories", "docs-navigation"]) {
-    await page.goto(`/#admin/settings/${route}`);
-    const row = page.locator('[data-slot="reorder-row"]').first();
-    await expect(row).toBeVisible();
-    const title = (await row
-      .locator('[data-slot="reorder-title"]')
-      .boundingBox())!;
-    const detail = (await row
-      .locator('[data-slot="reorder-detail"]')
-      .boundingBox())!;
-    const actions = (await row
-      .locator('[data-slot="reorder-actions"]')
-      .boundingBox())!;
-    expect(detail.y).toBeGreaterThanOrEqual(title.y + title.height);
-    expect(detail.x).toBe(title.x);
-    expect(
-      Math.abs(detail.y + detail.height / 2 - actions.y - actions.height / 2),
-    ).toBeLessThan(1);
-    for (const control of await row
-      .locator(
-        '[data-slot="reorder-heading"] > div:first-child button, [data-slot="reorder-selection"], [data-slot="reorder-icon"]',
-      )
-      .all()) {
-      const box = (await control.boundingBox())!;
-      expect(
-        Math.abs(box.y + box.height / 2 - title.y - title.height / 2),
-      ).toBeLessThan(1);
-    }
-    expect(
-      await row.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBe(0);
+for (const width of [320, 390, 430]) {
+  for (const hasTouch of [false, true]) {
+    test(`narrow hierarchy counts align with checkboxes at ${width}px with ${hasTouch ? "touch" : "mouse"}`, async ({
+      browser,
+      baseURL,
+    }, info) => {
+      const context = await browser.newContext({
+        baseURL,
+        viewport: { width, height: 900 },
+        hasTouch,
+        isMobile: hasTouch,
+      });
+      const page = await context.newPage();
+      const data = freshWorkspace();
+      data.content
+        .filter((item) => item.kind === "doc")
+        .forEach((doc, index) => {
+          doc.sectionId = index === 0 ? "mobile-child" : "mobile-root";
+          doc.category = "Mobile section";
+          doc.folder = index === 0 ? "Mobile subsection" : "";
+        });
+      data.settings = {
+        ...data.settings!,
+        docSections: [
+          { id: "mobile-root", name: "Mobile section" },
+          {
+            id: "mobile-child",
+            name: "Mobile subsection",
+            parentId: "mobile-root",
+          },
+        ],
+        docCategoryOrder: [],
+      };
+      await context.addInitScript((workspace) => {
+        sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+        localStorage.setItem(
+          "fieldbook.workspace.v1",
+          JSON.stringify(workspace),
+        );
+      }, withPublishedSnapshots(data));
+      await page.goto("/#admin/settings/categories");
+      async function assertCountAlignment(row: Locator) {
+        await expect(row).toBeVisible();
+        const title = (await row
+          .locator('[data-slot="reorder-title"]')
+          .boundingBox())!;
+        const detail = (await row
+          .locator('[data-slot="reorder-detail"]')
+          .boundingBox())!;
+        const actions = (await row
+          .locator('[data-slot="reorder-actions"]')
+          .boundingBox())!;
+        const checkbox = (await row.getByRole("checkbox").boundingBox())!;
+        expect(detail.y).toBeGreaterThanOrEqual(title.y + title.height);
+        expect(Math.abs(detail.x - checkbox.x)).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(
+            detail.y + detail.height / 2 - actions.y - actions.height / 2,
+          ),
+        ).toBeLessThan(1);
+        for (const control of await row
+          .locator(
+            '[data-slot="reorder-heading"] > div:first-child button, [data-slot="reorder-selection"], [data-slot="reorder-icon"]',
+          )
+          .all()) {
+          const box = (await control.boundingBox())!;
+          expect(
+            Math.abs(box.y + box.height / 2 - title.y - title.height / 2),
+          ).toBeLessThan(1);
+        }
+        expect(
+          await row.evaluate(
+            (element) => element.scrollWidth - element.clientWidth,
+          ),
+        ).toBe(0);
+      }
+      const first = () => page.locator('[data-slot="reorder-row"]').first();
+      await assertCountAlignment(first());
+      await page.getByRole("tab", { name: "Updates", exact: true }).click();
+      await assertCountAlignment(first());
+      await page.goto("/#admin/settings/docs-navigation");
+      await assertCountAlignment(first());
+      await page
+        .getByRole("button", { name: "Expand Mobile section", exact: true })
+        .click();
+      const subsection = page.locator('[data-slot="reorder-row"]').filter({
+        has: page.getByText("Mobile subsection", { exact: true }),
+      });
+      await assertCountAlignment(subsection);
+      await page.screenshot({
+        path: info.outputPath(
+          `mobile-counts-${width}-${hasTouch ? "touch" : "mouse"}.png`,
+        ),
+        fullPage: true,
+      });
+      await page.goto("/#admin/settings/categories");
+      const create = page.getByRole("button", {
+        name: "Create category",
+        exact: true,
+      });
+      if (hasTouch)
+        expect((await create.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await create.click();
+      const cancel = page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Cancel", exact: true });
+      if (hasTouch)
+        expect((await cancel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await cancel.click();
+      await expect(page.getByRole("dialog")).toBeHidden();
+      await page.goto("/#admin/content");
+      await page.getByRole("button", { name: "Content", exact: true }).click();
+      for (const name of ["Doc", "Update", "Course"]) {
+        const item = page.getByRole("menuitem", { name, exact: true });
+        if (hasTouch)
+          expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      }
+      await page.keyboard.press("Escape");
+      await context.close();
+    });
   }
-  await page.goto("/#admin/settings/categories");
-  const create = page.getByRole("button", {
-    name: "Create category",
-    exact: true,
-  });
-  expect((await create.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await create.click();
-  const cancel = page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Cancel", exact: true });
-  expect((await cancel.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await cancel.click();
-  await expect(page.getByRole("dialog")).toBeHidden();
-  await page.goto("/#admin/content");
-  await page.getByRole("button", { name: "Content", exact: true }).click();
-  for (const name of ["Doc", "Update", "Course"]) {
-    const item = page.getByRole("menuitem", { name, exact: true });
-    expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  }
-  await page.keyboard.press("Escape");
-  await context.close();
-});
+}
 
 test("demo models start selected without validation or unsaved changes, including older empty settings", async ({
   page,

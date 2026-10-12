@@ -40,6 +40,12 @@ test("installed category controls count actual rows and save settings through th
   const heading = await page.getByRole("heading", { name: "Categories", exact: true }).boundingBox();
   const surface = await card.boundingBox();
   expect(heading!.y + heading!.height).toBeLessThan(surface!.y);
+  if (info.project.name === "production-phone") {
+    const row = page.locator('[data-slot="reorder-row"]').first();
+    const count = await row.locator('[data-slot="reorder-detail"]').boundingBox();
+    const checkbox = await row.getByRole("checkbox").boundingBox();
+    expect(Math.abs(count!.x - checkbox!.x)).toBeLessThanOrEqual(1);
+  }
   await expect(page.getByText("Unassigned installed draft", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Restored installed draft", { exact: true })).toBeVisible();
   const bulk = page.getByRole("button", {
