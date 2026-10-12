@@ -1,4 +1,5 @@
 import type { TableNode } from "@mdxeditor/editor";
+import { parse, type DefaultTreeAdapterTypes } from "parse5";
 import { setTableColumnWidths, tableColumnWidths } from "./writing-table";
 import { normalizeContentLink } from "./content-links";
 
@@ -158,30 +159,50 @@ export function tableFromTsv(value: string): WritingTable | null {
 
 export function tableFromHtml(value: string): WritingTable | null {
   if (!value || value.length > MAX_CLIPBOARD_LENGTH) return null;
-  const element = new DOMParser().parseFromString(value, "text/html").querySelector("table");
-  if (!element || element.querySelector("table")) return null;
-  const metadata = element.getAttribute("data-fieldbook-table");
+  type HtmlNode = DefaultTreeAdapterTypes.Node;
+  type HtmlElement = DefaultTreeAdapterTypes.Element;
+  const isElement = (node: HtmlNode): node is HtmlElement => "tagName" in node && node.namespaceURI === "http://www.w3.org/1999/xhtml";
+  const elements = (root: HtmlNode, tag: string) => {
+    const found: HtmlElement[] = [], pending = "childNodes" in root ? [...root.childNodes].reverse() : [];
+    while (pending.length) {
+      const node = pending.pop()!;
+      if (isElement(node) && node.tagName === tag) found.push(node);
+      if ("childNodes" in node) for (let index = node.childNodes.length - 1; index >= 0; index--) pending.push(node.childNodes[index]);
+    }
+    return found;
+  };
+  const attribute = (node: HtmlElement, name: string) => node.attrs.find(attr => !attr.namespace && attr.name === name)?.value || "";
+  // Parse clipboard HTML as plain data, never as a browser document or live DOM.
+  const element = elements(parse(value, { scriptingEnabled: false }), "table")[0];
+  if (!element || elements(element, "table").length) return null;
+  const metadata = attribute(element, "data-fieldbook-table");
   if (metadata) {
     try {
       const table = decodeTableClipboard(decodeURIComponent(metadata));
       if (table) return table;
     } catch { /* Invalid metadata falls back to the ordinary HTML table. */ }
   }
-  const contents = (node: Node): Inline[] => {
-    if (node.nodeType === Node.TEXT_NODE) return [{ type: "text", value: node.textContent || "" }];
-    if (!(node instanceof Element) || ["SCRIPT", "STYLE"].includes(node.tagName)) return [];
-    const children = Array.from(node.childNodes).flatMap(contents);
-    if (node.tagName === "BR") return [{ type: "break" }];
-    if (["STRONG", "B"].includes(node.tagName)) return [{ type: "strong", children }];
-    if (["EM", "I"].includes(node.tagName)) return [{ type: "emphasis", children }];
-    if (["S", "DEL", "STRIKE"].includes(node.tagName)) return [{ type: "delete", children }];
-    if (node.tagName === "CODE") return [{ type: "inlineCode", value: node.textContent || "" }];
-    if (node.tagName === "A" && safeUrl(node.getAttribute("href"))) return [{ type: "link", url: safeUrl(node.getAttribute("href")), children }];
-    if (node.tagName === "IMG" && safeUrl(node.getAttribute("src"))) return [{ type: "image", url: safeUrl(node.getAttribute("src")), alt: node.getAttribute("alt") || "" }];
+  const text = (nodes: Inline[]): string => nodes.map(node => "value" in node ? node.value : "children" in node ? text(node.children) : node.type === "break" ? "\n" : "").join("");
+  const contents = (node: HtmlNode, depth = 0): Inline[] => {
+    if (node.nodeName === "#text" && "value" in node) return [{ type: "text", value: node.value }];
+    if (!isElement(node) || ["script", "style"].includes(node.tagName) || depth > 20) return [];
+    const children = node.childNodes.flatMap(child => contents(child, depth + 1));
+    if (node.tagName === "br") return [{ type: "break" }];
+    if (["strong", "b"].includes(node.tagName)) return [{ type: "strong", children }];
+    if (["em", "i"].includes(node.tagName)) return [{ type: "emphasis", children }];
+    if (["s", "del", "strike"].includes(node.tagName)) return [{ type: "delete", children }];
+    if (node.tagName === "code") return [{ type: "inlineCode", value: text(children) }];
+    if (node.tagName === "a" && safeUrl(attribute(node, "href"))) return [{ type: "link", url: safeUrl(attribute(node, "href")), children }];
+    if (node.tagName === "img" && safeUrl(attribute(node, "src"))) return [{ type: "image", url: safeUrl(attribute(node, "src")), alt: attribute(node, "alt") }];
     return children;
   };
-  const rows = Array.from(element.rows);
-  const width = rows[0]?.cells.length;
-  if (!width || width > MAX_COLUMNS || rows.length > MAX_ROWS || rows.some(row => row.cells.length !== width || Array.from(row.cells).some(cell => cell.colSpan !== 1 || cell.rowSpan !== 1))) return null;
-  return { type: "table", children: rows.map(row => ({ type: "tableRow", children: Array.from(row.cells).map(cell => ({ type: "tableCell", children: contents(cell) })) })) };
+  const sectionOrder = (row: HtmlElement) => row.parentNode && isElement(row.parentNode) ? row.parentNode.tagName === "thead" ? 0 : row.parentNode.tagName === "tfoot" ? 2 : 1 : 1;
+  const rows = elements(element, "tr").sort((a, b) => sectionOrder(a) - sectionOrder(b)).map(row => row.childNodes.filter((node): node is HtmlElement => isElement(node) && ["td", "th"].includes(node.tagName)));
+  const merged = (cell: HtmlElement) => ["colspan", "rowspan"].some(name => {
+    const span = parseInt(attribute(cell, name), 10);
+    return span > 1 || (name === "rowspan" && span === 0);
+  });
+  const width = rows[0]?.length;
+  if (!width || width > MAX_COLUMNS || rows.length > MAX_ROWS || rows.some(row => row.length !== width || row.some(merged))) return null;
+  return { type: "table", children: rows.map(row => ({ type: "tableRow", children: row.map(cell => ({ type: "tableCell", children: contents(cell) })) })) };
 }

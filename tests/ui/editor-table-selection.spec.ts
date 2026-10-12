@@ -166,6 +166,21 @@ test("HTML and tab-separated pastes fill a grid and reject unsafe links", async 
   await expect(cells(page).nth(10)).toContainText("Four");
 });
 
+test("HTML table paste ignores executable markup and resources outside the table", async ({ page }) => {
+  await open(page);
+  const requests: string[] = [];
+  page.on("request", request => { if (request.url().startsWith("https://clipboard.invalid/")) requests.push(request.url()); });
+  await page.route("https://clipboard.invalid/**", route => route.abort());
+  await cells(page).nth(3).locator('[contenteditable="true"]').click();
+  await clipboard(page, "paste", { "text/html": '<img src="https://clipboard.invalid/outside"><iframe src="https://clipboard.invalid/frame"></iframe><table><tr><td onclick="window.tablePasteExecuted=true"><script>window.tablePasteExecuted=true</script><strong>Safe paste</strong><a href="java&#10;script:void(0)"> plain text</a></td><td>Second cell</td></tr></table>' });
+  await expect(cells(page).nth(3).locator("strong")).toHaveText("Safe paste");
+  await expect(cells(page).nth(3)).toHaveText("Safe paste plain text");
+  await expect(cells(page).nth(4)).toHaveText("Second cell");
+  await expect(cells(page).nth(3).locator("script, iframe, img, a, [onclick]")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as Window & { tablePasteExecuted?: boolean }).tablePasteExecuted)).toBeUndefined();
+  expect(requests).toEqual([]);
+});
+
 test("a rectangular drag scrolls to hidden columns while the pointer stays at the edge", async ({ page }) => {
   await open(page);
   for (let index = 0; index < 6; index++) {

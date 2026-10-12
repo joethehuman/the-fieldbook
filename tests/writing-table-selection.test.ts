@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   cellRectangle, clearTableCells, decodeTableClipboard, pasteTableCells,
-  selectedTable, tableClipboardText, tableFromTsv, type WritingTable,
+  selectedTable, tableClipboardText, tableFromHtml, tableFromTsv, type WritingTable,
 } from "../lib/writing-table-selection";
 import { setTableColumnWidths, tableColumnWidths } from "../lib/writing-table";
 
@@ -86,4 +86,40 @@ test("oversized pastes leave the destination unchanged", () => {
   const source = fixture();
   assert.equal(pasteTableCells(table, source, { top: 999, bottom: 999, left: 0, right: 0 }), null);
   assert.deepEqual(table, before);
+});
+
+test("HTML is parsed without browser globals and preserves rich cells, entities, and section order", () => {
+  const table = tableFromHtml('<table><tfoot><tr><td>Footer</td><td>End</td></tr></tfoot><thead><tr><th>Header &amp; title</th><th>Owner</th></tr></thead><tbody><tr><td><strong>Bold</strong> <em>italic</em><br><code>x &lt; y</code></td><td><a href="https://example.com">Link</a></td></tr></tbody></table>')!;
+  assert.equal(tableClipboardText(table), 'Header & title\tOwner\n"Bold italic\nx < y"\tLink\nFooter\tEnd');
+  assert.equal(table.children[1].children[0].children[0].type, "strong");
+  assert.equal(table.children[1].children[1].children[0].type, "link");
+});
+
+test("HTML drops executable markup, event attributes, foreign content, and unsafe URLs", () => {
+  const table = tableFromHtml('<img src="https://clipboard.invalid/outside"><table><tr><td onclick="void(0)"><script>discarded</script><style>discarded</style><svg><text>discarded</text></svg><strong>Safe</strong><a href="java&#10;script:void(0)"> plain</a><img src="data:image/svg+xml,ignored"><img src="https://example.com/image.png" alt="Picture" onerror="void(0)"></td></tr></table>')!;
+  assert.deepEqual(table.children[0].children[0].children, [
+    { type: "strong", children: [{ type: "text", value: "Safe" }] },
+    { type: "text", value: " plain" },
+    { type: "image", url: "https://example.com/image.png", alt: "Picture" },
+  ]);
+});
+
+test("HTML metadata preserves saved layout and invalid metadata falls back to safe HTML", () => {
+  const table = fixture();
+  setTableColumnWidths(table, [180, 220, 260]);
+  const metadata = encodeURIComponent(JSON.stringify({ version: 1, table }));
+  const decoded = tableFromHtml(`<table data-fieldbook-table="${metadata}"><tr><td>Fallback</td></tr></table>`)!;
+  assert.deepEqual(decoded, table);
+  assert.equal(tableClipboardText(tableFromHtml('<table data-fieldbook-table="%invalid"><tr><td>Fallback</td></tr></table>')!), "Fallback");
+});
+
+test("HTML rejects nested, merged, ragged, oversized, and missing tables", () => {
+  for (const html of [
+    '<table><tr><td><table><tr><td>Nested</td></tr></table></td></tr></table>',
+    '<table><tr><td colspan="2">Merged</td></tr></table>',
+    '<table><tr><td rowspan="0">Merged</td></tr></table>',
+    '<table><tr><td>One</td><td>Two</td></tr><tr><td>Ragged</td></tr></table>',
+    `<table><tr>${"<td>Wide</td>".repeat(101)}</tr></table>`,
+    '<p>Ordinary prose</p>',
+  ]) assert.equal(tableFromHtml(html), null);
 });
