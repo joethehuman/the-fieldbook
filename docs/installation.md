@@ -106,6 +106,14 @@ Choose resource sizes for your expected workload in DigitalOcean. Configure spen
 3. Wait for Auth and Storage to initialize. On the new, unused backend, run [.do/prepare-supabase-backend.sql](../.do/prepare-supabase-backend.sql) as the cluster administrator, then restart Auth and Storage. It configures their schema paths and Storage's standard role permissions. If the Marketplace bootstrap placed Auth's migration ledger in `public`, it preserves that history in `auth`. It refuses a backend with users or an installed Fieldbook schema. If Storage cannot verify the database certificate, mount the cluster's CA certificate into its container and set `NODE_EXTRA_CA_CERTS` to that path. Preserve certificate verification.
 4. For media stored in Spaces, configure Supabase Storage's [S3 backend](https://supabase.com/docs/guides/self-hosting/self-hosted-s3) with your private bucket, region endpoint and bucket-scoped credentials. The bucket stays private; Fieldbook uses the Storage API to issue upload and read permissions. This preserves its existing upload interface.
 
+The Marketplace image includes `utils/add-new-auth-keys.sh`. Run it in the backend's Docker directory with `--update-env`, using Node.js 22, to generate asymmetric signing and verification keys. Its output contains secrets; save it privately. Copy [.do/supabase-fieldbook.compose.yaml](../.do/supabase-fieldbook.compose.yaml) into that directory as `docker-compose.fieldbook.yml`. This override propagates the keys, trusted database certificate, Google configuration, MCP settings and Spaces credentials to the appropriate services.
+
+Add these installation values to the backend's private `.env`: `FIELDBOOK_URL`, `FIELDBOOK_PUBLIC_SUPABASE_URL` (the app URL followed by `/backend`), `FIELDBOOK_SPACES_BUCKET`, `FIELDBOOK_SPACES_REGION`, `FIELDBOOK_SPACES_ACCESS_KEY` and `FIELDBOOK_SPACES_SECRET_KEY`. Store the cluster's CA at `volumes/certificates/digitalocean-ca.pem`. For Google, set `GOOGLE_ENABLED=true`, `GOOGLE_CLIENT_ID` and `GOOGLE_SECRET` after creating the client. Set `FIELDBOOK_MCP_ENABLED=true` when enabling MCP. Restart the services with the image's base, managed-database and Fieldbook overrides:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.dbaas.yml -f docker-compose.fieldbook.yml up -d
+```
+
 ### Configure App Platform
 
 Use [.do/app.yaml](../.do/app.yaml) as the app specification. Replace the repository, deployment branch, VPC, private backend address and credentials with your own settings. Select component sizes and instance counts before creating the app. Review automatic deployment settings for your chosen source connection.
@@ -150,6 +158,6 @@ DIGITALOCEAN_MODEL_ACCESS_KEY=YOUR_SERVER_ONLY_MODEL_ACCESS_KEY
 DIGITALOCEAN_AI_MODELS=YOUR_TOOL_CAPABLE_TEXT_MODEL_IDS
 ```
 
-Use a model access key with appropriate model permissions. Declare compatible text model IDs separated by commas; Fieldbook verifies their presence in the inference catalog. The catalog does not expose tool capabilities, pricing or privacy assurances, so review them in DigitalOcean. In Ask AI settings, select the DO model and set fallback to None. Router choice is independent of hosting; Vercel AI Gateway remains available through `FIELDBOOK_AI_ROUTER=vercel`.
+Use a model access key with appropriate model permissions. Foundation-model and inference-router permissions are separate; review both when creating the key. Declare compatible text model IDs separated by commas; Fieldbook verifies their presence in the inference catalog. The catalog does not expose tool capabilities, pricing or privacy assurances, so review them in DigitalOcean. In Ask AI settings, select the DO model and set fallback to None. Router choice is independent of hosting; Vercel AI Gateway remains available through `FIELDBOOK_AI_ROUTER=vercel`.
 
 Before admitting users, verify real sign-in, publishing, learner progress, private uploads and reads, a source-cited AI answer if enabled, MCP permissions if enabled, and an accepted cleanup run. See [upgrading](upgrading.md) for existing installations. Application deployment does not apply database changes.

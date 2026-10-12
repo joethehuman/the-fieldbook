@@ -19,7 +19,7 @@ Use the Node.js and pnpm versions declared in `package.json`. Install dependenci
 | `server/providers/` | Provider-specific integrations. |
 | `supabase/migrations/` | Ordered database changes for the current supported backend. |
 
-The documented stack is Vercel, hosted Supabase, and Google sign-in. Treat alternative providers as contribution targets until their implementation and installation instructions have been verified.
+The installation guide covers Vercel with hosted Supabase and DigitalOcean App Platform with managed PostgreSQL and self-hosted Supabase services. Both retain Google sign-in. Treat further provider combinations as contribution targets until their implementation and installation instructions have been verified.
 
 ## Implement through provider interfaces
 
