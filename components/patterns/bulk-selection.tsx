@@ -116,6 +116,7 @@ export function BulkSelectionBar({
 }) {
   return (
     <div
+      data-slot="bulk-selection-bar"
       className={cn(
         "flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border py-2",
         className,
@@ -191,7 +192,11 @@ export function BulkPicker({
         <DialogContent size="picker">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
-          {error && <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>}
+          {error && (
+            <Alert variant="destructive" onDismiss={() => setError("")}>
+              {error}
+            </Alert>
+          )}
           <DialogBody className="flex flex-col overflow-y-auto">
             <SearchableSelectionList
               bounded="compact"

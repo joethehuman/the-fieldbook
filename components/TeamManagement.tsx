@@ -2,6 +2,7 @@
 import { sortLabels } from "@/lib/collection-sort";
 import { SortPicker } from "./patterns/sort-picker";
 import { DetailNavigation } from "./patterns/detail-navigation";
+import { usePhoneLayout } from "./patterns/use-phone-layout";
 
 import {
   BulkActions,
@@ -141,6 +142,8 @@ export function TeamsAdmin({
   const [tab, setTab] = useState<string>(initialTab || "members");
   const [query, setQuery] = useState("");
   const [selectTeams, setSelectTeams] = useState(false);
+  const phone = usePhoneLayout();
+  const showTeamSelection = phone || selectTeams;
   const [memberSort, setMemberSort] = useState("name");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Team | null>(null);
@@ -846,6 +849,41 @@ export function TeamsAdmin({
               Organization
             </Button>
           )}
+          <ActionGroup>
+            {!phone && (hierarchyItems.length > 1 || selectTeams) && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                aria-pressed={selectTeams}
+                onClick={() => {
+                  setSelectTeams(!selectTeams);
+                  teamSelection.setSelected([]);
+                }}
+              >
+                {selectTeams ? (
+                  <X aria-hidden="true" />
+                ) : (
+                  <ListChecks aria-hidden="true" />
+                )}
+                {selectTeams ? "Done selecting" : "Select multiple"}
+              </Button>
+            )}
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void editTeam({
+                  id: crypto.randomUUID(),
+                  name: "",
+                  parentId: browseId || organization?.id || undefined,
+                })
+              }
+            >
+              <Plus aria-hidden="true" />
+              Add team
+            </Button>
+          </ActionGroup>
         </SectionHeader>
         <HierarchyBrowser
           phoneList
@@ -857,45 +895,8 @@ export function TeamsAdmin({
             teamSelection.setSelected([]);
           }}
           reveal={browserReveal}
-          primaryAction={
-            <ActionGroup>
-              {(hierarchyItems.length > 1 || selectTeams) && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  aria-pressed={selectTeams}
-                  onClick={() => {
-                    setSelectTeams(!selectTeams);
-                    teamSelection.setSelected([]);
-                  }}
-                >
-                  {selectTeams ? (
-                    <X aria-hidden="true" />
-                  ) : (
-                    <ListChecks aria-hidden="true" />
-                  )}
-                  {selectTeams ? "Done selecting" : "Select multiple"}
-                </Button>
-              )}
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  void editTeam({
-                    id: crypto.randomUUID(),
-                    name: "",
-                    parentId: browseId || organization?.id || undefined,
-                  })
-                }
-              >
-                <Plus aria-hidden="true" />
-                Add team
-              </Button>
-            </ActionGroup>
-          }
           selectionActions={
-            selectTeams ? (range) => (
+            showTeamSelection ? (range) => (
               <BulkActions
                 collectionSize={teamSelection.collectionSize}
                 range={range}
@@ -906,9 +907,9 @@ export function TeamsAdmin({
               />
             ) : undefined
           }
-          selected={selectTeams ? teamSelection.selected : undefined}
+          selected={showTeamSelection ? teamSelection.selected : undefined}
           onSelectionChange={
-            selectTeams ? teamSelection.setSelected : undefined
+            showTeamSelection ? teamSelection.setSelected : undefined
           }
           label="Teams"
           disabled={busy}

@@ -62,9 +62,10 @@ export function FieldError({
     <Alert
       variant="destructive"
       dismissible={!props["aria-hidden"]}
+      dismissLayout="inline"
       data-slot="field-error"
       id={id}
-      className={cn("min-h-control-sm border-0 bg-transparent px-0 py-0 text-copy font-normal [&>button]:end-0 [&>button]:top-0", className)}
+      className={cn("min-h-control-sm items-center border-0 bg-transparent px-0 py-0 text-copy font-normal", className)}
       {...props}
     >
       <span id={id ? `${id}-message` : undefined}>{children}</span>

@@ -921,7 +921,7 @@ test("phone team directory finds deep paths and preserves selection through reco
   const name = levelName(11);
   const row = browser.getByRole("row").filter({ has: page.getByRole("button", { name, exact: true }) });
   await expect(row).toContainText(`Revenue / ${levelName(1)}`);
-  await page.getByRole("button", { name: "Select multiple", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Select multiple", exact: true })).toHaveCount(0);
   const choice = page.getByRole("checkbox", { name: `Select ${name}`, exact: true });
   await choice.check();
   await teamCommand(page, name);

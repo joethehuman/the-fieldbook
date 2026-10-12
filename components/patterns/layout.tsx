@@ -76,7 +76,7 @@ export function CollectionToolbar({
   children,
 }: {
   filters: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <div
@@ -84,7 +84,9 @@ export function CollectionToolbar({
       className="flex min-w-0 flex-wrap items-center justify-between gap-x-8 gap-y-4"
     >
       <div className="min-w-0">{filters}</div>
-      <div className="flex flex-wrap items-center gap-2">{children}</div>
+      {children && (
+        <div className="flex flex-wrap items-center gap-2">{children}</div>
+      )}
     </div>
   );
 }
@@ -117,7 +119,10 @@ export function ContentCardFooter({
       className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground"
     >
       {children}
-      <span data-slot="card-action" className="inline-flex items-center gap-2 text-foreground">
+      <span
+        data-slot="card-action"
+        className="inline-flex items-center gap-2 text-foreground"
+      >
         {action}
       </span>
     </div>

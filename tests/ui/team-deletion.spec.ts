@@ -69,7 +69,8 @@ test("bulk team deletion reviews paths, cancels safely and promotes the survivin
 }, info) => {
   const root = await seed(page);
   await section(page, "Teams");
-  await page.getByRole("button", { name: "Select multiple", exact: true }).click();
+  if (info.project.name !== "phone")
+    await page.getByRole("button", { name: "Select multiple", exact: true }).click();
   await page
     .getByRole("checkbox", { name: "Select Delete this team", exact: true })
     .check();

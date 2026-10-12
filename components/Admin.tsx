@@ -1272,6 +1272,10 @@ export default function Admin({
           tabIndex={0}
           value={tab}
           className="admin-panel mt-0"
+          data-admin-collection={
+            (!detailScope && !person && !destination.id && !destination.create) ||
+            undefined
+          }
           key={tab}
         >
           <>
@@ -1305,6 +1309,42 @@ export default function Admin({
                     </>
                   }
                 >
+                  {tab === "content" && (
+                    <ActionGroup>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button>
+                            <Plus aria-hidden="true" />
+                            Content
+                            <ChevronDown aria-hidden="true" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="min-h-11"
+                            onSelect={() => create("doc")}
+                          >
+                            <Plus size={15} aria-hidden="true" />
+                            Doc
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="min-h-11"
+                            onSelect={() => create("brief")}
+                          >
+                            <Plus size={15} aria-hidden="true" />
+                            Update
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="min-h-11"
+                            onSelect={() => create("course")}
+                          >
+                            <Plus size={15} aria-hidden="true" />
+                            Course
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </ActionGroup>
+                  )}
                   {tab === "people" && (
                     <ActionGroup>
                       {production ? (
@@ -1410,42 +1450,7 @@ export default function Admin({
                       ]}
                     />
                   }
-                >
-                  <ActionGroup>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button>
-                          <Plus aria-hidden="true" />
-                          Content
-                          <ChevronDown aria-hidden="true" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          className="min-h-11"
-                          onSelect={() => create("doc")}
-                        >
-                          <Plus size={15} aria-hidden="true" />
-                          Doc
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="min-h-11"
-                          onSelect={() => create("brief")}
-                        >
-                          <Plus size={15} aria-hidden="true" />
-                          Update
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="min-h-11"
-                          onSelect={() => create("course")}
-                        >
-                          <Plus size={15} aria-hidden="true" />
-                          Course
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </ActionGroup>
-                </CollectionToolbar>
+                />
                 <CollectionControls
                   filters={contentFilters}
                   onClear={clearContentFilters}

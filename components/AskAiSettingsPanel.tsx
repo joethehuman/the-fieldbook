@@ -34,7 +34,7 @@ const demoSetup: AiSetup = {
   retrieval: { ready: false, message: "Browser-local sample data only." },
   models: ["primary", "backup"].map((name) => ({
     id: `demo/${name}`,
-    name: name === "primary" ? "Example primary model" : "Example backup model",
+    name: name === "primary" ? "Gavin’s XL MAXIMUS Demo" : "Example backup model",
     inputPerMillion: null,
     outputPerMillion: null,
     zeroRetention: "unknown",
@@ -139,7 +139,7 @@ export function AskAiSettingsPanel({
     return (
       <FormField
         label={backup ? "Fallback model" : "Primary model"}
-        errorPlaceholder={!backup ? primaryRequired : undefined}
+        errorPlaceholder={production && !backup ? primaryRequired : undefined}
         error={!backup && !selected ? primaryRequired : undefined}
         description={
           backup
@@ -269,7 +269,7 @@ export function AskAiSettingsPanel({
             disabled={busy}
           >
             <FieldGroup>
-              <div className="grid items-start gap-4 md:grid-cols-2">
+              <div data-slot="ai-model-fields" className="grid items-start gap-4 md:grid-cols-2">
                 {picker(false)}
                 {picker(true)}
               </div>

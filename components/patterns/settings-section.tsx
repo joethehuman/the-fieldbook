@@ -36,6 +36,7 @@ export function SettingsSection({
   const card = (
     <Card
       {...props}
+      data-settings-section
       className={cn("p-0 sm:p-0", className)}
       aria-labelledby={headingId}
     >
@@ -47,7 +48,9 @@ export function SettingsSection({
       </CardHeader>
       <CardContent>
         <FieldGroup
-          className={measure === "form" ? "w-full max-w-(--form-width)" : undefined}
+          className={
+            measure === "form" ? "w-full max-w-(--form-width)" : undefined
+          }
           disabled={disabled}
           aria-labelledby={headingId}
           aria-describedby={guidanceId}
@@ -79,7 +82,10 @@ export function SettingsSection({
     <div className="grid min-w-0 gap-2">
       {card}
       {belowActions && (
-        <div data-slot="settings-below-actions" className="flex justify-end px-5">
+        <div
+          data-slot="settings-below-actions"
+          className="flex justify-end px-5"
+        >
           {belowActions}
         </div>
       )}

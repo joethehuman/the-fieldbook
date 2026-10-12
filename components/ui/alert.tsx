@@ -89,6 +89,7 @@ export function Alert({
   dismissKey,
   onDismiss,
   dismissLabel = "Dismiss message",
+  dismissLayout = "overlay",
   ref: forwardedRef,
   ...props
 }: ComponentProps<"div"> &
@@ -99,6 +100,8 @@ export function Alert({
     /** Clear notification copy only; keep restrictions and recovery state separate. */
     onDismiss?: () => void;
     dismissLabel?: string;
+    /** Inline field messages align their copy and dismiss control in one row. */
+    dismissLayout?: "overlay" | "inline";
   }) {
   const ref = useRef<HTMLDivElement>(null);
   const animation = useRef<Animation | null>(null);
@@ -190,7 +193,9 @@ export function Alert({
         variants({ variant }),
         "min-w-0 outline-none",
         className,
-        dismissible && "relative pe-12",
+        dismissible && (dismissLayout === "inline"
+          ? "grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3"
+          : "relative pe-12"),
       )}
       {...props}
     >
@@ -200,7 +205,10 @@ export function Alert({
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute end-2 top-2 size-8 p-0 text-current hover:text-current focus-visible:ring-muted-foreground focus-visible:ring-offset-0"
+          className={cn(
+            "size-8 p-0 text-current hover:text-current focus-visible:ring-muted-foreground focus-visible:ring-offset-0",
+            dismissLayout === "inline" ? "static" : "absolute end-2 top-2",
+          )}
           aria-label={dismissLabel}
           disabled={closing === key}
           onFocus={(event) => {

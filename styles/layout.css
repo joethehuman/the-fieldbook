@@ -221,6 +221,7 @@
     text-transform: none;
   }
   .admin-panel {
+    container: admin-surface / inline-size;
     display: flow-root;
     min-height: 0;
     /* Keep outer focus rings inside the scrollport without moving content. */
@@ -235,6 +236,10 @@
   }
   .admin-panel > * + * {
     margin-block-start: var(--space-6);
+  }
+  .admin-panel[data-admin-collection="true"] {
+    container: admin-surface admin-collection / inline-size;
+    --admin-record-width: max(7rem, calc(100cqw - 10rem));
   }
   .editor {
     display: flex;
@@ -1265,5 +1270,208 @@
     .app .sidebar-toggle { display: none; }
     .app .sidebar.open { transition: transform 150ms ease; }
     @media (prefers-reduced-motion: reduce) { .app .sidebar.open { transition: none; } }
+  }
+}
+
+/* Collection composition follows available width; the shell and writing layouts
+   retain their own viewport/input rules. Utilities are scoped to directory views. */
+@layer utilities {
+  @container admin-surface (width < 48rem) {
+    .admin-panel > * + * {
+      margin-block-start: var(--space-4);
+    }
+    .admin-panel[data-admin-collection="true"] :is(.learning-admin > .grid, [data-slot="hierarchy-viewport"], [data-slot="progress-overview"]) {
+      gap: var(--space-4);
+    }
+    .admin-panel [data-slot="section-header"] {
+      display: grid;
+      gap: var(--space-3);
+      padding-bottom: var(--space-4);
+    }
+    .admin-panel [data-slot="section-heading"] {
+      overflow-wrap: break-word;
+    }
+    .admin-panel [data-slot="section-actions"] {
+      gap: var(--space-2);
+    }
+    .admin-panel [data-slot="collection-primary-row"] {
+      gap: var(--space-2);
+    }
+    .admin-panel [data-slot="collection-search"] {
+      flex-basis: 100%;
+    }
+    .admin-panel [data-slot="collection-secondary-row"] {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .admin-panel [data-slot="collection-secondary-row"] > [data-slot="sort-picker"] {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .admin-panel [data-slot="sort-picker"] > span {
+      overflow-wrap: normal;
+    }
+    .admin-panel[data-admin-collection="true"] :is([data-slot="collection-toolbar"], [data-slot="bulk-selection-bar"]) {
+      gap: var(--space-2);
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="bulk-selection-bar"] {
+      padding-block: var(--space-2);
+    }
+    .admin-panel [data-settings-section] > [data-slot="card-header"] {
+      padding: var(--space-4) var(--space-4) 0;
+    }
+    .admin-panel [data-settings-section] > [data-slot="card-content"] {
+      padding: var(--space-4);
+    }
+    .admin-panel [data-settings-section] > [data-slot="card-footer"] {
+      padding-inline: var(--space-4);
+      gap: var(--space-3);
+    }
+    .admin-panel [data-slot="ai-model-fields"] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .admin-panel[data-admin-collection="true"] :is(#settings-categories, #settings-docs) {
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .admin-panel[data-admin-collection="true"] :is(#settings-categories, #settings-docs) > [data-slot="card-header"] {
+      padding: 0;
+      gap: var(--space-2);
+    }
+    .admin-panel[data-admin-collection="true"] #settings-categories [data-slot="card-title"] {
+      font-size: var(--text-2xl);
+      line-height: var(--text-2xl--line-height);
+    }
+    .admin-panel[data-admin-collection="true"] :is(#settings-categories, #settings-docs) > [data-slot="card-content"] {
+      padding: var(--space-4) 0;
+    }
+    .admin-panel[data-admin-collection="true"] :is(#settings-categories, #settings-docs) > [data-slot="card-footer"] {
+      padding-inline: var(--space-3);
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-heading"] {
+      grid-template-columns: auto auto minmax(0, 1fr) auto;
+      align-items: center;
+      column-gap: var(--space-1);
+      row-gap: 0;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-heading"]:has(> [data-slot="reorder-selection"]) {
+      grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+    }
+    .admin-panel[data-admin-collection="true"] :is([data-slot="reorder-identity"], [data-slot="reorder-label"]) {
+      display: contents;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-icon"] {
+      grid-column: -4;
+      grid-row: 1;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-title"] {
+      grid-column: -3 / -1;
+      grid-row: 1;
+      overflow-wrap: break-word;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-detail"] {
+      grid-column: -3;
+      grid-row: 2;
+      height: auto;
+      min-height: 0;
+      gap: 0;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-separator"] {
+      display: none;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-heading"] > [data-slot="reorder-actions"] {
+      grid-row: 2;
+      grid-column: -2;
+      gap: 0;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-row"]:has(> [data-slot="reorder-heading"]) {
+      padding-block: var(--space-2);
+    }
+    .admin-panel[data-admin-collection="true"] .doc-order-list > [data-slot="reorder-row"] {
+      padding-inline: var(--space-2);
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="table"]:not([data-layout^="feedback"]) :is(th, td) {
+      padding-inline: var(--space-3);
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="table"]:not([data-layout^="feedback"]) [data-slot="table-cell-content"][data-column="record"] {
+      width: var(--admin-record-width);
+      max-width: 24rem;
+    }
+    .admin-panel [data-slot="record-name"] {
+      display: block;
+      -webkit-line-clamp: unset;
+      overflow: visible;
+      overflow-wrap: break-word;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="record-meta"] {
+      overflow-wrap: anywhere;
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="group-record-counts"] {
+      display: block;
+    }
+    .admin-panel[data-admin-collection="true"] [data-layout="learningGroupsSelectable"] :is(th, td):has(> [data-column="count"]) {
+      display: none;
+    }
+    .admin-panel[data-admin-collection="true"] .group-grid [data-slot="card-content"] {
+      padding: var(--space-4);
+      gap: var(--space-3);
+    }
+    .admin-panel[data-admin-collection="true"] .report-summary {
+      gap: var(--space-3);
+      padding-block: var(--space-2);
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="progress-overview"] > [data-slot="card"] {
+      padding: var(--space-4);
+      gap: var(--space-3);
+    }
+  }
+  /* A hybrid device can use touch even when its primary pointer is a mouse. */
+  @media (any-pointer: coarse) {
+    .admin-panel,
+    body:has(.admin-panel) :is([data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [data-slot="dropdown-menu-content"]) {
+      --control-height: 2.75rem;
+      --control-height-sm: 2.75rem;
+    }
+    .admin-panel .writing-root {
+      --control-height: var(--control-height-standard);
+      --control-height-sm: var(--control-height-sm-standard);
+    }
+    .admin-panel [data-slot="choice"],
+    body:has(.admin-panel) [data-slot="dialog-content"] [data-slot="choice"] {
+      position: relative;
+    }
+    .admin-panel [data-slot="choice"]::before,
+    body:has(.admin-panel) [data-slot="dialog-content"] [data-slot="choice"]::before {
+      content: "";
+      position: absolute;
+      width: 2.75rem;
+      height: 2.75rem;
+      inset: 50% auto auto 50%;
+      transform: translate(-50%, -50%);
+    }
+    .admin-panel[data-admin-collection="true"] [data-slot="reorder-selection"] {
+      width: var(--control-height);
+    }
+    body:has(.admin-panel) :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
+      min-height: 2.75rem;
+    }
+    body:has(.admin-panel) [data-slot="alert"] > [data-slot="button"] {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+    body:has(.admin-panel) [data-slot="alert"]:has(> [data-slot="button"]) {
+      padding-inline-end: 3.75rem;
+      min-height: 3.75rem;
+    }
+    body:has(.admin-panel) [data-slot="field-error"] > [data-slot="button"] {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+    body:has(.admin-panel) [data-slot="field-error"]:has(> [data-slot="button"]) {
+      min-height: 2.75rem;
+    }
   }
 }

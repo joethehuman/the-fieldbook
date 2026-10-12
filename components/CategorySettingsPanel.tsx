@@ -278,6 +278,23 @@ export function CategorySettingsPanel({
               <CategoryList
                 controls={
                   <>
+                    <div
+                      data-slot="section-actions"
+                      className="flex flex-wrap items-center gap-2"
+                    >
+                      <Button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setNewName("");
+                          setCreateError("");
+                          setCreate(true);
+                        }}
+                      >
+                        <Plus aria-hidden="true" />
+                        Create category
+                      </Button>
+                    </div>
                     <CollectionControls
                       search={
                         <SearchField>
@@ -295,22 +312,6 @@ export function CategorySettingsPanel({
                             disabled={busy}
                           />
                         </SearchField>
-                      }
-                      primaryAction={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() => {
-                            setNewName("");
-                            setCreateError("");
-                            setCreate(true);
-                          }}
-                        >
-                          <Plus aria-hidden="true" />
-                          Create category
-                        </Button>
                       }
                     />
                     {kind === "course" && queries[kind].trim() && (

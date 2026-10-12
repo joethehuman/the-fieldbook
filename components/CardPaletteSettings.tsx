@@ -40,7 +40,7 @@ export function CardPaletteSettings({
   }
   return (
     <section
-      className="grid gap-5 border-t border-border pt-6"
+      className="@container/card-palette grid gap-5 border-t border-border pt-6"
       aria-label="Card artwork palette"
     >
       <div className="grid gap-1">
@@ -52,7 +52,7 @@ export function CardPaletteSettings({
       </div>
       <div className="grid min-w-0 gap-4">
         <div className="grid gap-5">
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] sm:items-end">
+          <div className="grid gap-4 @min-[32rem]/card-palette:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] @min-[32rem]/card-palette:items-end">
             <FormField label="Palette mode">
               <SelectField
                 value={value}
@@ -85,7 +85,7 @@ export function CardPaletteSettings({
             </p>
           </div>
           {selected.mode === "custom" ? (
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 @min-[32rem]/card-palette:grid-cols-3">
               {(
                 [
                   ["base", "Primary / canvas"],
@@ -148,10 +148,10 @@ export function CardPaletteSettings({
             </p>
           </div>
           <div
-            className="grid min-w-0 gap-3 sm:grid-cols-2"
+            className="grid min-w-0 gap-3 @min-[32rem]/card-palette:grid-cols-2"
             aria-label="Palette preview"
           >
-            <div className="overflow-hidden rounded-md border border-border sm:col-span-2">
+            <div className="overflow-hidden rounded-md border border-border @min-[32rem]/card-palette:col-span-2">
               <CardArtwork
                 id="palette-preview-course"
                 title="From API key to first request"

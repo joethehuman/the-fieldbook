@@ -820,7 +820,7 @@ export function RosterImport({
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-4 gap-y-2 py-3 text-copy">
+                    <dl className="grid grid-cols-1 gap-x-4 gap-y-2 py-3 text-copy sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
                       {ROSTER_IMPORT_COLUMNS.map((c) => (
                         <Fragment key={c.key}>
                           <dt className="font-medium">{c.label}</dt>
