@@ -62,6 +62,9 @@ export async function aiSetup(
       id: provider.id,
       name: provider.name,
       supportsFallback: provider.supportsFallback,
+      ...(provider.routerSelection
+        ? { routerSelection: provider.routerSelection }
+        : {}),
     };
     status.connection = provider.connection();
     const [catalog, retrieval] = await Promise.allSettled([
@@ -78,8 +81,12 @@ export async function aiSetup(
       ready: catalog.status === "fulfilled",
       message:
         catalog.status === "fulfilled"
-          ? "Available models loaded. Authentication and credit have not been verified."
-          : "The model list is unavailable. Check the model router configuration.",
+          ? provider.routerSelection
+            ? "Configured router metadata loaded. Inference access, credit and routing have not been verified."
+            : "Available models loaded. Authentication and credit have not been verified."
+          : catalog.reason instanceof HttpError
+            ? catalog.reason.message
+            : "The model list is unavailable. Check the model router configuration.",
     };
     status.retrieval = {
       ready: retrieval.status === "fulfilled",

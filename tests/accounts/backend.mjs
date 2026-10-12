@@ -74,6 +74,7 @@ const waitForAiStage = (stage) =>
         });
       });
 let readQueries = [];
+let logoutScopes = [];
 let settings = initial(),
   configuredGroups = [],
   configuredCurricula = [],
@@ -138,6 +139,7 @@ createServer(async (req, res) => {
     reads = 0;
     authReads = 0;
     readQueries = [];
+    logoutScopes = [];
     settings = { ...initial(), ...change.settings };
     configuredGroups = change.groups || [];
     configuredCurricula = change.curricula || [];
@@ -179,7 +181,7 @@ createServer(async (req, res) => {
     return send(res, { ok: true });
   }
   if (url.pathname === "/reads")
-    return send(res, { reads, readQueries, authReads, aiGenerations });
+    return send(res, { reads, readQueries, authReads, aiGenerations, logoutScopes });
   if (url.pathname === "/gateway/v1/models")
     return send(res, {
       data: [
@@ -822,7 +824,10 @@ createServer(async (req, res) => {
     authReads++;
     return send(res, user());
   }
-  if (url.pathname === "/auth/v1/logout") return send(res, {});
+  if (url.pathname === "/auth/v1/logout") {
+    logoutScopes.push(url.searchParams.get("scope"));
+    return send(res, {});
+  }
   return send(
     res,
     { message: `Unhandled synthetic request ${url.pathname}` },

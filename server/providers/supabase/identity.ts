@@ -4,8 +4,10 @@ import { cookies } from "next/headers";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { db } from "./client";
 import { loginSubjectForPerson } from "./identity-store";
+import { refreshIdentitySession } from "./session";
 import { env } from "../../env";
-import { ServiceError, isAbsentSession } from "../../errors";
+import { HttpError, ServiceError } from "../../errors";
+import { isAbsentSession } from "./auth-errors";
 import type {
   AuthorizationDetails,
   AuthorizationRedirect,
@@ -79,7 +81,30 @@ export async function verifyReaderIdentity(): Promise<ReaderIdentity> {
   return subject ? { status: "verified", subject } : { status: "absent" };
 }
 
-export async function startSignIn(redirectTo: string): Promise<string> {
+export function signInPresentation(): import("@/lib/identity").SignInPresentation {
+  return {
+    options: [{ id: "google", label: "Continue with Google" }],
+    signInLabel: "Sign in with Google",
+    progressDescription:
+      "Sign in with Google to save course progress across devices and browsers.",
+    accessDeniedDescription:
+      "This account doesn’t have access. Use an approved Google account or contact an administrator.",
+    registration: {
+      emailLabel: "Google email",
+      description:
+        "Add someone before they sign in. Their verified Google email activates this roster entry. No email is sent.",
+      pendingDescription:
+        "This preregistered user can activate their account with verified Google sign-in. Email is read-only.",
+    },
+  };
+}
+
+export async function startSignIn(
+  redirectTo: string,
+  optionId = "google",
+): Promise<string> {
+  if (optionId !== "google")
+    throw new HttpError(400, "Choose an available sign-in option.");
   const client = await sessionClient();
   const { data, error } = await client.auth.signInWithOAuth({
     provider: "google",
@@ -188,3 +213,22 @@ export async function deleteIdentity(personId: string): Promise<void> {
   const { error } = await db().auth.admin.deleteUser(subject);
   if (error && error.code !== "user_not_found") throw error;
 }
+
+export const supabaseIdentity: import("../../ports/identity").IdentityProvider =
+  {
+    signInPresentation,
+    verifyIdentity,
+    verifyReaderIdentity,
+    startSignIn,
+    exchangeSignInCode,
+    signOutIdentity,
+    refreshIdentitySession,
+    authorizationDetails,
+    decideAuthorization,
+    revokeAuthorization,
+    authorizationServer,
+    verifyMcpIdentity,
+    lockIdentity,
+    unlockIdentity,
+    deleteIdentity,
+  };

@@ -95,69 +95,130 @@ Deleted content and accounts have a 30-day recovery window, followed by hourly p
 
 ## DigitalOcean App Platform
 
-This recipe keeps Supabase's Auth, database API and Storage services while running them on DigitalOcean. It uses a Marketplace Supabase server, DO managed PostgreSQL and an App Platform gateway that exposes only the backend API. Fieldbook continues to use the Supabase provider implementation. It does not require a Supabase Cloud subscription.
+This candidate recipe runs Fieldbook and Supabase Auth, REST/PostgREST and Storage on App Platform, with **Managed PostgreSQL 17** and **private Spaces**. It needs no Supabase Cloud account, Droplet, Kong, Studio, Realtime or Edge Functions. The application, permission rules and released database schema are shared with Vercel. The DigitalOcean configuration is not yet supported for production; complete the acceptance checks below before relying on an installation.
 
-Choose resource sizes for your expected workload in DigitalOcean. Configure spend alerts before creating paid resources. Inference prepaid balances can stop inference when exhausted; other infrastructure continues accruing charges. Review credits, both prepaid balances and auto-reload settings. Spending controls and temporary deployment restrictions belong in your account and operating configuration.
+### Pinned components and compatibility
 
-### Prepare the backend
+Use this combination rather than independently choosing backend versions. The backend pins come from the [Supabase self-hosting configuration at `cb4307f`](https://github.com/supabase/supabase/tree/cb4307f15b99e02a8a56e103086d1eab72eb9e9a/docker). Image digests in the Dockerfiles and app spec prevent mutable tags from silently changing a deployment.
 
-1. Create an isolated installation using the [DO Supabase Marketplace image](https://docs.digitalocean.com/products/marketplace/catalog/supabase/). Follow its managed-database setup with PostgreSQL 17 or later. The `service_role` database role must have `BYPASSRLS`; keep this privileged role and its API key server-only.
-2. Keep the Supabase API reachable through the installation's private network. Restrict database trusted sources to the Supabase server. Keep Studio and infrastructure administration private.
-3. Wait for Auth and Storage to initialize. On the new, unused backend, run [.do/prepare-supabase-backend.sql](../.do/prepare-supabase-backend.sql) as the cluster administrator, then restart Auth and Storage. It configures their schema paths and Storage's standard role permissions. If the Marketplace bootstrap placed Auth's migration ledger in `public`, it preserves that history in `auth`. It refuses a backend with users or an installed Fieldbook schema. If Storage cannot verify the database certificate, mount the cluster's CA certificate into its container and set `NODE_EXTRA_CA_CERTS` to that path. Preserve certificate verification.
-4. For media stored in Spaces, configure Supabase Storage's [S3 backend](https://supabase.com/docs/guides/self-hosting/self-hosted-s3) with your private bucket, region endpoint and bucket-scoped credentials. The bucket stays private; Fieldbook uses the Storage API to issue upload and read permissions. This preserves its existing upload interface.
+| Component | Selected version | Verification scope |
+| --- | --- | --- |
+| Fieldbook runtime | Node 22.23.3, pnpm 10.17.1; locked Next.js 16.3.8 | Local application build and synthetic regression checks |
+| Supabase Auth | `supabase/gotrue:v2.196.0` | 70 upstream SQL migrations checked under the Auth role locally; container/hosted lifecycle pending |
+| PostgREST | `postgrest/postgrest:v14.17` | Configuration and image metadata inspected; managed database integration pending |
+| Supabase Storage | `supabase/storage-api:v1.74.0` | 69 upstream SQL migrations checked under the Storage role locally; TLS/upload source inspected; Spaces transfers pending |
+| Managed database | PostgreSQL 17, provider-maintained minor version | Bootstrap and migration SQL checked locally with PGlite 0.5.8 / PostgreSQL 18.3 substitutes; actual PG17 integration pending |
+| Optional inference | DO custom `router:<name>` target | Adapter and interface tests; real inference/routing pending. Provider service is public preview. |
 
-The Marketplace image includes `utils/add-new-auth-keys.sh`. Run it in the backend's Docker directory with `--update-env`, using Node.js 22, to generate asymmetric signing and verification keys. Its output contains secrets; save it privately. Copy [.do/supabase-fieldbook.compose.yaml](../.do/supabase-fieldbook.compose.yaml) into that directory as `docker-compose.fieldbook.yml`. This override propagates the keys, trusted database certificate, Google configuration, MCP settings and Spaces credentials to the appropriate services.
+The SQL harness does not run the actual backend containers. Hosted acceptance must cover this pinned set, existing-data updates and restarts before its support status changes. Vercel with hosted Supabase remains the supported recipe. Arbitrary backend combinations, PostgreSQL major versions, automatic router pools and horizontally scaled Fieldbook instances are outside this baseline.
 
-Add these installation values to the backend's private `.env`: `FIELDBOOK_URL`, `FIELDBOOK_PUBLIC_SUPABASE_URL` (the app URL followed by `/backend`), `FIELDBOOK_SPACES_BUCKET`, `FIELDBOOK_SPACES_REGION`, `FIELDBOOK_SPACES_ACCESS_KEY` and `FIELDBOOK_SPACES_SECRET_KEY`. Store the cluster's CA at `volumes/certificates/digitalocean-ca.pem`. For Google, set `GOOGLE_ENABLED=true`, `GOOGLE_CLIENT_ID` and `GOOGLE_SECRET` after creating the client. Set `FIELDBOOK_MCP_ENABLED=true` when enabling MCP. Restart the services with the image's base, managed-database and Fieldbook overrides:
+### Prepare durable resources and keys
 
-```sh
-docker compose -f docker-compose.yml -f docker-compose.dbaas.yml -f docker-compose.fieldbook.yml up -d
-```
-
-### Configure App Platform
-
-Use [.do/app.yaml](../.do/app.yaml) as the app specification. Replace the repository, deployment branch, VPC, private backend address and credentials with your own settings. Select component sizes and instance counts before creating the app. Review automatic deployment settings for your chosen source connection.
-
-The app contains:
-
-- **Fieldbook:** the standalone Next.js application built by [Dockerfile](../Dockerfile).
-- **Backend gateway:** [Dockerfile.supabase-gateway](../Dockerfile.supabase-gateway) exposes Supabase API routes through App Platform's HTTPS address. `/backend` routes to this component; Studio is not exposed. Its `FIELDBOOK_SUPABASE_INTERNAL_URL` points to the private Supabase API.
-- **Cleanup:** a scheduled job built by [Dockerfile.cleanup](../Dockerfile.cleanup) that posts to the installed cleanup endpoint hourly. See the database setup below for its credential.
-
-Configure the same installation variables as the Vercel recipe, using `FIELDBOOK_HOST=node`. With the example gateway, `NEXT_PUBLIC_SUPABASE_URL` is `https://YOUR-APP-HOST/backend` and `FIELDBOOK_URL` is `https://YOUR-APP-HOST`. App Platform's `${APP_URL}` binding can supply these values. Supply public Supabase values during both build and runtime; Next.js embeds public environment values at build time. Server-only keys must be secret environment variables.
-
-For the Marketplace Kong configuration, use its `.env` `ANON_KEY` as Fieldbook's public Supabase key and `SERVICE_ROLE_KEY` as its server key. Keep the server key private. The gateway restores `/backend` in resumable upload redirects as well as routing ordinary API requests. Verify a transfer larger than 6 MiB before relying on video uploads.
-
-Keep the app connected to the backend VPC. Use a custom hostname and disable App Platform edge caching so authenticated responses and streamed AI/MCP responses pass through correctly. Add the hostname's CNAME at your existing DNS provider using the target returned by DO; domain registration and nameservers can stay with their current provider. DO requires a custom hostname for this caching setting. For a preview, set `FIELDBOOK_ENVIRONMENT=preview` and `FIELDBOOK_PREVIEW_SUPABASE_URL` to the exact isolated HTTPS backend URL. Hosted Supabase previews can continue using `FIELDBOOK_PREVIEW_SUPABASE_REF`.
-
-### Install the application schema
-
-The self-hosted installer uses the released migrations and delegates HTTP cleanup scheduling to the host. It leaves the released baseline file unchanged. It requires Supabase's initialized Auth and Storage schemas and refuses an existing configured installation, records or unrelated application tables.
-
-From the matching source checkout, install locked dependencies, then set `FIELDBOOK_SETUP_DATABASE_URL`, `FIELDBOOK_SETUP_DATABASE_CA` (the cluster CA certificate path) and `FIELDBOOK_URL` in a private environment file. Run from a location authorized by the database's trusted sources:
+1. Create a dedicated Managed PostgreSQL **17** cluster/database and a private Spaces bucket in suitable regions. Use the database's certificate-matching DNS hostname and download its CA certificate. Restrict trusted sources to the App Platform VPC and the temporary operator connection used for setup. Use direct database connections, not a transaction pooler.
+2. Create Spaces credentials scoped to that bucket with read, write and delete access. Keep the bucket private; do not enable public ACLs or a public CDN. Fieldbook issues short-lived access through the Storage service.
+3. From the source checkout, run `pnpm install --frozen-lockfile`. Generate durable keys into an existing private directory outside the repository:
 
 ```sh
-node --env-file=.env.local scripts/setup-self-hosted.mjs
+node scripts/generate-self-hosted-keys.mjs --output /private/path/fieldbook-keys.env
 ```
 
-Confirm the displayed target by typing `SETUP`. The installer applies the schema and records migration versions in one transaction. It does not reset a data-bearing database. The original `setup-database.mjs` command remains the hosted Supabase setup path.
+The command creates an owner-readable file and refuses to overwrite it. It creates an ES256 signing key, legacy Storage signing secret, JWT API keys, and three independent service database passwords. Keep the original file in your secret manager and backup set. Reuse it after restarts, source updates and redeployments. The API keys expire after five years; plan their rotation before expiry. `JWT_KEYS`, `JWT_JWKS` (which includes a symmetric verification secret), `JWT_SECRET`, service key and database passwords are all server-only. This recipe uses JWT `ANON_KEY` / `SERVICE_ROLE_KEY`; opaque `sb_publishable_` / `sb_secret_` keys require an API gateway and are not used here.
 
-Read the new backend's `fb_cleanup_config.secret` through an authorized database connection and store it as the cleanup job's server-only `FIELDBOOK_CLEANUP_SECRET`. Never put it in public source. Configure the hourly job and verify a successful run; this backend does not use `pg_net` to schedule HTTP cleanup.
+4. In another private environment file, set `FIELDBOOK_SETUP_DATABASE_URL` to the administrator connection and `FIELDBOOK_SETUP_DATABASE_CA` to the downloaded certificate path. Run:
 
-### Configure sign-in, MCP and inference
+```sh
+node --env-file=/private/path/database.env --env-file=/private/path/fieldbook-keys.env scripts/prepare-digitalocean.mjs
+```
 
-Configure Google in self-hosted Supabase Auth using its version-matched environment settings. The Google redirect URI is the public backend callback, for example `https://YOUR-APP-HOST/backend/auth/v1/callback`. Auth's Site URL is `FIELDBOOK_URL`; allow `FIELDBOOK_URL/auth/callback` as its application redirect. Sign in as `FIELDBOOK_OWNER_EMAIL` to create the first administrator.
+Confirm the displayed hostname/database by typing `PREPARE`. The command runs [.do/prepare-supabase-backend.sql](../.do/prepare-supabase-backend.sql) transactionally. It refuses existing Auth/Storage schemas, service roles or application tables, creates the minimal roles/schemas/helpers, and sets independent passwords. It is only for a fresh dedicated backend, never an upgrade command. Auth and Storage subsequently create their own tables and migration ledgers. Keep the administrator credential out of running services.
 
-For MCP, enable Supabase's OAuth server and client-registration support, set its authorization path to `/oauth/consent`, configure asymmetric signing keys and enable Fieldbook's `fb_access_token_hook` as the custom access-token hook. The OAuth issuer must match the public backend's `/auth/v1` address. With the Marketplace Kong gateway, add the definitions in [.do/supabase-oauth-routes.yaml](../.do/supabase-oauth-routes.yaml) under its existing `services` list and restart Kong. These endpoints rely on Supabase Auth's client and session authentication. Keep the other API and administration routes protected. The App Platform gateway also serves the standard discovery path for the `/backend/auth/v1` issuer. Verify discovery, authorization, refresh, revocation and Fieldbook's connection permissions with the clients you intend to use.
+### Configure App Platform and Google
 
-For DO inference, configure:
+Copy [.do/app.yaml](../.do/app.yaml) into a private operator workspace. Replace every `YOUR_` value, including source repository/branch, VPC, attached managed cluster, database DNS and credentials, Spaces, owner email, Google client, and domain. Never commit the populated spec. Select service sizes for your workload; the example fixes one instance per service and does not provision an autoscaling topology. App Platform's public `git` source does not automatically follow each push; choose deployment triggers deliberately. Auth, REST and Storage each have a configured pool limit of five; account for additional service connections, operator access and old/new instances overlapping during redeployment when choosing database capacity. Do not leave Auth's pool unlimited or assume three configured limits describe every connection.
+
+The app spec runs:
+
+- **Fieldbook:** the existing standalone Next.js build, with the same application environment as Vercel and `FIELDBOOK_HOST=node`.
+- **Auth:** the pinned upstream image plus a small startup wrapper that writes the database CA from its environment to a private temporary file before starting Auth.
+- **REST:** the pinned PostgREST image plus the same CA wrapper and a pinned static BusyBox shell. Its readiness port is internal only.
+- **Storage:** the pinned upstream image, database CA PEM, private Spaces credentials and persistent PostgreSQL/S3 state. No file bytes depend on the container's local disk.
+- **Cleanup:** the hourly App Platform job. Omit this job from the initial deployment until its credential exists, then add it after database setup below.
+
+Map generated keys as follows:
+
+| Generated value | Component environment |
+| --- | --- |
+| `ANON_KEY` | Fieldbook `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; Storage `ANON_KEY` |
+| `SERVICE_ROLE_KEY` | Fieldbook `SUPABASE_SECRET_KEY`; Storage `SERVICE_KEY` |
+| `JWT_SECRET` | Auth `GOTRUE_JWT_SECRET`; Storage `AUTH_JWT_SECRET` |
+| `JWT_KEYS` | Auth `GOTRUE_JWT_KEYS` |
+| `JWT_JWKS` | REST `PGRST_JWT_SECRET`; Storage `JWT_JWKS` |
+| Three database passwords | Matching `supabase_auth_admin`, `authenticator`, `supabase_storage_admin` connection URLs |
+
+Use runtime-only secret variables for server secrets. Supply the two public Supabase variables at build and runtime because Next.js embeds public variables in browser assets. Generated hex database passwords are URL-safe. Auth and REST use `sslmode=verify-full` and the materialized CA file. Storage accepts the CA PEM via `DATABASE_SSL_ROOT_CERT`; **use a DNS hostname, not an IP address** (the upstream Storage version weakens identity verification for IP connections). Do not disable certificate verification or add an insecure URL SSL override.
+
+Use a custom HTTPS hostname and disable App Platform edge caching. Add its CNAME at the existing DNS provider using DO's assigned target; domain registration and nameservers need not change. `${APP_URL}` must resolve to the canonical hostname. `FIELDBOOK_URL` is that origin; `NEXT_PUBLIC_SUPABASE_URL` is that origin followed by `/backend`. For a separate preview, set `FIELDBOOK_ENVIRONMENT=preview` and `FIELDBOOK_PREVIEW_SUPABASE_URL` to the exact isolated backend URL. Hosted Supabase previews retain their reference-based configuration.
+
+Ingress strips `/backend/auth/v1`, `/backend/rest/v1` and `/backend/storage/v1` before forwarding to the respective service. It separately rewrites the RFC 8414 discovery path `/.well-known/oauth-authorization-server/backend/auth/v1` to Auth's metadata route. The `/upload/resumable` alias preserves Storage's returned TUS `Location` path for subsequent PATCH, HEAD and DELETE requests. `STORAGE_PUBLIC_URL` fixes the public origin; forwarded-prefix interpretation stays off. No custom gateway or header rewriting is needed. Signed uploads and Supabase's JWT/SQL permissions remain mandatory at the services; an `apikey` header alone is not authorization.
+
+Configure the Google OAuth Web client with the Fieldbook origin and this redirect URI:
+
+```text
+https://YOUR-APP-HOST/backend/auth/v1/callback
+```
+
+Auth's `API_EXTERNAL_URL` and JWT issuer include `/backend/auth/v1`, following current upstream guidance. Its Site URL is the Fieldbook origin and its allowlist is exactly `FIELDBOOK_URL/auth/callback`. Email/password, phone and anonymous Auth signups stay disabled. Keep `GOTRUE_DISABLE_SIGNUP=true` until Fieldbook setup completes, so an early Google login cannot populate the fresh backend. Then allow Google registration; Fieldbook's existing Access settings govern admission and roles. `FIELDBOOK_IDENTITY_PROVIDER` defaults to `supabase` for both recipes.
+
+Deploy the services with the access-token hook and OAuth server initially disabled. Wait for Auth `/health`, Storage `/status`, and internal PostgREST port 3001 `/ready` to pass. They indicate process/dependency readiness, not successful user flows. Confirm `auth.users`, `auth.schema_migrations`, `storage.buckets`, `storage.objects` and `storage.migrations` exist before continuing.
+
+### Install Fieldbook and enable cleanup
+
+Add the canonical HTTPS `FIELDBOOK_URL` to the private setup environment, then run:
+
+```sh
+node --env-file=/private/path/database.env scripts/setup-self-hosted.mjs
+```
+
+Confirm the target with `SETUP`. The command applies the immutable released baseline and subsequent migrations, recording versions in `supabase_migrations.schema_migrations` in one transaction. The only baseline adaptation removes the hosted `pg_cron`/`pg_net` HTTP schedule; shared application SQL stays the same. It refuses an installation with accounts, content or files. The original `setup-database.mjs` remains the hosted Supabase setup path.
+
+After setup, set Auth's `GOTRUE_DISABLE_SIGNUP=false` and enable `GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED=true` using the already configured `pg-functions://postgres/public/fb_access_token_hook` URI. Read `fb_cleanup_config.secret` through the authorized private administrator connection; set it as the cleanup job's runtime-only `FIELDBOOK_CLEANUP_SECRET`, then add the job and redeploy. Keep the endpoint and secret across future upgrades. Verify an accepted job invocation and an actual scheduled run. The app's **Recently deleted** warning also reports cleanup health.
+
+Sign in as `FIELDBOOK_OWNER_EMAIL` to create the first administrator, then configure Access. Enabling Google or obtaining a human session does not authorize MCP.
+
+### Optional MCP
+
+Enable Auth's `GOTRUE_OAUTH_SERVER_ENABLED` and `GOTRUE_OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION`, keeping `/oauth/consent` as its authorization path and the custom access-token hook enabled. Fieldbook's MCP settings independently enable the feature and the user separately approves connection capabilities. Keep the original asymmetric key set so access tokens remain verifiable after a restart. Revocation and current Fieldbook roles/grants are checked per request; browser sign-out only ends its local session.
+
+Use `https://YOUR-APP-HOST/api/mcp`. The endpoint uses the repository's pinned MCP SDK and Streamable HTTP contract in [mcp-contract.json](mcp-contract.json). Test the protocol versions and OAuth behavior of the actual intended clients, including ChatGPT, against this deployment. Verify resource discovery, issuer metadata, PKCE/consent, authenticated requests, refresh, revocation and denied capabilities. Do not infer client compatibility from reachable discovery or a successful human sign-in.
+
+### Optional DigitalOcean Inference Router
+
+[Inference Router](https://docs.digitalocean.com/products/inference/how-to/use-inference-router/) is in **public preview**. The current control panel no longer creates or edits custom routers; operators manage them through DigitalOcean's `/v2/gen-ai/models/routers` API. Configure a custom router with explicit model pools, priorities and fallback order there. Fieldbook only discovers and uses it; it does not administer the router.
+
+Set these runtime variables on Fieldbook:
 
 ```text
 FIELDBOOK_AI_ROUTER=digitalocean
-DIGITALOCEAN_MODEL_ACCESS_KEY=YOUR_SERVER_ONLY_MODEL_ACCESS_KEY
-DIGITALOCEAN_AI_MODELS=YOUR_TOOL_CAPABLE_TEXT_MODEL_IDS
+DIGITALOCEAN_INFERENCE_ROUTER=router:fieldbook
+DIGITALOCEAN_VERIFIED_MODELS=YOUR_TESTED_MODEL_ID,YOUR_TESTED_FALLBACK_ID
+DIGITALOCEAN_MODEL_ACCESS_KEY=YOUR_ROUTER_SCOPED_MODEL_ACCESS_KEY
+DIGITALOCEAN_ROUTER_READ_TOKEN=YOUR_SEPARATE_GENAI_READ_TOKEN
 ```
 
-Use a model access key with appropriate model permissions. Foundation-model and inference-router permissions are separate; review both when creating the key. Declare compatible text model IDs separated by commas; Fieldbook verifies their presence in the inference catalog. The catalog does not expose tool capabilities, pricing or privacy assurances, so review them in DigitalOcean. In Ask AI settings, select the DO model and set fallback to None. Router choice is independent of hosting; Vercel AI Gateway remains available through `FIELDBOOK_AI_ROUTER=vercel`.
+Create a [model access key](https://docs.digitalocean.com/products/inference/how-to/manage-model-access-keys/) scoped to the selected router. Create a separate custom DigitalOcean API token with **`genai:read`** for router/model discovery. DO also adds its required read-only dependencies (`regions:read`, `sizes:read`, `actions:read`); grant no write scopes. Store both as server-only secrets. Never put a deployment token or router-write token in Fieldbook. Keep operator router-administration credentials outside the application.
 
-Before admitting users, verify real sign-in, publishing, learner progress, private uploads and reads, a source-cited AI answer if enabled, MCP permissions if enabled, and an accepted cleanup run. See [upgrading](upgrading.md) for existing installations. Application deployment does not apply database changes.
+Fieldbook lists custom routers through the router API, reads the explicitly configured target's detail, and checks every pool and fallback model against the separate model catalog. Every policy must declare its model IDs, and at least one fallback model must be explicit. All must advertise serverless text generation and `tool_calling`. The catalog does not establish streaming or forced tool-selection compatibility; some models require a different API or reject `tool_choice`. Search planning requires a forced `searchPublishedContent` tool call with valid queries through Chat Completions; answer generation requires streamed Chat Completions. Test both for every exact model in the pools and fallbacks, then list only those tested model IDs in `DIGITALOCEAN_VERIFIED_MODELS`. The setting is an operator attestation, not an automated probe. Missing catalog requirements or an unattested model prevents enabling/using the target. Custom target names must fit `router:` plus 1–153 lowercase letters, digits or hyphens.
+
+This baseline excludes implicit preset pools, dedicated endpoints and the automatic `inference-router` target because their complete eligible pools cannot be validated against these requirements. This is a compatibility boundary, not a claim that DO cannot route to them. Use a disposable single-model router configuration to isolate each model during compatibility checks, then restore and validate the intended full router policy before enabling Ask AI. Metadata validation does not prove that these tests ran or that routing/failover occurred.
+
+In Admin → Ask AI, select the configured router. Pools and fallback policy are managed in DO, so Fieldbook does not offer its own fallback picker for this integration. Aggregate price, retention and training assurances are unknown; review every eligible model's current terms and rates in DO. Leave Ask AI off until real source-cited inference is checked. Vercel AI Gateway remains the default when `FIELDBOOK_AI_ROUTER` is omitted and retains its model/fallback experience.
+
+### Acceptance and operating boundaries
+
+Before relying on the DO installation, exercise real Google login and accounts (including preregistered, inactive and denied accounts), publication, saved progress, private signed reads, ordinary uploads and resumable uploads larger than 6 MiB. Verify unauthenticated access to private bytes is denied. Test optional AI/MCP as described above and scheduled deletion cleanup with disposable records. Never use existing production records as test fixtures without their operator's approval.
+
+Restart Auth, REST, Storage and Fieldbook, then redeploy the same source/configuration and confirm saved accounts, content, progress, MCP refresh and private files remain usable. Resume a partially completed upload after Storage restarts. Apply a pending Fieldbook migration to a data-bearing test installation when a release has one; a fresh install alone proves no upgrade path. These checks can use a temporary restore or an existing authorized non-production installation; a permanent additional environment is not required.
+
+For router validation, use synthetic prompts and inspect DO's response model and `x-model-router-selected-route` where available. Record what route was observed. Test fallback only through a controlled operator-owned test router/pool using DO-supported failure conditions; do not disable shared models or change production pools. Successful configuration or one successful answer does not establish failover. Disable Ask AI while changing eligible pools, recheck capabilities and actual tool/streaming behavior, update the verified-model attestation if needed, then re-enable.
+
+The recipe deliberately departs from the [DO template](https://github.com/AppPlatform-Templates/supabase-appplatform) in component pins, least-privilege service roles, verified TLS, durable asymmetric keys, omitted unused services, Fieldbook's hook/cleanup, and the discovery/TUS ingress aliases. Keep those adjustments small and review them with upstream changes. See [upgrading and operations](upgrading.md) for independent application, database and backend updates, health checks, backups and recovery.

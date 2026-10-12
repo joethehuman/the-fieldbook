@@ -24,7 +24,6 @@ const sourceChoices = [
   { value: "brief", label: "Updates" },
   { value: "course", label: "Courses and lessons" },
 ] as const;
-const primaryRequired = "Choose a primary model to enable AI.";
 const demoSetup: AiSetup = {
   router: { id: "demo", name: "Demo", supportsFallback: true },
   selectionRouter: "demo",
@@ -34,7 +33,8 @@ const demoSetup: AiSetup = {
   retrieval: { ready: false, message: "Browser-local sample data only." },
   models: ["primary", "backup"].map((name) => ({
     id: `demo/${name}`,
-    name: name === "primary" ? "Gavin’s XL MAXIMUS Demo" : "Example backup model",
+    name:
+      name === "primary" ? "Gavin’s XL MAXIMUS Demo" : "Example backup model",
     inputPerMillion: null,
     outputPerMillion: null,
     zeroRetention: "unknown",
@@ -107,6 +107,10 @@ export function AskAiSettingsPanel({
   }, [production, value.enabled]);
 
   const router = setup?.router;
+  const routerSelection = router?.routerSelection;
+  const primaryRequired = routerSelection
+    ? "Choose an inference router to enable AI."
+    : "Choose a primary model to enable AI.";
   const boundRouter = value.router ?? setup?.selectionRouter;
   const routerChanged = Boolean(
     value.model && router && boundRouter !== router.id,
@@ -122,7 +126,7 @@ export function AskAiSettingsPanel({
       (!router
         ? setup.connection.message
         : !setup.connection.configured
-          ? "The model router needs credentials. Complete the installation configuration to enable Ask AI."
+          ? setup.connection.message
           : !setup.catalog.ready
             ? setup.catalog.message
             : !setup.retrieval.ready
@@ -138,7 +142,13 @@ export function AskAiSettingsPanel({
     const supportsFallback = router?.supportsFallback;
     return (
       <FormField
-        label={backup ? "Fallback model" : "Primary model"}
+        label={
+          backup
+            ? "Fallback model"
+            : routerSelection
+              ? "Inference router"
+              : "Primary model"
+        }
         errorPlaceholder={production && !backup ? primaryRequired : undefined}
         error={!backup && !selected ? primaryRequired : undefined}
         description={
@@ -146,7 +156,9 @@ export function AskAiSettingsPanel({
             ? supportsFallback === false
               ? "This router does not support a fallback."
               : "Optional backup if the primary cannot respond."
-            : "Required. Your choice stays saved while AI is off."
+            : routerSelection
+              ? "The installation configuration controls which router is available."
+              : "Required. Your choice stays saved while AI is off."
         }
       >
         <SelectField
@@ -178,7 +190,13 @@ export function AskAiSettingsPanel({
             )
           }
         >
-          <option value="">{backup ? "None" : "Choose a primary model"}</option>
+          <option value="">
+            {backup
+              ? "None"
+              : routerSelection
+                ? "Choose an inference router"
+                : "Choose a primary model"}
+          </option>
           {selected && !entry && (
             <option value={selected}>{selected} — unavailable</option>
           )}
@@ -188,7 +206,11 @@ export function AskAiSettingsPanel({
                 !backup || (supportsFallback && entry.id !== value.model),
             )
             .map((entry) => (
-              <option key={entry.id} value={entry.id}>
+              <option
+                key={entry.id}
+                value={entry.id}
+                disabled={entry.validation?.ready === false}
+              >
                 {entry.name}
               </option>
             ))}
@@ -251,10 +273,16 @@ export function AskAiSettingsPanel({
                 </Badge>
               )}
             </div>
-            {problem && <Alert role="status" dismissible>{problem}</Alert>}
+            {problem && (
+              <Alert role="status" dismissible>
+                {problem}
+              </Alert>
+            )}
             {routerChanged && (
               <Alert dismissible>
-                The model router changed. Review the primary and fallback models before saving.
+                {routerSelection
+                  ? "The model router changed. Choose the configured inference router before saving."
+                  : "The model router changed. Review the primary and fallback models before saving."}
               </Alert>
             )}
           </FieldGroup>
@@ -264,32 +292,69 @@ export function AskAiSettingsPanel({
         <>
           <SettingsSection
             id="settings-ai-models"
-            title={<h3>Models</h3>}
-            description="Choose the primary model and an optional backup."
+            title={<h3>{routerSelection ? "Routing" : "Models"}</h3>}
+            description={
+              routerSelection?.description ??
+              "Choose the primary model and an optional backup."
+            }
             disabled={busy}
           >
             <FieldGroup>
-              <div data-slot="ai-model-fields" className="grid items-start gap-4 md:grid-cols-2">
+              <div
+                data-slot="ai-model-fields"
+                className={
+                  routerSelection
+                    ? "grid items-start gap-4"
+                    : "grid items-start gap-4 md:grid-cols-2"
+                }
+              >
                 {picker(false)}
-                {picker(true)}
+                {!routerSelection && picker(true)}
               </div>
+              {routerSelection && (
+                <>
+                  <FieldDescription>{routerSelection.details}</FieldDescription>
+                  {setup?.models.map(
+                    (entry) =>
+                      entry.validation && (
+                        <FieldDescription key={entry.id} role="status">
+                          {entry.validation.message}
+                        </FieldDescription>
+                      ),
+                  )}
+                  {value.fallbackModel && (
+                    <Alert dismissible>
+                      A previous fallback is still saved. Choose the inference
+                      router again to clear it before saving.
+                    </Alert>
+                  )}
+                </>
+              )}
               {!routerChanged &&
                 setup?.catalog.ready &&
                 value.model &&
                 !model && (
                   <Alert dismissible>
-                    The primary model is unavailable. Choose a replacement
-                    {fallback
-                      ? ". The fallback model can still answer questions."
-                      : " to enable Ask AI."}
+                    {routerSelection ? (
+                      "The saved inference router is unavailable. Choose the configured router to enable Ask AI."
+                    ) : (
+                      <>
+                        The primary model is unavailable. Choose a replacement
+                        {fallback
+                          ? ". The fallback model can still answer questions."
+                          : " to enable Ask AI."}
+                      </>
+                    )}
                   </Alert>
                 )}
-              {!routerChanged &&
+              {!routerSelection &&
+                !routerChanged &&
                 setup?.catalog.ready &&
                 value.fallbackModel &&
                 !fallback && (
                   <Alert dismissible>
-                    The fallback model is unavailable. Choose a replacement or select None.
+                    The fallback model is unavailable. Choose a replacement or
+                    select None.
                   </Alert>
                 )}
             </FieldGroup>

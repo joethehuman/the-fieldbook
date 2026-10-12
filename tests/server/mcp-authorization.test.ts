@@ -7,10 +7,7 @@ import {
 import { MCP_CAPABILITIES } from "../../lib/mcp-access";
 import { defaultSettings } from "../../lib/settings";
 import type { User } from "../../lib/types";
-import type {
-  AuthorizationDetails,
-  ProfileRecord,
-} from "../../server/ports/identity";
+import type { AuthorizationDetails } from "../../server/ports/identity";
 
 const subject = "11111111-1111-4111-8111-111111111111";
 const personId = "22222222-2222-4222-8222-222222222222";
@@ -23,7 +20,7 @@ const user: User = {
   registered: true,
   groups: [],
 };
-const record: ProfileRecord = { ...user, auth_user_id: subject };
+const record = { ...user, auth_user_id: subject };
 
 test("every MCP refresh applies account, consent and reporting changes immediately", async () => {
   const oldEnv = { ...process.env },

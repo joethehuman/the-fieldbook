@@ -1,5 +1,6 @@
 import "server-only";
 import { db, check } from "./client";
+import { fieldbookProfile } from "./profile";
 import type {
   ConnectionGrant,
   ProfileRecord,
@@ -19,7 +20,7 @@ export async function findProfileBySubject(
   if (activeOnly) query = query.eq("active", true).is("deleted_at", null);
   const { data, error } = await query.maybeSingle();
   check(error);
-  return data;
+  return data ? fieldbookProfile(data) : null;
 }
 
 export async function registerProfile(
@@ -33,7 +34,7 @@ export async function registerProfile(
   });
   if (error?.code === "P0001") return null;
   check(error);
-  return data;
+  return data ? fieldbookProfile(data) : null;
 }
 
 /** Inbound MCP credentials carry a provider subject; resolve it before checking person grants. */

@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS dependencies
+FROM node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS dependencies
 WORKDIR /app
 RUN npm install --global pnpm@10.17.1
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -17,7 +17,7 @@ ENV FIELDBOOK_APP_KIND=installed
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
-FROM node:22-bookworm-slim AS runner
+FROM node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

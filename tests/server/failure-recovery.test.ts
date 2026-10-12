@@ -1,3 +1,4 @@
+import { isAbsentSession } from "../../server/providers/supabase/auth-errors";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { check } from "../../server/db";
@@ -5,7 +6,6 @@ import {
   errorResponse,
   HttpError,
   ServiceError,
-  isAbsentSession,
 } from "../../server/errors";
 import { actor } from "../../server/auth";
 

@@ -28,6 +28,8 @@ function inspect(directory) {
     const name = relative(root, path).replaceAll("\\", "/");
     if (name.startsWith("server/providers/")) continue;
     const source = readFileSync(path, "utf8");
+    if (/\bauth_user_id\b/.test(source))
+      violations.push(`${name}: provider account mapping outside its adapter`);
     if (
       /["'](?:@supabase\/|@ai-sdk\/openai-compatible|@vercel\/(?:analytics|speed-insights))/.test(
         source,
@@ -42,7 +44,7 @@ function inspect(directory) {
     )
       violations.push(`${name}: AI Gateway SDK import`);
     if (
-      /\b(?:AI_GATEWAY_API_KEY|VERCEL_OIDC_TOKEN|DIGITALOCEAN_MODEL_ACCESS_KEY|DIGITALOCEAN_AI_MODELS)\b/.test(
+      /\b(?:AI_GATEWAY_API_KEY|VERCEL_OIDC_TOKEN|DIGITALOCEAN_MODEL_ACCESS_KEY|DIGITALOCEAN_AI_MODELS|DIGITALOCEAN_INFERENCE_ROUTER|DIGITALOCEAN_ROUTER_READ_TOKEN|DIGITALOCEAN_VERIFIED_MODELS)\b/.test(
         source,
       )
     )

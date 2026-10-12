@@ -9,10 +9,16 @@ import {
   lockIdentity,
   unlockIdentity,
   deleteIdentity,
+  identityProvider,
+  signInPresentation,
+  startSignIn,
+  findProfileBySubject,
+  registerProfile,
 } from "../../server/identity";
 import { POST as mcp } from "../../app/api/mcp/route";
 import { proxy } from "../../proxy";
 import { LEGACY_MCP_CAPABILITIES } from "../../lib/mcp-access";
+import { data as dataStore } from "../../server/data";
 import { defaultSettings } from "../../lib/settings";
 
 const subject = "11111111-1111-4111-8111-111111111111";
@@ -46,6 +52,7 @@ async function fixture(run: () => Promise<void>) {
   const originalEnvironment = { ...process.env };
   Object.assign(process.env, config);
   delete process.env.VERCEL_ENV;
+  delete process.env.FIELDBOOK_IDENTITY_PROVIDER;
   try {
     await run();
   } finally {
@@ -422,5 +429,112 @@ test("proxy refresh forwards the new session to rendering and the browser", asyn
       "/docs?topic=setup",
     );
     assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+  });
+});
+
+test("identity composition preserves Google presentation and rejects unimplemented providers and options", async () => {
+  await fixture(async () => {
+    const login = signInPresentation();
+    assert.deepEqual(login.options, [
+      { id: "google", label: "Continue with Google" },
+    ]);
+    assert.equal(login.signInLabel, "Sign in with Google");
+    assert.equal(login.registration.emailLabel, "Google email");
+    assert.match(login.registration.description, /verified Google email/);
+    assert.equal(
+      JSON.parse(JSON.stringify(login)).options[0].id,
+      "google",
+      "presentation contains only public serializable data",
+    );
+    await assert.rejects(
+      startSignIn("https://fieldbook.example/auth/callback", "unconfigured"),
+      /available sign-in option/,
+    );
+    process.env.FIELDBOOK_IDENTITY_PROVIDER = "supabase";
+    assert.equal(typeof identityProvider().refreshIdentitySession, "function");
+    process.env.FIELDBOOK_IDENTITY_PROVIDER = "unimplemented";
+    assert.throws(
+      identityProvider,
+      (error: ServiceError) =>
+        error.status === 503 && error.service === "configuration",
+    );
+  });
+});
+
+test("Supabase profile mapping hides external subjects in identity, roster and governance records", async () => {
+  await fixture(async () => {
+    const personId = "22222222-2222-4222-8222-222222222222";
+    let registered = true;
+    globalThis.fetch = async (input) => {
+      const url = location(input);
+      const raw = {
+        ...person,
+        id: personId,
+        auth_user_id: registered ? subject : null,
+      };
+      if (url.pathname.startsWith("/rest/v1/rpc/"))
+        return Response.json({
+          revision: 1,
+          users: [raw],
+          groups: [],
+          teams: [],
+          progress: [],
+          pending: [],
+        });
+      assert.equal(url.pathname, "/rest/v1/fb_profiles");
+      if (url.searchParams.has("auth_user_id")) return Response.json(raw);
+      return Response.json([raw], { headers: { "Content-Range": "0-0/1" } });
+    };
+    const check = (
+      record: Awaited<ReturnType<typeof findProfileBySubject>>,
+    ) => {
+      assert.ok(record);
+      assert.equal(record.id, personId);
+      assert.equal(record.registered, registered);
+      assert.equal("auth_user_id" in record, false);
+    };
+    for (registered of [true, false]) {
+      check(await findProfileBySubject(subject));
+      check((await dataStore().listProfiles())[0]);
+      check((await dataStore().readGovernanceSnapshot(personId)).users[0]);
+      check((await dataStore().readAdminPeopleSnapshot(personId)).users[0]);
+    }
+  });
+});
+
+test("registration delegates account linking to the existing transaction and retains the stable person ID", async () => {
+  await fixture(async () => {
+    const personId = "22222222-2222-4222-8222-222222222222";
+    let denied = false;
+    globalThis.fetch = async (input, init) => {
+      assert.equal(
+        location(input).pathname,
+        "/rest/v1/rpc/fb_register_profile",
+      );
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        p_id: subject,
+        p_email: person.email,
+        p_name: person.name,
+        p_owner: false,
+      });
+      return denied
+        ? Response.json(
+            { code: "P0001", message: "Account is pending deletion" },
+            { status: 400 },
+          )
+        : Response.json({ ...person, id: personId });
+    };
+    const registration = {
+      subject,
+      email: person.email,
+      name: person.name,
+      owner: false,
+    };
+    const linked = await registerProfile(registration);
+    assert.equal(linked?.id, personId);
+    assert.equal(linked?.registered, true);
+    assert.equal("auth_user_id" in linked!, false);
+    denied = true;
+    assert.equal(await registerProfile(registration), null);
   });
 });

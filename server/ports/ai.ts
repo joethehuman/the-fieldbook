@@ -4,7 +4,9 @@ import type { AiConnection, AiMessage, AiModel, AiSource } from "@/lib/ai";
 export interface AiProvider {
   readonly id: string;
   readonly name: string;
+  /** Whether Fieldbook may select a separate fallback alongside the target. */
   readonly supportsFallback: boolean;
+  readonly routerSelection?: { description: string; details: string };
   connection(): AiConnection;
   models(signal: AbortSignal): Promise<AiModel[]>;
   validateModel(model: string, signal: AbortSignal): Promise<void>;

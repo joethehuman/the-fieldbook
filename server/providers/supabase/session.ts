@@ -2,7 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "../../env";
-import { isAbsentSession } from "../../errors";
+import { isAbsentSession } from "./auth-errors";
 
 /** Refresh only; Fieldbook's actor services separately verify identity and permissions. */
 export async function refreshIdentitySession(

@@ -53,7 +53,7 @@ function provider(
         users: [
           {
             ...admin,
-            auth_user_id: "subject",
+            registered: true,
             role: options.revoked ? "learner" : "admin",
           },
         ],

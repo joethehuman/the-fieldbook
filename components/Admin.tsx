@@ -1,4 +1,5 @@
 "use client";
+import { useIdentityPresentation } from "./IdentityPresentation";
 import { compareOptionalDates, sortLabels } from "@/lib/collection-sort";
 import { SortPicker } from "./patterns/sort-picker";
 import { useOrganizationChangeReview } from "./OrganizationChangeReview";
@@ -261,7 +262,7 @@ const adminSections = [
       {
         id: "settings-ai",
         name: "Ask AI",
-        description: "Choose primary and fallback models, published sources and answer guidance.",
+        description: "Configure Ask AI, published sources and answer guidance.",
         icon: Settings,
       },
       {
@@ -409,6 +410,7 @@ export default function Admin({
   onReviewDeadlines,
   onLoadPublished,
 }: Props) {
+  const login = useIdentityPresentation();
   const notify = useToast();
   const { confirm } = useInteractionDialog();
   const organizationReview = useOrganizationChangeReview();
@@ -2054,7 +2056,7 @@ export default function Admin({
               <DialogDescription>
                 {production
                   ? person.registered === false
-                    ? "This preregistered user can activate their account with verified Google sign-in. Email is read-only."
+                    ? login.registration.pendingDescription
                     : "Changes apply to this verified account. Login email is read-only."
                   : "Use fictional details. This does not create a secure account."}
               </DialogDescription>

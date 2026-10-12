@@ -1,5 +1,0 @@
-FROM nginx:1.28-alpine
-# Substitute only the configured upstream; retain nginx's request variables.
-ENV NGINX_ENVSUBST_FILTER=^FIELDBOOK_SUPABASE_INTERNAL_URL$
-COPY .do/supabase-gateway.conf.template /etc/nginx/templates/default.conf.template
-EXPOSE 8080

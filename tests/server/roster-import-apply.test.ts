@@ -38,8 +38,20 @@ async function database() {
   const store = {
     readConfiguration: () =>
       value(pg, "select to_jsonb(c) value from fb_config c where id"),
-    readAdminPeopleSnapshot: (actor: string) =>
-      value(pg, "select fb_admin_people_snapshot($1) value", [actor]),
+    readAdminPeopleSnapshot: async (actor: string) => {
+      const snapshot = await value(
+        pg,
+        "select fb_admin_people_snapshot($1) value",
+        [actor],
+      );
+      return {
+        ...snapshot,
+        users: snapshot.users.map((row: Record<string, unknown>) => ({
+          ...row,
+          registered: Boolean(row.auth_user_id),
+        })),
+      };
+    },
     listDeletedRosterProfiles: async () =>
       (
         await pg.query<{
@@ -62,6 +74,7 @@ async function database() {
         )
       ).rows.map((row) => ({
         ...row,
+        registered: Boolean(row.auth_user_id),
         hire_date:
           row.hire_date instanceof Date
             ? row.hire_date.toISOString().slice(0, 10)
@@ -743,7 +756,7 @@ test("CSV recovery handles pending users and unlock failures with no partial imp
     assert.equal(restored.added_at, pending.added_at);
     assert.equal(restored.active, true);
     assert.equal(restored.role, "learner");
-    assert.equal(restored.auth_user_id, null);
+    assert.equal(restored.registered, false);
   } finally {
     await pg.close();
   }

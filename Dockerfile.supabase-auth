@@ -1,0 +1,5 @@
+# Pins follow the backend compatibility table in docs/installation.md.
+FROM supabase/gotrue:v2.196.0@sha256:c0c25187a6b835e65a6f6e6c6b39d090e832d40e6de5186f2c038e0411944232
+COPY .do/with-database-ca.sh /fieldbook/with-database-ca.sh
+ENTRYPOINT ["/bin/sh", "/fieldbook/with-database-ca.sh"]
+CMD ["auth"]

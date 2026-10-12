@@ -146,7 +146,7 @@ async function prepare(
     unlockIds: recoveryProfiles
       .filter(
         (p) =>
-          p.auth_user_id &&
+          p.registered &&
           prepared.proposal?.users.some(
             (user) => user.id === p.id && user.active,
           ),

@@ -8,6 +8,7 @@ import { requestMatchesOrigin } from "@server/deployment";
 import { errorResponse } from "@server/errors";
 export async function GET(req: Request) {
   const requestUrl = new URL(req.url);
+  const option = requestUrl.searchParams.get("option") ?? undefined;
   const cookieStore = await cookies();
   const next = safeNext(
     requestUrl.searchParams.get("next") ??
@@ -19,12 +20,14 @@ export async function GET(req: Request) {
     origin = installation().origin;
     // PKCE cookies must be set on the same host that receives the callback.
     if (!requestMatchesOrigin(req, origin)) {
-      return Response.redirect(
-        `${origin}/auth/login?next=${encodeURIComponent(next)}`,
-      );
+      const canonical = new URL("/auth/login", origin);
+      canonical.searchParams.set("next", next);
+      if (option !== undefined) canonical.searchParams.set("option", option);
+      return Response.redirect(canonical);
     }
     const destination = await startSignIn(
       `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      option,
     );
     return Response.redirect(destination);
   } catch (e) {

@@ -3,124 +3,133 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
 import pg from "pg";
-import { setupGuardSql } from "./setup-database.mjs";
-import { selfHostedMigration } from "./providers/supabase/self-hosted.mjs";
+import {
+  selfHostedConnectionOptions,
+  SelfHostedSetupError,
+} from "./providers/supabase/self-hosted.mjs";
+import { runSelfHostedMigrations } from "./providers/supabase/migrations.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 async function main() {
-  const connectionString = process.env.FIELDBOOK_SETUP_DATABASE_URL;
-  const origin = new URL(process.env.FIELDBOOK_URL || "");
-  if (
-    !connectionString ||
-    origin.protocol !== "https:" ||
-    origin.pathname !== "/" ||
-    origin.search ||
-    origin.hash ||
-    origin.username ||
-    origin.password
-  )
-    throw new Error(
-      "Set FIELDBOOK_SETUP_DATABASE_URL and the canonical HTTPS FIELDBOOK_URL.",
-    );
-  const database = new URL(connectionString);
-  if (!["postgres:", "postgresql:"].includes(database.protocol))
-    throw new Error(
-      "Use a PostgreSQL connection URL for the empty self-hosted backend.",
-    );
-  const caFile = process.env.FIELDBOOK_SETUP_DATABASE_CA;
-  database.searchParams.delete("sslmode");
-  const client = new pg.Client({
-    connectionString: database.toString(),
-    ssl: {
-      rejectUnauthorized: true,
-      ...(caFile ? { ca: readFileSync(caFile, "utf8") } : {}),
-    },
-  });
-  const files = readdirSync(resolve(root, "supabase/migrations"))
-    .filter((name) => /^\d+_.+\.sql$/.test(name))
-    .sort();
-  const versions = files.map((name) => name.split("_")[0]);
-  const prompt = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  try {
+  const args = process.argv.slice(2);
+  if (args.includes("--help")) {
+    console.log("node scripts/setup-self-hosted.mjs [--upgrade] [--dry-run]");
     console.log(
-      `Target: ${database.hostname}:${database.port || "5432"}${database.pathname} → ${origin.origin}`,
+      "Default: fresh setup only. --upgrade: apply pending migrations to existing data.",
     );
+    console.log(
+      "--dry-run: read-only history and compatibility checks; lists pending files without executing them.",
+    );
+    console.log(
+      "Set FIELDBOOK_SETUP_DATABASE_URL and FIELDBOOK_SETUP_DATABASE_CA (PEM path). Fresh setup also requires FIELDBOOK_URL.",
+    );
+    return;
+  }
+  if (args.some((arg) => !["--upgrade", "--dry-run"].includes(arg))) {
+    throw new SelfHostedSetupError(
+      "Unknown option. Use --help for the supported commands.",
+    );
+  }
+  const upgrade = args.includes("--upgrade");
+  const dryRun = args.includes("--dry-run");
+  let origin;
+  if (!upgrade) {
+    let url;
+    try {
+      url = new URL(process.env.FIELDBOOK_URL || "");
+    } catch {}
     if (
-      (
-        await prompt.question(
-          "Set up this empty self-hosted backend with external cleanup scheduling? Type SETUP: ",
-        )
-      ).trim() !== "SETUP"
-    )
-      throw new Error("Setup cancelled.");
-  } finally {
-    prompt.close();
+      !url ||
+      url.protocol !== "https:" ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash ||
+      url.username ||
+      url.password
+    ) {
+      throw new SelfHostedSetupError(
+        "Set FIELDBOOK_URL to the canonical HTTPS Fieldbook origin, without a path.",
+      );
+    }
+    origin = url.origin;
+  }
+  const caFile = process.env.FIELDBOOK_SETUP_DATABASE_CA;
+  const options = selfHostedConnectionOptions(
+    process.env.FIELDBOOK_SETUP_DATABASE_URL,
+    caFile ? readFileSync(caFile, "utf8") : undefined,
+  );
+  const database = new URL(options.connectionString);
+  const client = new pg.Client(options);
+  const migrations = readdirSync(resolve(root, "supabase/migrations"))
+    .filter((name) => name.endsWith(".sql"))
+    .sort()
+    .map((filename) => ({
+      filename,
+      source: readFileSync(
+        resolve(root, "supabase/migrations", filename),
+        "utf8",
+      ),
+    }));
+  console.log(
+    `Target: ${database.hostname}:${database.port || "5432"}${database.pathname}${origin ? ` → ${origin}` : ""}`,
+  );
+  if (!dryRun) {
+    const prompt = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    try {
+      const confirmation = upgrade ? "UPGRADE" : "SETUP";
+      const answer = await prompt.question(
+        upgrade
+          ? "Apply pending Fieldbook migrations to this installation? Type UPGRADE: "
+          : "Set up this empty backend with external cleanup scheduling? Type SETUP: ",
+      );
+      if (answer.trim() !== confirmation)
+        throw new SelfHostedSetupError("Database operation cancelled.");
+    } finally {
+      prompt.close();
+    }
   }
   await client.connect();
   try {
-    await client.query("BEGIN");
-    await client.query("SELECT pg_advisory_xact_lock(686271842)");
-    await client.query(setupGuardSql(versions));
-    const {
-      rows: [ready],
-    } = await client.query(
-      "SELECT to_regclass('auth.users') IS NOT NULL AND to_regclass('storage.buckets') IS NOT NULL AS ready",
-    );
-    if (!ready.ready)
-      throw new Error(
-        "Finish configuring Supabase Auth and Storage before database setup.",
-      );
-    const {
-      rows: [installed],
-    } = await client.query(
-      "SELECT to_regclass('public.fb_config') IS NOT NULL AS installed",
-    );
-    if (!installed.installed) {
-      await client.query(
-        "CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions",
-      );
-      await client.query(
-        "CREATE SCHEMA IF NOT EXISTS supabase_migrations; CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations(version text PRIMARY KEY, statements text[], name text)",
-      );
-      for (const filename of files) {
-        await client.query(
-          selfHostedMigration(
-            readFileSync(
-              resolve(root, "supabase/migrations", filename),
-              "utf8",
-            ),
-            filename,
-          ),
-        );
-        await client.query(
-          "INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES($1,$2)",
-          [filename.split("_")[0], filename.replace(/^\d+_|\.sql$/g, "")],
-        );
-      }
-    }
-    await client.query(
-      "UPDATE public.fb_cleanup_config SET endpoint=$1 WHERE id=true",
-      [`${origin.origin}/api/internal/purge-deleted`],
-    );
-    await client.query("SELECT pg_notify('pgrst', 'reload schema')");
-    await client.query("COMMIT");
+    const result = await runSelfHostedMigrations(client, {
+      migrations,
+      upgrade,
+      dryRun,
+      origin,
+    });
     console.log(
-      "Self-hosted database setup complete. Configure an hourly POST to /api/internal/purge-deleted using this backend's worker secret. Verify a successful run before using deletion recovery.",
+      `${dryRun ? "Pending" : "Applied"} migrations: ${result.pending.length ? result.pending.join(", ") : "none"}.`,
     );
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
+    if (dryRun) {
+      console.log(
+        "Dry run complete; no schema or records changed. Pending SQL has not been executed or proven compatible by this preview.",
+      );
+    } else if (upgrade) {
+      console.log(
+        "Fieldbook database update complete. The cleanup endpoint and worker credential are unchanged. Check affected flows and the next external cleanup run.",
+      );
+    } else {
+      console.log(
+        "Self-hosted database setup complete. Configure an hourly POST to /api/internal/purge-deleted using this backend's worker secret. Verify a successful run before using deletion recovery.",
+      );
+    }
   } finally {
     await client.end();
   }
 }
-main().catch(() => {
-  // Database/provider diagnostics can contain connection credentials or SQL values.
-  console.error(
-    "Self-hosted setup stopped. Review the target, service readiness and migration compatibility before retrying.",
-  );
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  main().catch((error) => {
+    // Database/provider diagnostics can contain credentials or SQL values.
+    console.error(
+      error instanceof SelfHostedSetupError
+        ? error.message
+        : "Self-hosted database operation stopped. Review the target, TLS certificate, service readiness and migration compatibility before retrying. No database diagnostics were printed because they can contain credentials or records.",
+    );
+    process.exitCode = 1;
+  });
+}
