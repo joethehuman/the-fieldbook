@@ -63,6 +63,8 @@ Review [Supabase's current update guidance](https://supabase.com/docs/guides/sel
 
 Keep the pinned set current through a short periodic security/deprecation review and promptly assess relevant advisories. Do not upgrade every component merely because a Fieldbook application patch is available. Conversely, an application-only patch does not remediate a vulnerable backend image. Further PostgreSQL majors and independently mixed component sets require a compatibility review.
 
+If Storage stops on a migration checksum mismatch, keep `DB_ALLOW_MIGRATION_REFRESH=false` and compare the exact old and new image files with the recorded ledger before proceeding. Its checksum includes the filename as well as SQL, so a renamed file can produce a mismatch even when its SQL is unchanged. Do not erase the ledger, rerun old migrations, or enable blanket hash refresh to bypass the error. Any reconciliation needs a backed-up, reviewed procedure for that exact version transition.
+
 ## Routine health and recovery
 
 Check App Platform service health and failed deployments/jobs after changes, and include database capacity/connections, Spaces availability, credential expiration and upstream advisories in routine operations. Auth `/health`, Storage `/status`, internal REST `:3001/ready`, and `/fieldbook-build.json` are useful first checks. Use the expected deployment revision in the build marker; do not treat it as proof of real authentication or private media. Watch the next scheduled cleanup execution and the **Recently deleted** warning. Keep logs access-controlled and redact tokens, connection strings and signed URLs before sharing diagnostics.

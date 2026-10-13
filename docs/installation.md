@@ -104,17 +104,17 @@ Use this combination rather than independently choosing backend versions. The ba
 | Component | Selected version | Verification scope |
 | --- | --- | --- |
 | Fieldbook runtime | Node 22.23.3, pnpm 10.17.1; locked Next.js 16.3.8 | Local application build and synthetic regression checks |
-| Supabase Auth | `supabase/gotrue:v2.196.0` | 70 upstream SQL migrations checked under the Auth role locally; container/hosted lifecycle pending |
-| PostgREST | `postgrest/postgrest:v14.17` | Configuration and image metadata inspected; managed database integration pending |
-| Supabase Storage | `supabase/storage-api:v1.74.0` | 69 upstream SQL migrations checked under the Storage role locally; TLS/upload source inspected; Spaces transfers pending |
-| Managed database | PostgreSQL 17, provider-maintained minor version | Bootstrap and migration SQL checked locally with PGlite 0.5.8 / PostgreSQL 18.3 substitutes; actual PG17 integration pending |
-| Optional inference | DO custom `router:<name>` target | Adapter and interface tests; real inference/routing pending. Provider service is public preview. |
+| Supabase Auth | `supabase/gotrue:v2.196.0` | Container startup, 70 vendor migrations and health against fresh Managed PG17; account lifecycle pending |
+| PostgREST | `postgrest/postgrest:v14.17` | Container startup and readiness against Managed PG17 with verified TLS |
+| Supabase Storage | `supabase/storage-api:v1.74.0` | Container startup and vendor migrations through 69 against fresh Managed PG17; TLS rejects wrong CA/hostname; Spaces transfers pending |
+| Managed database | PostgreSQL 17.11 tested; provider-maintained minor version | Fresh preparation, vendor initialization and Fieldbook baseline passed; existing-data update command preserved records with no pending migrations |
+| Optional inference | DO custom router with `openai-gpt-oss-20b` and `openai-gpt-oss-120b` | Real forced-tool and streaming checks; primary and unmatched-task fallback selection observed. Failure-driven failover remains unverified. Provider service is public preview. |
 
-The SQL harness does not run the actual backend containers. Hosted acceptance must cover this pinned set, existing-data updates and restarts before its support status changes. Vercel with hosted Supabase remains the supported recipe. Arbitrary backend combinations, PostgreSQL major versions, automatic router pools and horizontally scaled Fieldbook instances are outside this baseline.
+Container and database checks do not establish App Platform routing or application behavior. Hosted acceptance must cover this pinned set, existing-data updates and restarts before its support status changes. Vercel with hosted Supabase remains the supported recipe. Arbitrary backend combinations, PostgreSQL major versions, automatic router pools and horizontally scaled Fieldbook instances are outside this baseline.
 
 ### Prepare durable resources and keys
 
-1. Create a dedicated Managed PostgreSQL **17** cluster/database and a private Spaces bucket in suitable regions. Use the database's certificate-matching DNS hostname and download its CA certificate. Restrict trusted sources to the App Platform VPC and the temporary operator connection used for setup. Use direct database connections, not a transaction pooler.
+1. Create a dedicated Managed PostgreSQL **17** cluster/database and a private Spaces bucket in suitable regions. Use the database's certificate-matching DNS hostname and download its CA certificate. After connecting the app to its VPC, add its **VPC egress private IP addresses** to the database's trusted sources, along with the temporary operator connection used for setup. The app API returns these under `vpc.egress_ips`; selecting the app itself as a trusted source does not authorize this private path. Recheck the addresses after network changes. Follow [DO's VPC connection guidance](https://docs.digitalocean.com/products/app-platform/how-to/enable-vpc/), keep the app and database in the intended VPC, and use direct database connections rather than a transaction pooler.
 2. Create Spaces credentials scoped to that bucket with read, write and delete access. Keep the bucket private; do not enable public ACLs or a public CDN. Fieldbook issues short-lived access through the Storage service.
 3. From the source checkout, run `pnpm install --frozen-lockfile`. Generate durable keys into an existing private directory outside the repository:
 
@@ -141,7 +141,7 @@ The app spec runs:
 - **Fieldbook:** the existing standalone Next.js build, with the same application environment as Vercel and `FIELDBOOK_HOST=node`.
 - **Auth:** the pinned upstream image plus a small startup wrapper that writes the database CA from its environment to a private temporary file before starting Auth.
 - **REST:** the pinned PostgREST image plus the same CA wrapper and a pinned static BusyBox shell. Its readiness port is internal only.
-- **Storage:** the pinned upstream image, database CA PEM, private Spaces credentials and persistent PostgreSQL/S3 state. No file bytes depend on the container's local disk.
+- **Storage:** the pinned upstream image plus the same CA wrapper, private Spaces credentials and persistent PostgreSQL/S3 state. No file bytes depend on the container's local disk.
 - **Cleanup:** the hourly App Platform job. Omit this job from the initial deployment until its credential exists, then add it after database setup below.
 
 Map generated keys as follows:
@@ -155,7 +155,7 @@ Map generated keys as follows:
 | `JWT_JWKS` | REST `PGRST_JWT_SECRET`; Storage `JWT_JWKS` |
 | Three database passwords | Matching `supabase_auth_admin`, `authenticator`, `supabase_storage_admin` connection URLs |
 
-Use runtime-only secret variables for server secrets. Supply the two public Supabase variables at build and runtime because Next.js embeds public variables in browser assets. Generated hex database passwords are URL-safe. Auth and REST use `sslmode=verify-full` and the materialized CA file. Storage accepts the CA PEM via `DATABASE_SSL_ROOT_CERT`; **use a DNS hostname, not an IP address** (the upstream Storage version weakens identity verification for IP connections). Do not disable certificate verification or add an insecure URL SSL override.
+Use runtime-only secret variables for server secrets. Supply the two public Supabase variables at build and runtime because Next.js embeds public variables in browser assets. Generated hex database passwords are URL-safe. All three backend services use `sslmode=verify-full` and the materialized CA file. Storage also receives the CA PEM via `DATABASE_SSL_ROOT_CERT`: its tenant pool uses that setting, while its PubSub connection reads TLS settings from `DATABASE_URL`. **Use a DNS hostname, not an IP address** (the upstream Storage version weakens identity verification for IP connections). Do not disable certificate verification or add an insecure URL SSL override.
 
 Use a custom HTTPS hostname and disable App Platform edge caching. Add its CNAME at the existing DNS provider using DO's assigned target; domain registration and nameservers need not change. `${APP_URL}` must resolve to the canonical hostname. `FIELDBOOK_URL` is that origin; `NEXT_PUBLIC_SUPABASE_URL` is that origin followed by `/backend`. For a separate preview, set `FIELDBOOK_ENVIRONMENT=preview` and `FIELDBOOK_PREVIEW_SUPABASE_URL` to the exact isolated backend URL. Hosted Supabase previews retain their reference-based configuration.
 

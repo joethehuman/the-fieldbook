@@ -179,12 +179,8 @@ services:
         type: SECRET
         scope: RUN_TIME
   - name: storage
-    image:
-      registry_type: DOCKER_HUB
-      registry: supabase
-      repository: storage-api
-      # supabase/storage-api v1.74.0 (App Platform accepts digest OR tag).
-      digest: sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85
+    git: *source
+    dockerfile_path: Dockerfile.supabase-storage
     http_port: 5000
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-1gb
@@ -194,11 +190,14 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: postgres://supabase_storage_admin:YOUR_STORAGE_DATABASE_PASSWORD@YOUR_DATABASE_DNS:25060/defaultdb
+        value: postgres://supabase_storage_admin:YOUR_STORAGE_DATABASE_PASSWORD@YOUR_DATABASE_DNS:25060/defaultdb?sslmode=verify-full&sslrootcert=/tmp/fieldbook-db-ca.crt
         type: SECRET
         scope: RUN_TIME
-      # This version accepts the PEM directly and verifies DNS-host connections.
-      # Do not add sslmode=no-verify, use an IP address, or disable Node TLS.
+      # The tenant pool accepts PEM; PubSub also needs verified TLS in the URL.
+      # The wrapper materializes the same CA for every database client.
+      - key: DATABASE_CA_CERT
+        value: ${backend-db.CA_CERT}
+        scope: RUN_TIME
       - key: DATABASE_SSL_ROOT_CERT
         value: ${backend-db.CA_CERT}
         scope: RUN_TIME

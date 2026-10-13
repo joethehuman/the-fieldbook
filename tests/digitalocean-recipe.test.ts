@@ -260,6 +260,8 @@ test("recipe preserves verified TLS, persistent signing keys and runtime-only se
     /sslmode=verify-full&sslrootcert=/,
   );
   assert.match(envs("rest").PGRST_DB_URI, /sslmode=verify-full&sslrootcert=/);
+  assert.match(envs("storage").DATABASE_URL, /sslmode=verify-full&sslrootcert=/);
+  assert.equal(envs("storage").DATABASE_CA_CERT, "${backend-db.CA_CERT}");
   assert.equal(envs("storage").DATABASE_SSL_ROOT_CERT, "${backend-db.CA_CERT}");
   assert.equal(envs("storage").REQUEST_ALLOW_X_FORWARDED_PATH, "false");
   assert.equal(envs("storage").STORAGE_BACKEND, "s3");
@@ -280,8 +282,8 @@ test("recipe preserves verified TLS, persistent signing keys and runtime-only se
   assert.equal(envs("fieldbook").DATABASE_URL, undefined);
   assert.match(read("Dockerfile.supabase-auth"), /gotrue:v2\.196\.0@sha256:/);
   assert.match(read("Dockerfile.supabase-rest"), /postgrest:v14\.17@sha256:/);
-  assert.equal(service("storage").image.tag, undefined);
-  assert.match(service("storage").image.digest, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(service("storage").dockerfile_path, "Dockerfile.supabase-storage");
+  assert.match(read("Dockerfile.supabase-storage"), /storage-api:v1\.74\.0@sha256:/);
   assert.doesNotMatch(
     read(".do/app.yaml"),
     /NODE_TLS_REJECT_UNAUTHORIZED|rejectUnauthorized: false|backend-gateway|kong/i,
