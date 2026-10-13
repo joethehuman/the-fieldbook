@@ -12,7 +12,7 @@ import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWr
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { EditorAppDockContext } from "./editor-app-header";
 import { useMobileEditorViewport } from "./use-mobile-editor-viewport";
-import { mobileEditorLayout, mobileEditorOpeningReady } from "./mobile-editor-layout";
+import { createMobileEditorOpening, mobileEditorLayout, mobileEditorOpeningReady } from "./mobile-editor-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
 export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
@@ -81,7 +81,7 @@ export function EditorFrame({
   const panelReturn = useRef<WritingCursor | null>(null);
   const preparedPanel = useRef<"outline" | "details" | null>(null);
   const [panelReady, setPanelReady] = useState(true);
-  const openingPanel = useRef<{ deadline: number; elapsed: boolean; timer: number } | null>(null);
+  const openingPanel = useRef<(ReturnType<typeof createMobileEditorOpening> & { timer: number }) | null>(null);
   function cancelPanelOpening() {
     if (openingPanel.current) window.clearTimeout(openingPanel.current.timer);
     openingPanel.current = null;
@@ -122,14 +122,9 @@ export function EditorFrame({
         } catch { /* A completed gesture no longer owns its captured writing target. */ }
       }
       if (controls.current?.dataset.keyboardVisible === "true") {
-        const session = { deadline: performance.now() + 350, elapsed: false, timer: 0 };
+        const session = { ...createMobileEditorOpening(performance.now(), frame.current ? mobileEditorLayout(frame.current).viewport : null), timer: 0 };
         openingPanel.current = session;
         setPanelReady(false);
-        session.timer = window.setTimeout(() => {
-          if (openingPanel.current !== session) return;
-          session.elapsed = true;
-          measureDock.current?.();
-        }, 350);
       }
       blurWritingInput();
       window.getSelection()?.removeAllRanges();
@@ -203,7 +198,14 @@ export function EditorFrame({
         if (pending) {
           const panel = overlayLayer.current?.querySelector<HTMLElement>('[data-open="true"]');
           const preferred = Math.min(360, panel?.scrollHeight || 360);
-          if (mobileEditorOpeningReady(layout?.band || null, preferred, pending.deadline, pending.elapsed)) cancelPanelOpening();
+          const readiness = mobileEditorOpeningReady(pending, layout?.band || null, preferred,
+            [viewport?.height || window.innerHeight, viewport?.offsetTop || 0,
+              viewport?.width || window.innerWidth, viewport?.offsetLeft || 0, viewport?.scale || 1], performance.now(), layout?.viewport);
+          window.clearTimeout(pending.timer);
+          if (readiness.ready) cancelPanelOpening();
+          else pending.timer = window.setTimeout(() => {
+            if (openingPanel.current === pending) measureDock.current?.();
+          }, readiness.checkIn);
         }
       }
       setStyle(frame.current, "--editor-navigation-height", `${dock ? 0 : rect.height}px`);

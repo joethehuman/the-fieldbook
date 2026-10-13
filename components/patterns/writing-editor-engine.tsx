@@ -6,7 +6,7 @@ import { writingTableControlsPlugin } from "./writing-table-controls";
 import { $createWritingVideoNode, writingVideoPlugin } from "./writing-video";
 import { WritingMediaLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
 import { useScrollFade } from "./use-scroll-fade";
-import { mobileEditorLayout, mobileEditorOpeningReady } from "./mobile-editor-layout";
+import { createMobileEditorOpening, mobileEditorLayout, mobileEditorOpeningReady } from "./mobile-editor-layout";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
 import { $applyWritingBlockStyle, $isMediaParagraph, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
@@ -134,7 +134,9 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
         if (first) first.insertBefore(paragraph); else root.append(paragraph);
       }
       paragraph.selectStart();
-    });
+    }, { discrete: true });
+    // Keep the title-to-body handoff inside the same keyboard gesture.
+    lexical?.getRootElement()?.focus({ preventScroll: true });
   }
   const fade = useScrollFade<HTMLDivElement>();
   return <div ref={fade.ref} data-state="active" className="writing-viewport writing-scroll-area scroll-fade mt-0 focus-visible:ring-0"
@@ -437,8 +439,7 @@ export default function WritingEditorEngine({
     menu: HTMLDivElement;
     ready: boolean;
     mode: "above" | "below" | null;
-    deadline: number;
-    fallbackElapsed: boolean;
+    opening: ReturnType<typeof createMobileEditorOpening>;
     cancel?: () => void;
   } | null>(null);
   const lexicalEditor = useRef<LexicalEditor | null>(null);
@@ -593,11 +594,11 @@ export default function WritingEditorEngine({
     if (!dock || !menu) return;
     const layout = mobileEditorLayout(dock);
     if (paletteSession.current?.menu !== menu) paletteSession.current = {
-      menu, ready: false, mode: null, deadline: performance.now() + 350, fallbackElapsed: false,
+      menu, ready: false, mode: null, opening: createMobileEditorOpening(performance.now(), layout.viewport),
     };
     const session = paletteSession.current;
     const waitsForKeyboard = !!mediaChooser || slashFromToolbar;
-    let fallback = 0;
+    let readinessCheck = 0;
     const setStyle = (name: string, value: string) => {
       if (menu.style.getPropertyValue(name) !== value) menu.style.setProperty(name, value);
     };
@@ -632,7 +633,19 @@ export default function WritingEditorEngine({
       const candidate = dockPosition === "top" ? "below" : "above";
       const mode = session.mode || candidate;
       const wasReady = session.ready;
-      session.ready ||= !waitsForKeyboard || mobileEditorOpeningReady(layout.band, preferred, session.deadline, session.fallbackElapsed);
+      if (!session.ready) {
+        clearTimeout(readinessCheck);
+        const opening = mobileEditorOpeningReady(session.opening, layout.band, preferred,
+          [viewport?.height || window.innerHeight, viewport?.offsetTop || 0,
+            viewport?.width || window.innerWidth, viewport?.offsetLeft || 0, viewport?.scale || 1], performance.now(), layout.viewport);
+        session.ready = !waitsForKeyboard || opening.ready;
+        if (!session.ready) readinessCheck = window.setTimeout(() => {
+          readinessCheck = 0;
+          // Reread native geometry before deciding; a timer alone cannot make
+          // the palette visible or lock it to a transient dock position.
+          layout.schedule("viewport");
+        }, opening.checkIn);
+      }
       // Choose a lane once the opening is ready. Native keyboard dismissal
       // may grow its room, but cannot flip the visible menu to another lane.
       if (session.ready && !session.mode) session.mode = mode;
@@ -643,7 +656,7 @@ export default function WritingEditorEngine({
       if (mediaChooser) setStyle("overflow-y", "auto");
       menu.dataset.paletteReady = String(session.ready);
       if (session.ready && !wasReady) {
-        clearTimeout(fallback);
+        clearTimeout(readinessCheck);
         if (mediaChooser) menu.querySelector<HTMLButtonElement>(".writing-media-tabs button, .writing-media-fields button:not(:disabled)")?.focus({ preventScroll: true });
         else if (slashFromToolbar && focusInsertItem.current) {
           focusInsertItem.current = false;
@@ -668,16 +681,8 @@ export default function WritingEditorEngine({
     };
     const schedule = () => layout.schedule("overlay");
     const unsubscribe = layout.subscribe("overlay", place);
-    // Hardware keyboards and static viewport simulations may never emit a
-    // dismissal resize. Keep their constrained chooser reachable as well.
-    if (!session.ready) fallback = window.setTimeout(() => {
-      // Fractional timer delays can fire just before the clock deadline.
-      // The fallback itself ends the wait even without another viewport event.
-      session.fallbackElapsed = true;
-      schedule();
-    }, Math.max(0, session.deadline - performance.now()));
     const cancelOpening = () => {
-      clearTimeout(fallback);
+      clearTimeout(readinessCheck);
       if (paletteSession.current === session) paletteSession.current = null;
     };
     session.cancel = cancelOpening;
@@ -686,7 +691,7 @@ export default function WritingEditorEngine({
     observer.observe(menu);
     return () => {
       unsubscribe();
-      clearTimeout(fallback);
+      clearTimeout(readinessCheck);
       observer.disconnect();
       if (session.cancel === cancelOpening) session.cancel = undefined;
       if (!menu.isConnected && paletteSession.current?.menu === menu) paletteSession.current = null;
@@ -866,9 +871,20 @@ export default function WritingEditorEngine({
       if (slashFromToolbar) setSlashOpen(false);
       else keepSlashAsText(slashQuery, false);
     };
-    viewport?.addEventListener("scroll", close, { passive: true });
-    return () => viewport?.removeEventListener("scroll", close);
-  }, [canvas, slashOpen, slashFromToolbar, slashQuery, keepSlashAsText]);
+    // A mobile keyboard resize and our caret protection can both scroll the
+    // canvas while the author is typing a command. Only an intentional gesture
+    // dismisses those suggestions; desktop scroll dismissal stays unchanged.
+    const compact = canvas && !!compactRef.current;
+    if (compact) {
+      viewport?.addEventListener("touchmove", close, { passive: true });
+      viewport?.addEventListener("wheel", close, { passive: true });
+    } else viewport?.addEventListener("scroll", close, { passive: true });
+    return () => {
+      viewport?.removeEventListener("touchmove", close);
+      viewport?.removeEventListener("wheel", close);
+      viewport?.removeEventListener("scroll", close);
+    };
+  }, [canvas, !!compactControls, slashOpen, slashFromToolbar, slashQuery, keepSlashAsText]);
 
   function rememberSelection() {
     mediaSelection.current = null;

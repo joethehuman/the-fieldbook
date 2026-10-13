@@ -763,8 +763,7 @@ test("the main writing experience keeps title flow, undo, redo and export", asyn
   const compact =
     (await page.locator(".editor-frame").getAttribute("data-cards")) === "true";
   const commands = page.getByRole("button", {
-    name: "Commands: insert blocks or format selected text",
-    exact: true,
+    name: /^Commands:/,
   });
   const extraControls = compact;
   if (extraControls) await expect(commands).toBeVisible();
@@ -798,8 +797,7 @@ test("desktop slash insertion and mobile Commands keep the same block tools", as
   if (compact)
     await page
       .getByRole("button", {
-        name: "Commands: insert blocks or format selected text",
-        exact: true,
+        name: /^Commands:/,
       })
       .click();
   else await page.keyboard.type("/");
@@ -2478,6 +2476,11 @@ type CommandLifecycle = {
   proseFocusCount: number;
   visibleFrames: { height: number; top: number; bottom: number }[];
 };
+type ContinuousCommandMotion = {
+  finished: boolean;
+  recording: boolean;
+  frames: { top: number; bottom: number; height: number; viewportHeight: number; dockPosition?: string }[];
+};
 
 async function installCommandViewport(page: Page, viewport: CommandViewport) {
   await page.evaluate((viewport) => {
@@ -2551,6 +2554,41 @@ async function animateCommandKeyboardClosing(page: Page) {
       if (started) clearTimeout(fixture.closingTimer);
     });
   });
+}
+
+async function animateContinuousCommandKeyboardClosing(page: Page, duration: number) {
+  await page.evaluate(duration => {
+    const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+    const motion: ContinuousCommandMotion = { finished: false, recording: true, frames: [] };
+    (window as unknown as { continuousCommandMotion: ContinuousCommandMotion }).continuousCommandMotion = motion;
+    const record = () => {
+      const menu = document.querySelector<HTMLElement>(".writing-slash-menu");
+      if (menu) {
+        const style = getComputedStyle(menu), rect = menu.getBoundingClientRect();
+        if (style.visibility === "visible" && parseFloat(style.opacity) > 0.05 && rect.height > 0) {
+          motion.frames.push({ top: rect.top - fixture.viewport.offsetTop,
+            bottom: rect.bottom - fixture.viewport.offsetTop, height: rect.height,
+            viewportHeight: fixture.viewport.height,
+            dockPosition: document.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]')?.dataset.dockPosition });
+        }
+      }
+      if (motion.recording) requestAnimationFrame(record);
+    };
+    requestAnimationFrame(record);
+    document.querySelector('.writing-content[contenteditable="true"]')!.addEventListener("focusout", () => {
+      const started = performance.now();
+      const advance = () => {
+        const fraction = Math.min(1, (performance.now() - started) / duration);
+        fixture.viewport.height = 490 + 322 * fraction;
+        fixture.viewport.offsetTop = 24 * Math.sin(fraction * Math.PI);
+        window.visualViewport!.dispatchEvent(new Event("resize"));
+        window.visualViewport!.dispatchEvent(new Event("scroll"));
+        motion.finished = fraction === 1;
+        if (!motion.finished) requestAnimationFrame(advance);
+      };
+      requestAnimationFrame(advance);
+    }, { once: true });
+  }, duration);
 }
 
 async function changeCommandViewport(page: Page, next: CommandViewport) {
@@ -2652,6 +2690,23 @@ test("mobile viewport boundary does not accumulate movement from stale outer geo
   expect((await page.locator(".main-content").boundingBox())!.y).toBe(180);
   expect((await page.locator(".main-shell").boundingBox())!.height).toBe(490);
   expect((await page.locator(".topbar").boundingBox())!.height).toBe(60);
+  const immediateFrames = await page.evaluate(() => {
+    const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+    const shell = document.querySelector<HTMLElement>(".main-shell")!;
+    const header = document.querySelector<HTMLElement>(".topbar")!;
+    return [100, 72, 48, 24, 0, 35, 80, 120].map(offsetTop => {
+      fixture.viewport.offsetTop = offsetTop;
+      window.visualViewport!.dispatchEvent(new Event("scroll"));
+      // Read in the event's task, before a deferred animation frame can hide
+      // one paint of header lag behind native viewport panning.
+      return { offsetTop, shellTop: parseFloat(shell.style.getPropertyValue("--editor-viewport-top")),
+        screenTop: header.getBoundingClientRect().top - offsetTop };
+    });
+  });
+  for (const frame of immediateFrames) {
+    expect(frame.shellTop).toBe(frame.offsetTop);
+    expect(frame.screenTop).toBeCloseTo(0, 0);
+  }
 });
 
 test("mobile viewport owns the fixed header and scroller despite outer shell displacement", async ({ page }, info) => {
@@ -3055,8 +3110,9 @@ test("iPhone Commands insertion retains the keyboard lane after an eager return"
     { height: 490, offsetTop: 0, clientHeight: 490, appPan: 84 },
   ]) {
     await changeCommandViewport(page, state);
-    const geometry = await restoredCommandGeometry(page);
     await expectKeyboardTopDock(page);
+    await expectMobileWritingBand(page, 27);
+    const geometry = await restoredCommandGeometry(page);
     expect(geometry.focusGap, JSON.stringify(geometry)).toBeLessThanOrEqual(-27);
     expect(geometry.focusTop).toBeGreaterThanOrEqual(geometry.rawTop - 1);
   }
@@ -3088,7 +3144,10 @@ test("iPhone Commands closing restores a backward selection above the dock", asy
     expect(geometry.collapsed).toBe(false);
     expect(geometry.backward).toBe(true);
     await expectKeyboardTopDock(page);
-    expect(geometry.focusGap).toBeLessThanOrEqual(-27);
+    await expectMobileWritingBand(page, 27);
+    const settled = await restoredCommandGeometry(page);
+    expect(settled.selectedText).toBe(selected);
+    expect(settled.backward).toBe(true);
   }
   await page.screenshot({ path: info.outputPath("commands-restored-native-selection.png") });
   const owner = page.locator(".main-content");
@@ -3169,6 +3228,261 @@ for (const reduced of [false, true]) {
   });
 }
 
+test.describe("continuous mobile keyboard transitions", () => {
+  test.use({ isMobile: true });
+
+  for (const scenario of ["smooth", "reduced", "cancel-waiting", "cancel-moving"] as const) {
+    const title = {
+      smooth: "keyboard geometry settles before smoothly revealing a resting caret",
+      reduced: "a settled keyboard reveals the caret without animation for reduced motion",
+      "cancel-waiting": "a touch scroll cancels the reveal waiting for keyboard geometry",
+      "cancel-moving": "a new touch stops an in-progress smooth caret reveal",
+    }[scenario];
+    test(title, async ({ page }, info) => {
+      await page.emulateMedia({ reducedMotion: scenario === "reduced" ? "reduce" : "no-preference" });
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" });
+        Object.defineProperty(navigator, "platform", { configurable: true, value: "iPhone" });
+        Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+      });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await open(page, info.project.name.startsWith("production"), "course");
+      const writer = page.getByRole("textbox", { name: "Lesson content", exact: true });
+      await page.getByRole("textbox", { name: "Title", exact: true }).tap();
+      await page.getByRole("textbox", { name: "Lesson title", exact: true }).tap();
+      await installCommandViewport(page, { height: 844, offsetTop: 0, clientHeight: 844, appPan: 0 });
+      const paragraph = writer.locator("p").nth(20);
+      await paragraph.tap();
+      await paragraph.evaluate(paragraph => {
+        const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+        let text = walker.nextNode()!;
+        for (let next = walker.nextNode(); next; next = walker.nextNode()) text = next;
+        window.getSelection()!.setBaseAndExtent(text, text.textContent!.length, text, text.textContent!.length);
+        document.dispatchEvent(new Event("selectionchange"));
+        const owner = paragraph.closest<HTMLElement>(".main-content")!;
+        // A real edit after manually scrolling must resume caret protection,
+        // including when Lexical handles beforeinput and suppresses DOM input.
+        owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+        owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
+        owner.scrollTop += window.getSelection()!.getRangeAt(0).getBoundingClientRect().bottom - 670;
+        window.dispatchEvent(new Event("touchend"));
+      });
+      await expect.poll(() => nativeWritingSelectionMatches(page)).toBe(true);
+      await page.keyboard.insertText(" More.");
+      await expect(paragraph).toContainText("intact. More.");
+      await writer.evaluate(async () => { for (let index = 0; index < 4; index++) await new Promise(requestAnimationFrame); });
+      const result = await writer.evaluate(async (writer, scenario) => {
+        const owner = writer.closest<HTMLElement>(".main-content")!;
+        const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+        const originalScrollTo = owner.scrollTo;
+        const scrollTo = originalScrollTo.bind(owner);
+        let moving = true;
+        let interrupted = false;
+        let lastViewportAt = performance.now();
+        const scrolls: { moving: boolean; interrupted: boolean; sinceViewport: number; top: number; behavior?: ScrollBehavior }[] = [];
+        owner.scrollTo = ((options: ScrollToOptions | number, y?: number) => {
+          scrolls.push({ moving, interrupted, sinceViewport: performance.now() - lastViewportAt,
+            top: typeof options === "number" ? y! : options.top ?? owner.scrollTop,
+            behavior: typeof options === "number" ? undefined : options.behavior });
+          if (typeof options === "number") scrollTo(options, y!);
+          else scrollTo(options);
+        }) as typeof owner.scrollTo;
+        try {
+          // These are intermediate native keyboard frames, not further edits.
+          // A resting caret must not pull the canvas upward at every sample.
+          for (const height of [820, 800, 780, 760, 740, 720, 700, 680, 660, 640, 620, 600, 580, 560, 540, 520, 500, 490]) {
+            fixture.viewport.height = height;
+            lastViewportAt = performance.now();
+            window.visualViewport!.dispatchEvent(new Event("resize"));
+            await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+          }
+          moving = false;
+          const initialScroll = owner.scrollTop;
+          let chosenScroll: number | null = null;
+          const interrupt = () => {
+            interrupted = true;
+            owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+            owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
+            owner.scrollTop -= 80;
+            window.dispatchEvent(new Event("touchend"));
+            chosenScroll = owner.scrollTop;
+          };
+          if (scenario === "cancel-waiting") interrupt();
+          const samples: number[] = [];
+          const started = performance.now();
+          while (performance.now() - started < 900) {
+            await new Promise(requestAnimationFrame);
+            samples.push(owner.scrollTop);
+            if (scenario === "cancel-moving" && chosenScroll === null && owner.scrollTop > initialScroll + 10) interrupt();
+          }
+          return { scrolls, initialScroll, samples, chosenScroll, finalScroll: owner.scrollTop };
+        } finally { owner.scrollTo = originalScrollTo; }
+      }, scenario);
+      expect(result.scrolls.filter(scroll => scroll.moving)).toEqual([]);
+      if (scenario === "cancel-waiting") {
+        expect(result.scrolls).toEqual([]);
+        expect(result.finalScroll).toBeCloseTo(result.chosenScroll!, 0);
+      } else if (scenario === "cancel-moving") {
+        expect(result.chosenScroll).not.toBeNull();
+        expect(result.scrolls.length).toBeGreaterThan(0);
+        expect(result.scrolls.filter(scroll => scroll.interrupted)).toEqual([]);
+        expect(result.finalScroll).toBeCloseTo(result.chosenScroll!, 0);
+      } else {
+        expect(result.scrolls.length).toBeGreaterThan(0);
+        for (const scroll of result.scrolls) expect(scroll.sinceViewport).toBeGreaterThanOrEqual(96);
+        expect(result.finalScroll - result.initialScroll).toBeGreaterThan(100);
+        if (scenario === "smooth") {
+          // A single short, monotonic trip reaches the final band. Guard
+          // against repeated retargeting and overshoot, while allowing both
+          // ordinary and high-refresh-rate animation frame counts.
+          expect(result.scrolls.length).toBeLessThanOrEqual(24);
+          const elapsed = result.scrolls.at(-1)!.sinceViewport - result.scrolls[0].sinceViewport;
+          expect(elapsed).toBeGreaterThanOrEqual(100);
+          expect(elapsed).toBeLessThanOrEqual(260);
+          let previous = result.initialScroll;
+          for (const top of result.samples) {
+            expect(top).toBeGreaterThanOrEqual(previous - 1);
+            expect(top).toBeLessThanOrEqual(result.finalScroll + 1);
+            previous = top;
+          }
+          for (const scroll of result.scrolls) {
+            expect(scroll.top).toBeGreaterThanOrEqual(result.initialScroll);
+            expect(scroll.top).toBeLessThanOrEqual(result.finalScroll + 1);
+          }
+          expect(result.samples.filter(top => top > result.initialScroll + 1 && top < result.finalScroll - 1).length).toBeGreaterThan(2);
+        } else {
+          expect(result.scrolls.length).toBeLessThanOrEqual(2);
+          expect(result.scrolls.every(scroll => scroll.behavior !== "smooth")).toBe(true);
+          expect(result.samples.filter(top => top > result.initialScroll + 1 && top < result.finalScroll - 1)).toEqual([]);
+        }
+        await expectMobileWritingBand(page);
+      }
+    });
+  }
+
+  for (const duration of [300, 600, 900]) {
+    test(`Commands appears in one stationary lane after a ${duration}ms keyboard dismissal`, async ({ page }, info) => {
+      const { commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+      await animateContinuousCommandKeyboardClosing(page, duration);
+      await commands.tap();
+      await page.waitForFunction(() => (window as unknown as { continuousCommandMotion: ContinuousCommandMotion }).continuousCommandMotion.finished);
+      const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+      await expect(menu).toBeVisible();
+      await menu.evaluate(async () => { for (let index = 0; index < 5; index++) await new Promise(requestAnimationFrame); });
+      const frames = await page.evaluate(() => {
+        const motion = (window as unknown as { continuousCommandMotion: ContinuousCommandMotion }).continuousCommandMotion;
+        motion.recording = false;
+        return motion.frames;
+      });
+      expect(frames.length).toBeGreaterThan(2);
+      expect(frames.at(-1)!.height).toBeCloseTo(360, 0);
+      // Compare screen coordinates, accounting for native viewport panning.
+      // Every duration must show the same final bottom-dock lane from its
+      // first visible paint, rather than expose a menu still chasing its anchor.
+      for (const frame of frames) {
+        expect(frame.viewportHeight).toBeCloseTo(812, 0);
+        expect(frame.dockPosition).toBe("bottom");
+        expect(frame.top).toBeCloseTo(frames.at(-1)!.top, 0);
+        expect(frame.bottom).toBeCloseTo(frames.at(-1)!.bottom, 0);
+        expect(frame.height).toBeCloseTo(frames.at(-1)!.height, 0);
+      }
+      await expectFloatingSurfaceClearDock(page, menu);
+      const options = menu.locator(".writing-slash-options");
+      expect((await options.boundingBox())!.height).toBeGreaterThanOrEqual(290);
+      const firstRow = menu.getByRole("menuitem", { name: "Normal Text", exact: true });
+      expect((await firstRow.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+      const close = menu.getByRole("menuitem", { name: "Close menu esc", exact: true });
+      await expect(close).toBeInViewport();
+      await options.evaluate(options => { options.scrollTop = options.scrollHeight; });
+      await expect(menu.getByRole("menuitem", { name: "Image", exact: true })).toBeInViewport();
+      await expect(menu.getByRole("menuitem", { name: "Upload video", exact: true })).toBeInViewport();
+      await expect(menu.getByRole("menuitem", { name: "Embed video link", exact: true })).toBeInViewport();
+      await expect(close).toBeInViewport();
+      await close.tap();
+      await expect(menu).toHaveCount(0);
+    });
+  }
+
+  test("the first visible Commands palette accepts a raw finger tap without waiting for target stability", async ({ page }, info) => {
+    const { writer, paragraph, commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+    const original = await paragraph.textContent();
+    await animateContinuousCommandKeyboardClosing(page, 600);
+    await commands.tap();
+    const target = await page.waitForFunction(() => {
+      const menu = document.querySelector<HTMLElement>(".writing-slash-menu");
+      if (!menu) return null;
+      const style = getComputedStyle(menu);
+      if (style.visibility !== "visible" || parseFloat(style.opacity) <= 0.05) return null;
+      const item = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(item => item.textContent?.trim() === "Heading 2");
+      if (!item) return null;
+      const rect = item.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2,
+        viewportHeight: window.visualViewport!.height,
+        dockPosition: document.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]')?.dataset.dockPosition };
+    }, undefined, { polling: "raf" });
+    const point = await target.jsonValue();
+    if (!point) throw new Error("Commands never exposed its Heading 2 target");
+    // Locator.tap waits for stability and can silently defer a real person's
+    // tap until a moving target settles. Send the actual first-visible point.
+    await page.touchscreen.tap(point.x, point.y);
+    expect(point.viewportHeight).toBeCloseTo(812, 0);
+    expect(point.dockPosition).toBe("bottom");
+    await expect(writer.locator("h2")).toHaveText(original!);
+    await expect(writer).toBeFocused();
+    await page.evaluate(() => { (window as unknown as { continuousCommandMotion: ContinuousCommandMotion }).continuousCommandMotion.recording = false; });
+  });
+
+  test("a typed command survives caret scrolling while the keyboard is still moving", async ({ page }, info) => {
+    const { writer } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+    const last = writer.locator("p").last();
+    await last.tap();
+    await last.evaluate(paragraph => {
+      const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+      let text = walker.nextNode()!;
+      for (let next = walker.nextNode(); next; next = walker.nextNode()) text = next;
+      window.getSelection()!.setBaseAndExtent(text, text.textContent!.length, text, text.textContent!.length);
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+    await expect.poll(() => nativeWritingSelectionMatches(page)).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(writer.locator("p").last()).toHaveText("");
+    await page.keyboard.press("/");
+    const menu = page.locator(".writing-slash-menu");
+    await expect(menu).toBeVisible();
+    const before = await page.locator(".main-content").evaluate(owner => owner.scrollTop);
+    await page.evaluate(() => {
+      const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+      const motion = { finished: false, present: [] as boolean[] };
+      (window as unknown as { typedCommandMotion: typeof motion }).typedCommandMotion = motion;
+      const started = performance.now();
+      const advance = () => {
+        const fraction = Math.min(1, (performance.now() - started) / 300);
+        fixture.viewport.height = 490 - 90 * fraction;
+        fixture.viewport.offsetTop = 12 * fraction;
+        window.visualViewport!.dispatchEvent(new Event("resize"));
+        window.visualViewport!.dispatchEvent(new Event("scroll"));
+        motion.present.push(!!document.querySelector(".writing-slash-menu"));
+        motion.finished = fraction === 1;
+        if (!motion.finished) requestAnimationFrame(advance);
+      };
+      requestAnimationFrame(advance);
+    });
+    await page.keyboard.type("heading 2", { delay: 20 });
+    await page.waitForFunction(() => (window as unknown as { typedCommandMotion: { finished: boolean } }).typedCommandMotion.finished);
+    expect(await page.evaluate(() => (window as unknown as { typedCommandMotion: { present: boolean[] } }).typedCommandMotion.present.every(Boolean))).toBe(true);
+    // The application's caret correction waits for the keyboard's quiet
+    // window. Verify the palette survives that correction, not just its delay.
+    await expect.poll(() => page.locator(".main-content").evaluate(owner => owner.scrollTop)).toBeGreaterThan(before);
+    await expectMobileWritingBand(page);
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: "Heading 2", exact: true })).toBeVisible();
+    await page.keyboard.press("Enter");
+    await page.keyboard.insertText("A heading after keyboard motion.");
+    await expect(writer.locator("h2")).toHaveText("A heading after keyboard motion.");
+    await expect(writer).not.toContainText("/heading 2");
+  });
+});
+
 test("iPhone Commands to media does not reopen prose input before Cancel", async ({ page }, info) => {
   const { writer, paragraph, commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
   const original = await paragraph.textContent();
@@ -3192,9 +3506,8 @@ test("iPhone Commands to media does not reopen prose input before Cancel", async
   await image.getByRole("button", { name: "Cancel", exact: true }).tap();
   await expect(writer).toBeFocused();
   await changeCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 490, appPan: 0 });
-  const geometry = await restoredCommandGeometry(page);
   await expectKeyboardTopDock(page);
-  expect(geometry.focusGap).toBeLessThanOrEqual(-27);
+  await expectMobileWritingBand(page, 27);
   await page.keyboard.type(" Returned from the chooser.");
   await expect(paragraph).toHaveText(`${original} Returned from the chooser.`);
 });
