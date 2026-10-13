@@ -289,7 +289,7 @@ export function SearchExperience({
               }}
               className="flex h-full min-h-0 flex-col"
             >
-              <div className="search-panel-heading flex shrink-0 flex-wrap items-center justify-between gap-2 bg-card px-4 pt-2">
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-card px-4 pt-2">
                 <TabsList aria-label="Search and Ask AI">
                   <TabsTrigger value="search">Search</TabsTrigger>
                   <TabsTrigger value="ai">Ask AI</TabsTrigger>

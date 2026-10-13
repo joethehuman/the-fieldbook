@@ -1312,11 +1312,10 @@ for (const app of ["demo", "production"] as const) {
         const searchBox = (await search.boundingBox())!;
         const heading = (await page.locator(".sidebar-heading").boundingBox())!;
         expect(searchBox.y + searchBox.height / 2).toBeCloseTo(heading.y + heading.height / 2, 0);
-        const mainBox = (await page.locator(".main-content").boundingBox())!;
-        const titleBox = (await title.boundingBox())!;
-        // Editorial headings use their own reading inset while chrome keeps one geometry.
-        expect(titleBox.y - mainBox.y).toBeGreaterThanOrEqual(16);
-        expect(titleBox.y - mainBox.y).toBeLessThanOrEqual(64);
+        const firstItem = (await page.locator(".sidebar-primary-link").first().boundingBox())!;
+        const firstLine = await title.evaluate((el) => { const box = el.getBoundingClientRect(); return { y: box.y, center: box.y + parseFloat(getComputedStyle(el).lineHeight) / 2 }; });
+        expect(Math.abs(firstLine.center - (firstItem.y + firstItem.height / 2))).toBeLessThanOrEqual(8);
+        expect(firstLine.y - (searchBox.y + searchBox.height)).toBeCloseTo(32, 0);
         if (compact) await page.getByRole("button", { name: "Close navigation", exact: true }).click();
         if (section === "docs") {
           const disclosure = page.locator(".reading-outline-disclosure summary");

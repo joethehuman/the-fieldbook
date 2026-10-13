@@ -5,11 +5,6 @@
     background: var(--surface);
   }
 
-  .workspace-chrome .sidebar-primary-link > span:not(.sidebar-nav-text):not(.nav-count) {
-    width: 100%;
-    justify-content: start;
-  }
-
   .search-shortcut {
     position: absolute;
     inset-inline-end: 0.75rem;
@@ -44,6 +39,7 @@
 
 @layer utilities {
   .workspace-chrome .sidebar-primary-link > span:not(.sidebar-nav-text):not(.nav-count) {
+    width: 100%;
     justify-content: start;
   }
 

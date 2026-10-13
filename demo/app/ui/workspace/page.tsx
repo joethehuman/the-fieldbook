@@ -16,7 +16,6 @@ export default function Page() {
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState(false);
   const [pending, setPending] = useState(false);
-  const [learner, setLearner] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
     <WorkspaceFrame
@@ -24,7 +23,6 @@ export default function Page() {
       collapsed={collapsed}
       menu={menu}
       pending={pending}
-      learner={learner}
       onDismiss={() => setMenu(false)}
       sidebar={
         <>
@@ -85,9 +83,6 @@ export default function Page() {
         </p>
         <Button variant="outline" onClick={() => setPending(!pending)}>
           {pending ? "Hide pending indicator" : "Show pending indicator"}
-        </Button>
-        <Button variant="outline" aria-pressed={learner} onClick={() => setLearner(!learner)}>
-          Learner presentation
         </Button>
         {Array.from({ length: 12 }, (_, index) => (
           <Card key={index}>

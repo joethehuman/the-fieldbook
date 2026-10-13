@@ -423,7 +423,6 @@ export default function ComponentCatalog() {
         </Card>
       </section>
       <section className="grid min-w-0 gap-4">
-        <div className="learner-workspace rounded-xl border border-border p-5">
         <CourseRow
           title="Example"
           heading={<h2>Learning cards and progress</h2>}
@@ -431,7 +430,6 @@ export default function ComponentCatalog() {
         >
           <LearningCardExamples />
         </CourseRow>
-        </div>
         <CollectionControls
           search={
             <SearchField>
