@@ -69,14 +69,9 @@ export function hierarchyBrowserMatches(
   items: HierarchyBrowserItem[],
   query: string,
 ) {
-  const byId = new Map(items.map((item) => [item.id, item]));
   const search = query.trim().toLowerCase();
   return items.filter((item) =>
-    `${item.label} ${item.description || ""} ${pathFor(item.id, byId)
-      .map((part) => part.label)
-      .join(" / ")}`
-      .toLowerCase()
-      .includes(search),
+    item.label.toLowerCase().includes(search),
   );
 }
 

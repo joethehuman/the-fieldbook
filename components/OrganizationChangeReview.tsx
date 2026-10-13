@@ -176,7 +176,7 @@ export function useOrganizationChangeReview() {
   const filtered = rows.filter((r) =>
     `${r.person} ${r.item} ${r.change}`
       .toLowerCase()
-      .includes(query.toLowerCase()),
+      .includes(query.trim().toLowerCase()),
   );
   const courseNames = (change: "gained" | "lost") => [
     ...new Map(
