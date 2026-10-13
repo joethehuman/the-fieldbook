@@ -1,6 +1,7 @@
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import type { AiCitation } from "./ai";
+import { citationMarkerPattern, citationMarkers } from "./ai-citation-markers";
 
 // A small structural Markdown type keeps this presentation helper independent
 // of Streamdown and its transitive AST type packages.
@@ -41,8 +42,8 @@ export function answerCitations(
   function visit(node: MarkdownNode) {
     if (nonProse.has(node.type)) return;
     if (node.type === "text") {
-      for (const match of (node.value || "").matchAll(/\[(S\d+)\]/g)) {
-        const source = verified.get(match[1]);
+      for (const marker of citationMarkers(node.value || "")) {
+        const source = verified.get(marker.id);
         if (!source || byId.has(source.id)) continue;
         const citation = byHref.get(source.href) || {
           number: byHref.size + 1,
@@ -90,18 +91,20 @@ export function citationLinks({
         // Keep internal IDs (including an unfinished trailing ID) out of prose
         // until final metadata can replace them with verified numbered links.
         const value = pending
-          ? (child.value || "").replace(/\[(?:S\d*)?$/, "")
+          ? (child.value || "").replace(/(?:\[|【)(?:S\d*)?$/, "")
           : child.value || "";
         const result: MarkdownNode[] = [];
         let cursor = 0;
-        for (const cluster of value.matchAll(/(?:\[S\d+\][ \t]*)+/g)) {
+        for (const cluster of value.matchAll(
+          new RegExp(`(?:${citationMarkerPattern}[ \\t]*)+`, "g"),
+        )) {
           const start = cluster.index;
           result.push({ type: "text", value: value.slice(cursor, start) });
           const seen = new Set<number>();
-          for (const match of cluster[0].matchAll(/\[(S\d+)\]/g)) {
-            const number = numbers[match[1]];
+          for (const marker of citationMarkers(cluster[0])) {
+            const number = numbers[marker.id];
             if (!number) {
-              if (!pending) result.push({ type: "text", value: match[0] });
+              if (!pending) result.push({ type: "text", value: marker.text });
             } else if (!seen.has(number)) {
               if (seen.size) result.push({ type: "text", value: " " });
               result.push({

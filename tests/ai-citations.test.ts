@@ -58,7 +58,7 @@ test("citations use reading order, reuse numbers and combine passages at one des
 
 test("only verified prose citations become links; code, model URLs and absent metadata stay inert", () => {
   const text =
-    "`[S2]` [fake](/__fieldbook-citation/1) [outside](https://evil.example)\n\nReal [S4]. Unknown [S99].\n\n```text\n[S2]\n```\n\n[ref][route]\n\n[route]: /__fieldbook-citation/1";
+    "`[S2]` `【S2】` `[S4]` `【S4】` [fake](/__fieldbook-citation/1) [【S4】](https://evil.example)\n\nReal 【S4】. Unknown [S99]【S99】. Malformed [S2】 【S2] 【S 2】 【s2】.\n\n```text\n[S2]【S2】[S4]【S4】\n```\n\n[ref][route]\n\n[route]: /__fieldbook-citation/1";
   const citations = answerCitations(text, [source("S2"), source("S4")]);
   assert.deepEqual(
     citations.sources.map(({ source }) => source.id),
@@ -81,6 +81,7 @@ test("only verified prose citations become links; code, model URLs and absent me
   visit(tree);
   assert.deepEqual(links.filter(Boolean), ["/__fieldbook-citation/1"]);
   assert.match(JSON.stringify(tree), /\[S99\]/);
+  assert.match(JSON.stringify(tree), /【S99】/);
   const empty = answerCitations("Hi! [S4]", []);
   assert.deepEqual(empty.sources, []);
   const pending = unified()
@@ -90,6 +91,41 @@ test("only verified prose citations become links; code, model URLs and absent me
     JSON.stringify(pending.runSync(pending.parse("Hi! [S4]"))),
     /__fieldbook-citation/,
   );
+});
+
+test("matching ASCII and Unicode markers share numbering and deduplicate mixed clusters", () => {
+  const text = "First 【S2】[S1]【S2】. Then [S3]【S1】.";
+  const citations = answerCitations(text, [
+    source("S1"),
+    source("S2"),
+    source("S3", "S2"),
+  ]);
+  assert.deepEqual(
+    citations.sources.map(({ number, source }) => [number, source.id]),
+    [
+      [1, "S2"],
+      [2, "S1"],
+    ],
+  );
+  assert.equal(citations.byId.get("S3"), citations.byId.get("S2"));
+  const processor = unified()
+    .use(remarkParse)
+    .use(citationLinks, {
+      numbers: { S1: 2, S2: 1, S3: 1 },
+    });
+  const rendered = JSON.stringify(processor.runSync(processor.parse(text)));
+  assert.doesNotMatch(rendered, /\[S\d+\]|【S\d+】/);
+  assert.equal((rendered.match(/__fieldbook-citation\/1/g) || []).length, 2);
+  assert.equal((rendered.match(/__fieldbook-citation\/2/g) || []).length, 2);
+
+  const malformed = "[S1】 【S1] 【S 1】 【s1】 【S1】(https://evil.example)";
+  const tree = processor.runSync(processor.parse(malformed));
+  // Only the complete marker is a verified link; its following URL stays text.
+  assert.equal(
+    (JSON.stringify(tree).match(/__fieldbook-citation/g) || []).length,
+    1,
+  );
+  assert.match(JSON.stringify(tree), /\[S1】 【S1\] 【S 1】 【s1】/);
 });
 
 test("different lessons retain distinct links even when their course is shared", () => {
@@ -111,9 +147,26 @@ test("pending prose hides internal and partial source IDs until verified metadat
     numbers: {},
     pending: true,
   });
-  for (const tail of ["[", "[S", "[S1", "[S12", "[S12]", "[S12][S3]"]) {
+  for (const tail of [
+    "[",
+    "[S",
+    "[S1",
+    "[S12",
+    "[S12]",
+    "[S12][S3]",
+    "【",
+    "【S",
+    "【S1",
+    "【S12",
+    "【S12】",
+    "【S12】[S3]",
+    "[S12]【S3",
+  ]) {
     const tree: any = pending.runSync(pending.parse("Read the steps " + tail));
-    assert.doesNotMatch(JSON.stringify(tree.children), /\[S|value.*\[$/);
+    assert.doesNotMatch(
+      JSON.stringify(tree.children),
+      /\[S|【S|value.*(?:\[|【)$/,
+    );
     assert.equal(tree.children[0].children[0].value, "Read the steps ");
   }
   const code: any = pending.runSync(pending.parse("`[S12]` and prose [S12]."));
@@ -130,13 +183,15 @@ test("pending prose hides internal and partial source IDs until verified metadat
     });
   const tree = complete.runSync(complete.parse("Read the steps [S12]."));
   assert.match(JSON.stringify(tree), /__fieldbook-citation\/1/);
+  const unicode = complete.runSync(complete.parse("Read the steps 【S12】."));
+  assert.match(JSON.stringify(unicode), /__fieldbook-citation\/1/);
 });
 
 test("installed Streamdown updates cached citation processors when final metadata arrives", async () => {
   const { createElement } = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { Streamdown, defaultRemarkPlugins } = await import("streamdown");
-  const render = (numbers: Record<string, number>) =>
+  const render = (numbers: Record<string, number>, marker: string) =>
     renderToStaticMarkup(
       createElement(
         Streamdown,
@@ -150,15 +205,17 @@ test("installed Streamdown updates cached citation processors when final metadat
           ],
           components: { a: "a" },
         },
-        "Read the published steps [S4].",
+        `Read the published steps ${marker}.`,
       ),
     );
-  const pending = render({});
-  assert.match(pending, /\[S4\]/);
-  assert.doesNotMatch(pending, /__fieldbook-citation/);
-  const complete = render({ S4: 1 });
-  assert.doesNotMatch(complete, /\[S4\]/);
-  assert.match(complete, /href="\/__fieldbook-citation\/1"/);
-  // Another answer can number the same evidence ID differently.
-  assert.match(render({ S4: 2 }), /href="\/__fieldbook-citation\/2"/);
+  for (const marker of ["[S4]", "【S4】"]) {
+    const pending = render({}, marker);
+    assert.ok(pending.includes(marker));
+    assert.doesNotMatch(pending, /__fieldbook-citation/);
+    const complete = render({ S4: 1 }, marker);
+    assert.ok(!complete.includes(marker));
+    assert.match(complete, /href="\/__fieldbook-citation\/1"/);
+    // Another answer can number the same evidence ID differently.
+    assert.match(render({ S4: 2 }, marker), /href="\/__fieldbook-citation\/2"/);
+  }
 });
