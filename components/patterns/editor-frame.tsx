@@ -12,7 +12,7 @@ import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWr
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { EditorAppDockContext } from "./editor-app-header";
 import { useMobileEditorViewport } from "./use-mobile-editor-viewport";
-import { createMobileEditorOpening, mobileEditorLayout, mobileEditorOpeningReady } from "./mobile-editor-layout";
+import { mobileEditorLayout } from "./mobile-editor-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
 export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
@@ -80,13 +80,6 @@ export function EditorFrame({
   const lastWritingCursor = useRef<WritingCursor | null>(null);
   const panelReturn = useRef<WritingCursor | null>(null);
   const preparedPanel = useRef<"outline" | "details" | null>(null);
-  const [panelReady, setPanelReady] = useState(true);
-  const openingPanel = useRef<(ReturnType<typeof createMobileEditorOpening> & { timer: number }) | null>(null);
-  function cancelPanelOpening() {
-    if (openingPanel.current) window.clearTimeout(openingPanel.current.timer);
-    openingPanel.current = null;
-    setPanelReady(true);
-  }
   function preparePanel(side: "outline" | "details") {
     if (!dock) return;
     if (!panelState.current.outline && !panelState.current.details) {
@@ -110,7 +103,6 @@ export function EditorFrame({
     const closing = panelState.current[side];
     if (!closing && preparedPanel.current !== side) preparePanel(side);
     preparedPanel.current = null;
-    cancelPanelOpening();
     if (!closing && dock) {
       const cursor = panelReturn.current;
       if (cursor?.kind === "prose" && cursor.surface.isConnected && cursor.surface.textContent === cursor.value
@@ -120,11 +112,6 @@ export function EditorFrame({
           range.setStart(cursor.start, cursor.startOffset); range.setEnd(cursor.end, cursor.endOffset);
           cursor.surface.dispatchEvent(new CustomEvent("fieldbook:writing-handoff", { bubbles: true, detail: range }));
         } catch { /* A completed gesture no longer owns its captured writing target. */ }
-      }
-      if (controls.current?.dataset.keyboardVisible === "true") {
-        const session = { ...createMobileEditorOpening(performance.now(), frame.current ? mobileEditorLayout(frame.current).viewport : null), timer: 0 };
-        openingPanel.current = session;
-        setPanelReady(false);
       }
       blurWritingInput();
       window.getSelection()?.removeAllRanges();
@@ -145,10 +132,8 @@ export function EditorFrame({
     let active = true;
     let releaseRequest = 0;
     let lastBand = "";
-    let lastPosition: string | null = null;
     let lastCaret: { node: Node; offset: number; top: number } | null = null;
     let caretSnapshotNeeded = false;
-    let fade: Animation | undefined;
     const setStyle = (target: HTMLElement | null | undefined, name: string, value: string) => {
       if (target && target.style.getPropertyValue(name) !== value) target.style.setProperty(name, value);
     };
@@ -160,27 +145,13 @@ export function EditorFrame({
       const keyboard = dock && shell?.dataset.editorKeyboard === "true";
       if (dock) {
         element.dataset.keyboardVisible = String(keyboard);
-        const position = keyboard ? "top" : "bottom";
-        element.dataset.dockPosition = position;
-        if (lastPosition !== null && lastPosition !== position && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          fade?.cancel();
-          fade = element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: "ease-out" });
-        }
-        lastPosition = position;
-        const metadata = header?.querySelector<HTMLElement>(".editor-save-status");
-        const cell = header?.querySelector<HTMLElement>(".app-editor-dock-cell");
-        const metadataWidth = metadata ? Array.from(metadata.children).reduce((width, child) => width + child.getBoundingClientRect().width, 0)
-          + (parseFloat(getComputedStyle(metadata).columnGap) || 0) : 0;
-        const statusGap = metadata?.parentElement ? parseFloat(getComputedStyle(metadata.parentElement).columnGap) || 0 : 0;
-        const halfGap = ((cell?.getBoundingClientRect().width || 0) - element.getBoundingClientRect().width) / 2;
-        if (app) app.dataset.editorHeaderMetadata = keyboard && metadataWidth + statusGap > halfGap ? "hidden" : "visible";
       }
       const rect = element.getBoundingClientRect();
       const usableTop = (header?.getBoundingClientRect().bottom || rootBounds?.top || 0) + 8;
       // The visual viewport is the visible writing area. Reserving guessed
       // browser/keyboard heights again makes a short document scroll too soon.
       const viewportBottom = (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
-      const usableBottom = (keyboard ? Math.min(bottom, viewportBottom) : rect.top) - 8;
+      const usableBottom = Math.min(bottom, viewportBottom) - 8;
       if (layout) layout.band = { top: usableTop, bottom: usableBottom, keyboard };
       const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
       const panelTop = dock ? usableTop : rect.bottom + 8;
@@ -190,21 +161,7 @@ export function EditorFrame({
         setStyle(element, "--editor-usable-top", `${usableTop}px`);
         setStyle(element, "--editor-usable-bottom", `${usableBottom}px`);
         setStyle(element, "--editor-writing-top", `${usableTop}px`);
-        element.dataset.dockSettled = "true";
-        setStyle(owner, "--editor-dock-clearance", `${keyboard ? 16 : rect.height + 24}px`);
-        const pending = openingPanel.current;
-        if (pending) {
-          const panel = overlayLayer.current?.querySelector<HTMLElement>('[data-open="true"]');
-          const preferred = Math.min(360, panel?.scrollHeight || 360);
-          const readiness = mobileEditorOpeningReady(pending, layout?.band || null, preferred,
-            [viewport?.height || window.innerHeight, viewport?.offsetTop || 0,
-              viewport?.width || window.innerWidth, viewport?.offsetLeft || 0, viewport?.scale || 1], performance.now(), layout?.viewport);
-          window.clearTimeout(pending.timer);
-          if (readiness.ready) cancelPanelOpening();
-          else pending.timer = window.setTimeout(() => {
-            if (openingPanel.current === pending) measureDock.current?.();
-          }, readiness.checkIn);
-        }
+        setStyle(owner, "--editor-dock-clearance", "8px");
       }
       setStyle(frame.current, "--editor-navigation-height", `${dock ? 0 : rect.height}px`);
       setStyle(overlayLayer.current, "--editor-panel-top", `${panelTop - (dock ? rootBounds?.top || 0 : 0)}px`);
@@ -270,8 +227,6 @@ export function EditorFrame({
     const editor = frame.current?.closest(".editor");
     if (editor) observer.observe(editor);
     if (phone && header) observer.observe(header);
-    const mutations = new MutationObserver(schedule);
-    if (dock && header) mutations.observe(header, { childList: true, characterData: true, subtree: true });
     if (!dock) owner?.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     if (!dock) {
@@ -291,12 +246,9 @@ export function EditorFrame({
       unsubscribe?.();
       unsubscribeCaret?.();
       cancelAnimationFrame(releaseRequest);
-      fade?.cancel();
       if (measureDock.current === schedule) measureDock.current = null;
       observer.disconnect();
-      mutations.disconnect();
       if (dock) {
-        app?.removeAttribute("data-editor-header-metadata");
         shell?.style.removeProperty("--editor-popup-available-height");
         if (owner && frame.current && frame.current.dataset.dock !== "true") {
           const navigationHeight = canvas.current?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().height || 0;
@@ -338,41 +290,26 @@ export function EditorFrame({
       }
     };
   }, [hasNavigation, phone, dock, overlayHost, dockHost]);
-  useLayoutEffect(() => {
-    if (!panels.outline && !panels.details) cancelPanelOpening();
-    measureDock.current?.();
-  }, [panels.outline, panels.details]);
-  useEffect(() => () => { if (openingPanel.current) window.clearTimeout(openingPanel.current.timer); }, []);
+  useLayoutEffect(() => { measureDock.current?.(); }, [panels.outline, panels.details]);
   useEffect(() => {
-    if (!dock || panelReady) return;
+    if (!dock || !panels.outline && !panels.details) return;
     const cancel = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || !openingPanel.current) return;
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
       event.preventDefault(); event.stopPropagation();
-      cancelPanelOpening();
       setPanels({ outline: false, details: false });
       returnToWriting(panels.outline ? outlineToggle.current : detailsToggle.current);
     };
-    const outside = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest('.editor-frame-controls[data-dock="true"], .editor-mobile-panels')) return;
-      cancelPanelOpening();
-      panelReturn.current = null;
-      setPanels({ outline: false, details: false });
-    };
-    document.addEventListener("keydown", cancel, true);
-    document.addEventListener("pointerdown", outside, true);
-    return () => {
-      document.removeEventListener("keydown", cancel, true);
-      document.removeEventListener("pointerdown", outside, true);
-    };
-  }, [dock, panelReady, panels.outline]);
+    // Let fields and portaled pickers consume Escape before closing the panel.
+    document.addEventListener("keydown", cancel);
+    return () => document.removeEventListener("keydown", cancel);
+  }, [dock, panels.outline, panels.details]);
   const wide = useRef(false);
   const narrow = useRef(false);
   const outlineToggle = useRef<HTMLButtonElement>(null);
   const detailsToggle = useRef<HTMLButtonElement>(null);
   const outlineId = useId();
   const detailsId = useId();
-  const dismissPanels = useCallback(() => { cancelPanelOpening(); setPanels({ outline: false, details: false }); }, []);
+  const dismissPanels = useCallback(() => setPanels({ outline: false, details: false }), []);
   const compactControls = useMemo(() => dock ? { panelsOpen: panels.outline || panels.details, dismissPanels } : null, [dock, panels.outline, panels.details, dismissPanels]);
   const defaultsApplied = useRef(false);
   const previousClearance = useRef({ outline: false, details: false });
@@ -511,7 +448,7 @@ export function EditorFrame({
     </div>
   </EditorDetailsGroup>;
   const panelControls = (
-      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} data-dock={dock || undefined} role={dock ? "group" : undefined} aria-label={dock ? "Editor controls" : undefined}>
+      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} data-dock={dock || undefined} data-dock-position={dock ? "top" : undefined} role={dock ? "group" : undefined} aria-label={dock ? "Editor controls" : undefined}>
       <div className="editor-controls-surface">
         {outline && (
           <Button ref={outlineToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${dock ? "relative w-[30px] h-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative size-11 rounded-full" : "absolute size-11 rounded-full"}`} data-side="outline"
@@ -577,7 +514,7 @@ export function EditorFrame({
         {!phone && panelSurfaces}
         <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!dock && (navigation || phone) && <div className="editor-canvas-navigation">{!phone && navigation}{phone && panelControls}</div>}{children}</div>
       </div>
-      {phone && overlayHost && createPortal(<div ref={overlayLayer} className="editor-mobile-panels" data-dock={dock || undefined} data-panel-ready={dock ? String(panelReady) : undefined}>{panelSurfaces}</div>, overlayHost)}
+      {phone && overlayHost && createPortal(<div ref={overlayLayer} className="editor-mobile-panels" data-dock={dock || undefined}>{panelSurfaces}</div>, overlayHost)}
     </section>
     </EditorWritingActionsContext.Provider>
     </EditorCompactControlsContext.Provider>

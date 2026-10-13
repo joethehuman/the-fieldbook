@@ -6,7 +6,7 @@ import { writingTableControlsPlugin } from "./writing-table-controls";
 import { $createWritingVideoNode, writingVideoPlugin } from "./writing-video";
 import { WritingMediaLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
 import { useScrollFade } from "./use-scroll-fade";
-import { createMobileEditorOpening, mobileEditorLayout, mobileEditorOpeningReady } from "./mobile-editor-layout";
+import { mobileEditorLayout } from "./mobile-editor-layout";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
 import { $applyWritingBlockStyle, $isMediaParagraph, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
@@ -430,7 +430,6 @@ export default function WritingEditorEngine({
   const paletteSession = useRef<{
     menu: HTMLDivElement;
     ready: boolean;
-    opening: ReturnType<typeof createMobileEditorOpening>;
     cancel?: () => void;
   } | null>(null);
   const lexicalEditor = useRef<LexicalEditor | null>(null);
@@ -585,11 +584,9 @@ export default function WritingEditorEngine({
     if (!dock || !menu) return;
     const layout = mobileEditorLayout(dock);
     if (paletteSession.current?.menu !== menu) paletteSession.current = {
-      menu, ready: false, opening: createMobileEditorOpening(performance.now(), layout.viewport),
+      menu, ready: false,
     };
     const session = paletteSession.current;
-    const waitsForKeyboard = !!mediaChooser || slashFromToolbar;
-    let readinessCheck = 0;
     const setStyle = (name: string, value: string) => {
       if (menu.style.getPropertyValue(name) !== value) menu.style.setProperty(name, value);
     };
@@ -601,41 +598,30 @@ export default function WritingEditorEngine({
       const bounds = app?.getBoundingClientRect();
       const visibleBottom = Math.min((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight), bounds?.bottom || window.innerHeight);
       const visibleTop = Math.max(0, visibleBottom - (viewport?.height || window.innerHeight), app?.querySelector(".topbar")?.getBoundingClientRect().bottom || 0);
-      const dockPosition = dock.dataset.dockPosition === "top" ? "top" : "bottom";
       const usableTop = layout.band?.top ?? NaN;
       const usableBottom = layout.band?.bottom ?? NaN;
       // The frame owns the permitted popup band. Even a constrained chooser
       // stays in that band, with the dock visible and its own list scrolling.
       const top = Number.isFinite(usableTop) ? usableTop
-        : dockPosition === "top" ? Math.max(visibleTop + 8, anchor.bottom + 8) : visibleTop + 8;
+        : Math.max(visibleTop + 8, anchor.bottom + 8);
       const bottom = Number.isFinite(usableBottom) ? usableBottom
-        : dockPosition === "bottom" ? Math.min(visibleBottom - 8, anchor.top - 8) : visibleBottom - 8;
+        : visibleBottom - 8;
       const left = viewport?.offsetLeft || 0;
       const visibleWidth = viewport?.width || window.innerWidth;
       const width = Math.min(mediaChooser ? 324 : 288, visibleWidth - 16);
       setStyle("width", `${width}px`);
       const available = Math.max(0, bottom - top);
-      const mode = dockPosition === "top" ? "below" : "above";
       const wasReady = session.ready;
-      // Wait for native motion before the first paint. A quiet fallback keeps
-      // controls reachable if a browser never reports keyboard dismissal;
-      // neither that fallback nor the first paint chooses a permanent anchor.
-      if (!session.ready) {
-        clearTimeout(readinessCheck);
-        const opening = mobileEditorOpeningReady(session.opening, layout.band, 360,
-          [viewport?.height || window.innerHeight, viewport?.offsetTop || 0,
-            viewport?.width || window.innerWidth, viewport?.offsetLeft || 0, viewport?.scale || 1], performance.now(), layout.viewport);
-        session.ready = !waitsForKeyboard || opening.ready;
-        if (!session.ready) readinessCheck = window.setTimeout(() => layout.schedule("viewport"), opening.checkIn);
-      }
-      setStyle("top", `${mode === "above" ? bottom : top}px`);
+      // One header anchor remains usable throughout native keyboard motion.
+      // The first measured paint can open; only available height changes.
+      session.ready = true;
+      setStyle("top", `${top}px`);
       setStyle("left", `${Math.max(left + 8, Math.min(anchor.x + anchor.width / 2 - width / 2, left + visibleWidth - width - 8))}px`);
-      setStyle("transform", mode === "above" ? "translateY(-100%)" : "none");
+      setStyle("transform", "none");
       setStyle("max-height", `${Math.min(360, available)}px`);
       if (mediaChooser) setStyle("overflow-y", "auto");
       menu.dataset.paletteReady = String(session.ready);
       if (session.ready && !wasReady) {
-        clearTimeout(readinessCheck);
         if (mediaChooser) menu.querySelector<HTMLButtonElement>(".writing-media-tabs button, .writing-media-fields button:not(:disabled)")?.focus({ preventScroll: true });
         else if (slashFromToolbar && focusInsertItem.current) {
           focusInsertItem.current = false;
@@ -661,7 +647,6 @@ export default function WritingEditorEngine({
     const schedule = () => layout.schedule("overlay");
     const unsubscribe = layout.subscribe("overlay", place);
     const cancelOpening = () => {
-      clearTimeout(readinessCheck);
       if (paletteSession.current === session) paletteSession.current = null;
     };
     session.cancel = cancelOpening;
@@ -670,7 +655,6 @@ export default function WritingEditorEngine({
     observer.observe(menu);
     return () => {
       unsubscribe();
-      clearTimeout(readinessCheck);
       observer.disconnect();
       if (session.cancel === cancelOpening) session.cancel = undefined;
       if (!menu.isConnected && paletteSession.current?.menu === menu) paletteSession.current = null;

@@ -37,7 +37,7 @@ export function useMobileEditorViewport(
       if (!keyboard && !editing) fullHeight = Math.max(fullHeight, document.documentElement.clientHeight, height);
       const changed = layout.recordViewport(
         [height, viewport?.offsetTop || 0, viewport?.width || nextWidth, viewport?.offsetLeft || 0, viewport?.scale || 1],
-        performance.now(), fullHeight,
+        performance.now(),
       );
       if (changed) {
         window.clearTimeout(settledTimer);

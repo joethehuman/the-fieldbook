@@ -32,9 +32,11 @@ export function EditorSaveStatus({
           {state === "saving" ? <Spinner /> : state === "saved" ? <Check className="size-4" strokeWidth={1.5} /> : null}
         </span>
       </span>
-      <Badge variant={published ? "success" : "default"}>
-        {published ? "Published" : "Draft"}
-      </Badge>
+      <span className="editor-publication-badge">
+        <Badge variant={published ? "success" : "default"}>
+          {published ? "Published" : "Draft"}
+        </Badge>
+      </span>
     </div>
   );
 }

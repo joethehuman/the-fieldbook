@@ -2676,6 +2676,11 @@ export function Editor({
   const audienceLabel = audienceAssigned ? "Edit Audience" : "Assign audience";
   const details = (
     <FieldGroup disabled={busy} className="editor-details-content">
+      <div className="editor-publication-details">
+        <EditorDetailsGroup id="writing-publication" title="Publication status">
+          <PublicationStatus published={!!c.publishedRevision} />
+        </EditorDetailsGroup>
+      </div>
       {requirements.length > 0 && <EditorDetailsGroup id="writing-readiness" title="Before publishing">
           <ul className="grid gap-2">
             {requirements.map((item) => (
