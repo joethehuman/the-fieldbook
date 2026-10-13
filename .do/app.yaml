@@ -47,9 +47,12 @@ services:
       - key: FIELDBOOK_BUILD_REVISION
         value: ${_self.COMMIT_HASH}
       - key: NEXT_PUBLIC_SUPABASE_URL
-        value: ${APP_URL}/backend
+        # Dockerfile build arguments cannot depend on runtime bindable URLs.
+        value: https://YOUR_APP_DOMAIN/backend
+        scope: RUN_AND_BUILD_TIME
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         value: YOUR_ANON_KEY
+        scope: RUN_AND_BUILD_TIME
       - key: SUPABASE_SECRET_KEY
         value: YOUR_SERVICE_ROLE_KEY
         type: SECRET
