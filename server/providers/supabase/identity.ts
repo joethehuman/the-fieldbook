@@ -7,7 +7,7 @@ import { loginSubjectForPerson } from "./identity-store";
 import { refreshIdentitySession } from "./session";
 import { env } from "../../env";
 import { HttpError, ServiceError } from "../../errors";
-import { isAbsentSession } from "./auth-errors";
+import { isAbsentSession, isInactiveIdentity } from "./auth-errors";
 import type {
   AuthorizationDetails,
   AuthorizationRedirect,
@@ -51,6 +51,8 @@ export async function verifyIdentity(
     throw unavailable();
   }
   if (result.error) {
+    if (isInactiveIdentity(result.error))
+      throw new HttpError(403, "This account is inactive.");
     if (isAbsentSession(result.error)) return null;
     throw unavailable(result.error.code);
   }
@@ -75,8 +77,11 @@ export async function verifyReaderIdentity(): Promise<ReaderIdentity> {
   } catch {
     throw unavailable();
   }
-  if (result.error)
+  if (result.error) {
+    if (isInactiveIdentity(result.error))
+      throw new HttpError(403, "This account is inactive.");
     return { status: isAbsentSession(result.error) ? "absent" : "verify-user" };
+  }
   const subject = result.data?.claims.sub;
   return subject ? { status: "verified", subject } : { status: "absent" };
 }

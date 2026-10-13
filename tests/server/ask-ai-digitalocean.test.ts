@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { digitaloceanAi } from "../../server/providers/digitalocean/ai";
 import { ai } from "../../server/ai";
-import { aiBounds, aiUnavailableMessage } from "../../lib/ai";
+import { aiUnavailableMessage } from "../../lib/ai";
 
 const routerUuid = "123e4567-e89b-12d3-a456-426614174000";
 const routerConfig = {
@@ -82,13 +82,14 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
     calls.push(body);
     assert.equal(body.model, "router:fieldbook");
     assert.equal(body.max_tokens, undefined);
+    assert.equal(body.reasoning_effort, "low");
     if (failure)
       return Response.json(
         { error: { message: "private source and credential" } },
         { status: 402 },
       );
     if (!body.stream) {
-      assert.equal(body.max_completion_tokens, aiBounds.planningOutputTokens);
+      assert.equal(body.max_completion_tokens, 1024);
       assert.deepEqual(body.tool_choice, {
         type: "function",
         function: { name: "searchPublishedContent" },
@@ -104,6 +105,7 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
             message: {
               role: "assistant",
               content: null,
+              reasoning_content: "Private planning reasoning",
               tool_calls: [
                 {
                   id: "search",
@@ -122,11 +124,23 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
         usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
       });
     }
-    assert.equal(body.max_completion_tokens, aiBounds.answerOutputTokens);
+    assert.equal(body.max_completion_tokens, 2048);
     assert.equal(body.tools, undefined);
     assert.match(body.messages.at(-1).content, /S1/);
     assert.ok(!body.messages.at(-1).content.includes("/docs/example"));
     const chunks = [
+      {
+        id: "answer",
+        model: "test-chat",
+        created: 1,
+        choices: [
+          {
+            index: 0,
+            delta: { reasoning_content: "Private answer reasoning" },
+            finish_reason: null,
+          },
+        ],
+      },
       {
         id: "answer",
         model: "test-chat",
@@ -226,6 +240,108 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
     globalThis.fetch = previousFetch;
     process.env = previousEnvironment;
     console.warn = previousWarn;
+  }
+});
+
+test("Reasoning-only, truncated, or invalid plans fail closed without retries or reasoning disclosure", async () => {
+  const originalFetch = globalThis.fetch;
+  const environment = { ...process.env };
+  Object.assign(process.env, {
+    DIGITALOCEAN_MODEL_ACCESS_KEY: "synthetic-model-key",
+    DIGITALOCEAN_INFERENCE_ROUTER: "router:fieldbook",
+    DIGITALOCEAN_ROUTER_READ_TOKEN: "synthetic-read-key",
+  });
+  const toolCall = (queries: string[]) => ({
+    id: "search",
+    type: "function",
+    function: {
+      name: "searchPublishedContent",
+      arguments: JSON.stringify({ queries }),
+    },
+  });
+  let calls = 0;
+  let finish = "length";
+  let toolCalls: ReturnType<typeof toolCall>[] = [];
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    const body = JSON.parse(String(init?.body));
+    if (body.stream)
+      return new Response(
+        `data: ${JSON.stringify({
+          id: "answer",
+          created: 1,
+          model: "test-chat",
+          choices: [
+            {
+              index: 0,
+              delta: { reasoning_content: "Private unfinished reasoning" },
+              finish_reason: "length",
+            },
+          ],
+        })}\n\ndata: [DONE]\n\n`,
+        { headers: { "content-type": "text/event-stream" } },
+      );
+    return Response.json({
+      id: "plan",
+      created: 1,
+      model: "test-chat",
+      choices: [
+        {
+          index: 0,
+          finish_reason: finish,
+          message: {
+            role: "assistant",
+            content: null,
+            reasoning_content: "Private planning reasoning",
+            tool_calls: toolCalls,
+          },
+        },
+      ],
+    });
+  };
+  const input = {
+    model: "router:fieldbook",
+    messages: [{ role: "user" as const, text: "How do backups work?" }],
+    instructions: "Synthetic policy",
+    signal: new AbortController().signal,
+  };
+  try {
+    for (const state of [
+      { reason: "length", tools: [] },
+      { reason: "length", tools: [toolCall(["backup"])] },
+      { reason: "stop", tools: [] },
+      { reason: "tool_calls", tools: [toolCall(["a", "b", "c", "d"])] },
+      {
+        reason: "tool_calls",
+        tools: [toolCall(["backup"]), toolCall(["restore"])],
+      },
+    ]) {
+      finish = state.reason;
+      toolCalls = state.tools;
+      const before = calls;
+      await assert.rejects(digitaloceanAi.planSearch(input), {
+        status: 503,
+        message: aiUnavailableMessage,
+      });
+      assert.equal(calls, before + 1);
+    }
+    const visible: string[] = [];
+    const before = calls;
+    await assert.rejects(
+      async () => {
+        for await (const part of digitaloceanAi.streamAnswer({
+          ...input,
+          sources: [],
+        }))
+          visible.push(part);
+      },
+      { status: 503, message: aiUnavailableMessage },
+    );
+    assert.deepEqual(visible, []);
+    assert.equal(calls, before + 1);
+  } finally {
+    process.env = environment;
+    globalThis.fetch = originalFetch;
   }
 });
 

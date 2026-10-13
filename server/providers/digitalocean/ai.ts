@@ -2,7 +2,7 @@ import "server-only";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText, smoothStream, streamText, tool } from "ai";
 import { z } from "zod";
-import { aiBounds, aiUnavailableMessage, type AiModel } from "@/lib/ai";
+import { aiUnavailableMessage, type AiModel } from "@/lib/ai";
 import type { AiProvider } from "../../ports/ai";
 import { aiSearchPlanSchema } from "../../ai-schema";
 import { HttpError } from "../../errors";
@@ -11,6 +11,12 @@ globalThis.AI_SDK_LOG_WARNINGS = false;
 const baseURL = "https://inference.do-ai.run/v1";
 const unavailable = () => new HttpError(503, aiUnavailableMessage);
 const controlURL = "https://api.digitalocean.com/v2/gen-ai/models";
+// DO's completion cap includes reasoning. Reserve room for both reasoning and
+// the forced tool/visible answer; low effort bounds latency without disabling
+// reasoning that gpt-oss requires. Pool compatibility checks must use these
+// request settings, not an unbounded direct-model probe.
+const completionBounds = { planning: 1024, answer: 2048 } as const;
+const reasoningOptions = { digitalocean: { reasoningEffort: "low" } };
 // Custom routers keep operator-owned pools and fallback order. The automatic
 // inference-router target has a changing pool we cannot validate for Ask AI.
 const targetSchema = z.string().regex(/^router:[a-z0-9][a-z0-9-]{0,152}$/);
@@ -224,7 +230,7 @@ function model(id: string, fallback: string | undefined) {
     baseURL,
     apiKey: process.env.DIGITALOCEAN_MODEL_ACCESS_KEY,
     // DigitalOcean documents max_completion_tokens; the generic provider emits
-    // the older max_tokens field. Keep the application's existing token bounds.
+    // the older max_tokens field. Both reasoning and visible output use this cap.
     transformRequestBody: ({ max_tokens, ...body }) => ({
       ...body,
       max_completion_tokens: max_tokens,
@@ -281,11 +287,13 @@ export const digitaloceanAi: AiProvider = {
           }),
         },
         toolChoice: { type: "tool", toolName: "searchPublishedContent" },
-        maxOutputTokens: aiBounds.planningOutputTokens,
+        maxOutputTokens: completionBounds.planning,
+        providerOptions: reasoningOptions,
         maxRetries: 0,
         abortSignal: input.signal,
       });
       if (
+        result.finishReason === "length" ||
         result.toolCalls.length !== 1 ||
         result.toolCalls[0].toolName !== "searchPublishedContent"
       )
@@ -320,7 +328,8 @@ export const digitaloceanAi: AiProvider = {
               ),
           },
         ],
-        maxOutputTokens: aiBounds.answerOutputTokens,
+        maxOutputTokens: completionBounds.answer,
+        providerOptions: reasoningOptions,
         maxRetries: 0,
         abortSignal: input.signal,
         experimental_transform: smoothStream({ delayInMs: 50 }),
