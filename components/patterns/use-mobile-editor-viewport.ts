@@ -19,7 +19,6 @@ export function useMobileEditorViewport(
     // Rotation or attaching a trackpad must not reopen the outer page.
     const touch = window.matchMedia("(any-pointer: coarse)");
     let request = 0;
-    let previousSize: { height: number; width: number } | null = null;
     const releaseBody = () => {
       if (body.style.getPropertyValue("position") !== "fixed" || body.style.getPropertyPriority("position") !== "important") return;
       if (bodyPosition) body.style.setProperty("position", bodyPosition, bodyPositionPriority);
@@ -38,11 +37,6 @@ export function useMobileEditorViewport(
       const top = viewport?.offsetTop || 0;
       const left = viewport?.offsetLeft || 0;
       if (![height, width, top, left].every(Number.isFinite) || height <= 0 || width <= 0) return;
-      // Capture an eligible visible caret before this adapter shortens its
-      // canvas. The writing owner may reveal that same target once after layout.
-      if (previousSize && height < previousSize.height - 1 && Math.abs(width - previousSize.width) < 1)
-        app.dispatchEvent(new Event("fieldbook:writing-viewport-shrink"));
-      previousSize = { height, width };
       // Fixed positioning uses layout-viewport coordinates. Native input reveal
       // can pan the visual viewport with zero DOM scroll and ignore scrollTo.
       // Move the entire application boundary, never its header or caret alone.
@@ -69,7 +63,6 @@ export function useMobileEditorViewport(
       else {
         cancelAnimationFrame(request);
         request = 0;
-        previousSize = null;
         for (const property of properties) documentRoot.style.removeProperty(`--editor-viewport-${property}`);
         releaseBody();
       }

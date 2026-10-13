@@ -2629,131 +2629,6 @@ test("Markdown Return after a long title retains native field reveal and exact s
   await expectHeaderDock(page);
 });
 
-test.describe("mobile caret through a shrinking canvas", () => {
-  test.use({ isMobile: true });
-
-  for (const kind of ["doc", "course"] as const) {
-    test(`${kind}: a visible caret survives real viewport shrinking without another input`, async ({ page }, info) => {
-      await page.setViewportSize({ width: 375, height: 812 });
-      await open(page, info.project.name.startsWith("production"), kind);
-      const writer = page.locator('.writing-content[contenteditable="true"]');
-      await writer.locator("p").nth(1).tap();
-      expect((await restoredCommandGeometry(page)).focusBottom).toBeGreaterThan(250);
-      const point = await writer.evaluate(() => {
-        const selection = window.getSelection()!;
-        return { text: selection.focusNode!.textContent, offset: selection.focusOffset };
-      });
-      for (const height of [490, 350, 320, 250]) {
-        const before = await restoredCommandGeometry(page);
-        // Resize the browser's rendering surface, without overriding getters.
-        await page.setViewportSize({ width: 375, height });
-        await expectMobileWritingBand(page, 7);
-        const after = await restoredCommandGeometry(page);
-        if (before.focusBottom <= height - 8) expect(after.scrollTop).toBe(before.scrollTop);
-        expect(await writer.evaluate(() => {
-          const selection = window.getSelection()!;
-          return { text: selection.focusNode!.textContent, offset: selection.focusOffset };
-        })).toEqual(point);
-        await expect(writer).toBeFocused();
-        await expect(page.locator(".topbar")).toBeInViewport({ ratio: 1 });
-      }
-      // Ordinary input still belongs to native editing and Lexical after resize.
-      await page.keyboard.insertText(" resize-input ");
-      await expect(writer).toContainText("resize-input");
-      await expectMobileWritingBand(page);
-      await page.screenshot({ path: info.outputPath(`${kind}-caret-after-rendered-shrink.png`) });
-    });
-  }
-
-  test.describe("native wheel ownership in a touch-capable browser", () => {
-    // Playwright cannot send a native wheel in its mobile WebKit mode. Keep
-    // touch capability and the same compact layout while exercising real wheel routing.
-    test.use({ isMobile: false });
-    test("intentional wheel scrolling retains ownership when a smaller canvas would hide the caret", async ({ page }, info) => {
-      await page.setViewportSize({ width: 375, height: 812 });
-      await open(page, info.project.name.startsWith("production"), "course");
-      const writer = page.locator('.writing-content[contenteditable="true"]');
-      await writer.locator("p").nth(20).tap();
-      const owner = page.locator(".main-content");
-      const before = await owner.evaluate(owner => owner.scrollTop);
-      const box = (await owner.boundingBox())!;
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await page.mouse.wheel(0, -32);
-      await expect.poll(() => owner.evaluate(owner => owner.scrollTop)).toBeLessThan(before);
-      const scrolled = await owner.evaluate(owner => owner.scrollTop);
-      const caret = await restoredCommandGeometry(page);
-      expect(caret.focusTop).toBeGreaterThanOrEqual(caret.rawTop);
-      expect(caret.focusBottom).toBeLessThanOrEqual(812);
-      expect(caret.focusBottom).toBeGreaterThan(250);
-      await page.setViewportSize({ width: 375, height: 250 });
-      await owner.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
-      expect(await owner.evaluate(owner => owner.scrollTop)).toBe(scrolled);
-      // A deliberate edit returns control to the caret; inertia itself never does.
-      await page.keyboard.press("ArrowRight");
-      await expectMobileWritingBand(page);
-    });
-  });
-
-  for (const collapsed of [true, false]) test(`${collapsed ? "a collapsed caret" : "a backward selection"} hidden by manual scrolling is not recalled during viewport shrinking`, async ({ page }, info) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await open(page, info.project.name.startsWith("production"), "course");
-    const writer = page.locator('.writing-content[contenteditable="true"]');
-    await writer.locator("p").first().tap();
-    await writer.evaluate((element, collapsed) => {
-      const text = document.createTreeWalker(element.querySelector("p")!, NodeFilter.SHOW_TEXT).nextNode()!;
-      window.getSelection()!.setBaseAndExtent(text, 16, text, collapsed ? 16 : 2);
-      element.closest<HTMLElement>(".main-content")!.scrollTop = 600;
-    }, collapsed);
-    const readPoints = () => writer.evaluate(() => {
-      const selection = window.getSelection()!;
-      return { text: selection.toString(), anchor: selection.anchorNode!.textContent,
-        anchorOffset: selection.anchorOffset, focus: selection.focusNode!.textContent,
-        focusOffset: selection.focusOffset, collapsed: selection.isCollapsed };
-    });
-    const selection = await readPoints();
-    const owner = page.locator(".main-content");
-    await page.setViewportSize({ width: 375, height: 250 });
-    await owner.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
-    expect(await owner.evaluate(owner => owner.scrollTop)).toBe(600);
-    expect(await readPoints()).toEqual(selection);
-  });
-
-  test("scrolling between viewport capture and its next frame wins over the saved caret", async ({ page }, info) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await open(page, info.project.name.startsWith("production"), "course");
-    const writer = page.locator('.writing-content[contenteditable="true"]');
-    await writer.locator("p").nth(1).tap();
-    await installCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 812 });
-    await page.evaluate(() => {
-      const viewport = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport;
-      viewport.height = 250;
-      window.visualViewport!.dispatchEvent(new Event("resize"));
-      document.querySelector<HTMLElement>(".main-content")!.scrollTop = 600;
-    });
-    const owner = page.locator(".main-content");
-    await owner.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
-    expect(await owner.evaluate(owner => owner.scrollTop)).toBe(600);
-  });
-
-  test("a held focus tap and coalesced viewport reports keep the same caret", async ({ page }, info) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await open(page, info.project.name.startsWith("production"), "course");
-    const writer = page.locator('.writing-content[contenteditable="true"]');
-    await writer.locator("p").first().tap();
-    await writer.dispatchEvent("pointerdown", { pointerId: 7, pointerType: "touch", isPrimary: true, button: 0, clientX: 120, clientY: 290 });
-    await installCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 812 });
-    await page.evaluate(() => {
-      const viewport = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport;
-      for (const height of [320, 250, 220]) {
-        viewport.height = height;
-        window.visualViewport!.dispatchEvent(new Event("resize"));
-      }
-    });
-    await expectMobileWritingBand(page, 7);
-    await writer.dispatchEvent("pointerup", { pointerId: 7, pointerType: "touch", isPrimary: true, button: 0 });
-  });
-});
-
 test.describe("short mobile authoring with a rendered viewport", () => {
   test.use({ isMobile: true, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" });
 
@@ -4852,6 +4727,50 @@ test("ordinary canvas scroll is not countered by an application caret controller
   expect(await owner.evaluate(owner => owner.scrollTop)).toBeCloseTo(chosen, 0);
   expect((await dock.boundingBox())!).toEqual(before);
   await expect(writer).toContainText("Native editing.");
+});
+
+test("modeled shrinking viewport reports do not acquire ordinary caret scrolling", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "course");
+  const writer = page.getByRole("textbox", { name: "Lesson content", exact: true });
+  await writer.locator("p").first().tap();
+  // Finish the native focus transaction before recording viewport-only effects.
+  await writer.evaluate(async () => { for (let frame = 0; frame < 4; frame++) await new Promise(requestAnimationFrame); });
+  await installCommandViewport(page, { height: 812, offsetTop: 0, clientHeight: 812 });
+  type ShrinkProbe = { calls: number; anchor: Node | null; anchorOffset: number; focus: Node | null; focusOffset: number; surface: Element | null };
+  await writer.evaluate(element => {
+    const selection = window.getSelection()!;
+    const probe: ShrinkProbe = { calls: 0, anchor: selection.anchorNode, anchorOffset: selection.anchorOffset,
+      focus: selection.focusNode, focusOffset: selection.focusOffset, surface: document.activeElement };
+    (window as unknown as { ordinaryShrinkProbe: ShrinkProbe }).ordinaryShrinkProbe = probe;
+    const owner = element.closest<HTMLElement>(".main-content")!;
+    owner.scrollBy = new Proxy(owner.scrollBy, {
+      apply(target, receiver, argumentsList) {
+        probe.calls++;
+        return Reflect.apply(target, receiver, argumentsList);
+      },
+    });
+  });
+  // These modeled reports test application scroll ownership, not Safari's
+  // native camera, pointer routing or OS keyboard animation.
+  await page.evaluate(async () => {
+    const viewport = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport;
+    for (const height of [490, 350, 320, 300, 280, 260, 250, 240, 230, 220]) {
+      viewport.height = height;
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+    }
+  });
+  expect(await writer.evaluate(() => {
+    const probe = (window as unknown as { ordinaryShrinkProbe: ShrinkProbe }).ordinaryShrinkProbe;
+    const selection = window.getSelection()!;
+    return { calls: probe.calls, sameTarget: document.activeElement === probe.surface
+      && selection.anchorNode === probe.anchor && selection.anchorOffset === probe.anchorOffset
+      && selection.focusNode === probe.focus && selection.focusOffset === probe.focusOffset };
+  })).toEqual({ calls: 0, sameTarget: true });
+  await expect(writer).toBeFocused();
+  await expectHeaderDock(page);
 });
 
 test("last writing line stays reachable in an already short rendered viewport", async ({ page }, info) => {
