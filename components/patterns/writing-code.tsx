@@ -35,6 +35,7 @@ import { CodeBlockHeader } from "./code-block";
 import { WritingBlockActions, blockActions } from "./writing-block-actions";
 import { useCodeHighlight } from "./use-code-highlight";
 import { useWritingInteraction } from "./writing-interaction";
+import { registerEditingFocusReader } from "./editing-focus-geometry";
 
 // The reader and CodeMirror use the same color classes and theme variables.
 const colors = syntaxHighlighting(
@@ -156,7 +157,9 @@ export function WritingCodeEditor({
       }),
     });
     view.current = editor;
+    const removeFocusReader = registerEditingFocusReader(editor.contentDOM, () => editor.coordsAtPos(editor.state.selection.main.head));
     return () => {
+      removeFocusReader();
       editor.destroy();
       view.current = null;
     };

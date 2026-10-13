@@ -4734,8 +4734,8 @@ test("modeled shrinking viewport reports do not acquire ordinary caret scrolling
   await open(page, info.project.name.startsWith("production"), "course");
   const writer = page.getByRole("textbox", { name: "Lesson content", exact: true });
   await writer.locator("p").first().tap();
-  // Finish the native focus transaction before recording viewport-only effects.
-  await writer.evaluate(async () => { for (let frame = 0; frame < 4; frame++) await new Promise(requestAnimationFrame); });
+  // This is later viewport-only activity, outside the bounded focus permission.
+  await page.waitForTimeout(2200);
   await installCommandViewport(page, { height: 812, offsetTop: 0, clientHeight: 812 });
   type ShrinkProbe = { calls: number; anchor: Node | null; anchorOffset: number; focus: Node | null; focusOffset: number; surface: Element | null };
   await writer.evaluate(element => {
@@ -4744,7 +4744,7 @@ test("modeled shrinking viewport reports do not acquire ordinary caret scrolling
       focus: selection.focusNode, focusOffset: selection.focusOffset, surface: document.activeElement };
     (window as unknown as { ordinaryShrinkProbe: ShrinkProbe }).ordinaryShrinkProbe = probe;
     const owner = element.closest<HTMLElement>(".main-content")!;
-    owner.scrollBy = new Proxy(owner.scrollBy, {
+    for (const method of ["scrollBy", "scrollTo"] as const) owner[method] = new Proxy(owner[method], {
       apply(target, receiver, argumentsList) {
         probe.calls++;
         return Reflect.apply(target, receiver, argumentsList);
@@ -5176,7 +5176,7 @@ for (const kind of ["doc", "brief", "course"] as const) {
 }
 
 // Real rendering resizes cover field geometry, not an emulated OS keyboard.
-test.describe("mobile Quiz focus and editable code", () => {
+test.describe("coordinated mobile focus", () => {
   test.use({ hasTouch: true, isMobile: true });
 
   async function expectHeaderDock(page: Page) {
@@ -5188,211 +5188,332 @@ test.describe("mobile Quiz focus and editable code", () => {
     expect(box.y + box.height).toBeLessThanOrEqual(header.y + header.height);
     await expect(dock).toBeInViewport({ ratio: 1 });
   }
-
-  async function quiz(page: Page, installed: boolean, height = 812) {
-    await page.setViewportSize({ width: 375, height });
-    const fixture = await open(page, installed, "course", 1, item => {
-      item.body = "Paragraph 1.";
-      item.lessons = [{ id: "one", title: "First lesson", body: item.body }];
-      item.questions = [{ id: "focus-one", prompt: "Choose the useful answer", options: ["A clear answer", "Another answer"], optionIds: ["yes", "no"], correctOptionIds: ["yes"], explanation: "An explanation across several lines.\nKeep the useful details.\nA final line." }];
-    }, undefined, false, true);
-    const outline = page.getByRole("button", { name: "Outline", exact: true });
-    if (await outline.getAttribute("aria-expanded") !== "true") await outline.tap();
-    await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: "Quiz", exact: true }).tap();
-    await expect(page.locator(".course-quiz-canvas")).toBeVisible();
-    await page.locator(".main-content").evaluate(owner => {
-      const tracked = owner as HTMLElement & { quizScrollCalls: number };
-      tracked.quizScrollCalls = 0;
-      const scrollTo = owner.scrollTo.bind(owner);
-      owner.scrollTo = (first?: ScrollToOptions | number, second?: number) => {
-        tracked.quizScrollCalls++;
-        if (typeof first === "number") scrollTo(first, second ?? 0);
-        else scrollTo(first);
-      };
-    });
-    return fixture;
-  }
   async function settle(page: Page) {
     await page.evaluate(async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); });
   }
-  async function snapshot(field: Locator) {
-    return field.evaluate(node => {
-      const field = node as HTMLInputElement | HTMLTextAreaElement;
-      const owner = field.closest<HTMLElement>(".main-content")!;
-      const bounds = field.getBoundingClientRect(), canvas = owner.getBoundingClientRect();
-      return { top: bounds.top, bottom: bounds.bottom, canvasTop: canvas.top, canvasBottom: canvas.bottom,
-        focused: document.activeElement === field, start: field.selectionStart, end: field.selectionEnd,
-        direction: field.selectionDirection, value: field.value, scroll: owner.scrollTop,
-        reserve: field.closest(".course-quiz-canvas")!.querySelector<HTMLElement>(".course-quiz-focus-space")!.offsetHeight,
-        calls: (owner as HTMLElement & { quizScrollCalls: number }).quizScrollCalls };
-    });
-  }
-  async function visible(field: Locator) {
-    const state = await snapshot(field);
-    expect(state.focused).toBe(true);
-    expect(state.top).toBeGreaterThanOrEqual(state.canvasTop - 1);
-    expect(state.bottom).toBeLessThanOrEqual(state.canvasBottom + 1);
-    return state;
-  }
-  async function lower(field: Locator, top = 500) {
-    await field.evaluate((field, y) => {
-      const owner = field.closest<HTMLElement>(".main-content")!;
-      owner.scrollTop += field.getBoundingClientRect().top - y;
-    }, top);
-  }
-
-  for (const name of ["Question", "Answer 1 for question 1", "Explanation (optional)"]) {
-    test(`${name}: one deliberate reveal survives shrinking Quiz canvas and preserves saving`, async ({ page }, info) => {
-      const fixture = await quiz(page, info.project.name.startsWith("production"));
-      const field = page.locator('[data-question-id="focus-one"]').getByRole("textbox", { name, exact: true });
-      await lower(field);
-      await field.tap();
-      const before = await visible(field);
-      expect(before.calls).toBe(1);
-      expect(before.reserve).toBeGreaterThan(0);
-      for (const height of [490, 350, 250]) {
-        await page.setViewportSize({ width: 375, height });
-        await settle(page);
-        const after = await visible(field);
-        expect([after.start, after.end, after.direction, after.value]).toEqual([before.start, before.end, before.direction, before.value]);
-        expect(after.calls).toBe(1);
-        await expectHeaderDock(page);
-      }
-      await field.press("End");
-      await page.keyboard.insertText(" saved");
-      await waitForDraftSaved(page);
-      const question = (await fixture.read()).content[0].questions[0];
-      expect(name === "Question" ? question.prompt : name.startsWith("Answer") ? question.options[0] : question.explanation).toContain(" saved");
-      await page.reload();
+  async function fixture(page: Page, installed: boolean, kind = "quiz") {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const source = kind === "source";
+    const result = await open(page, installed, "course", 1, item => {
+      item.body = "Paragraph 1.";
+      const code = kind === "long code" ? Array.from({ length: 80 }, (_, i) => `const value${i + 1} = ${i + 1};`).join("\n") : "const value = 1;\nconsole.log(value);";
+      const body = Array.from({ length: 12 }, (_, i) => `Paragraph ${i + 1}. Preserve every useful word in the canvas.`).join("\n\n")
+        + `\n\n\`\`\`js\n${code}\n\`\`\`\n\n| Topic | Detail |\n| --- | --- |\n| First | A useful detail. |\n\nLast paragraph for focus.`;
+      item.lessons = [{ id: "one", title: "First lesson", body: source ? "Paragraph 1.\n\n<UnsupportedWidget>Keep exact source.</UnsupportedWidget>" : body }];
+      item.questions = [{ id: "focus-one", prompt: "Choose a useful response", options: ["A clear answer", "Another answer"], optionIds: ["yes", "no"], correctOptionIds: ["yes"], explanation: "An explanation across several lines.\nKeep the useful details.\nA final line." }];
+    }, undefined, source, true);
+    if (kind === "quiz") {
       const outline = page.getByRole("button", { name: "Outline", exact: true });
       if (await outline.getAttribute("aria-expanded") !== "true") await outline.tap();
       await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: "Quiz", exact: true }).tap();
-      await expect(field).toHaveValue(/ saved/);
+      await expect(page.locator(".course-quiz-canvas")).toBeVisible();
+    }
+    await settle(page);
+    await page.locator(".main-content").evaluate(owner => {
+      const tracked = owner as HTMLElement & { focusCalls: { top: number; behavior?: string }[] };
+      tracked.focusCalls = [];
+      const scrollTo = owner.scrollTo.bind(owner);
+      owner.scrollTo = (first?: ScrollToOptions | number, second?: number) => {
+        tracked.focusCalls.push({ top: typeof first === "number" ? second ?? 0 : first?.top ?? owner.scrollTop, behavior: typeof first === "object" ? first.behavior : undefined });
+        if (typeof first === "number") scrollTo(first, second ?? 0); else scrollTo(first);
+      };
+    });
+    return result;
+  }
+  async function calls(page: Page) {
+    return page.locator(".main-content").evaluate(owner => (owner as HTMLElement & { focusCalls: { top: number; behavior?: string }[] }).focusCalls);
+  }
+  async function lower(target: Locator) {
+    await target.evaluate(node => {
+      const owner = node.closest<HTMLElement>(".main-content")!;
+      owner.scrollTop += node.getBoundingClientRect().top - 500;
+    });
+  }
+  async function position(target: Locator) {
+    return target.evaluate(node => {
+      const field = node.closest<HTMLElement>('input,textarea,[contenteditable="true"]')!;
+      const owner = field.closest<HTMLElement>(".main-content")!;
+      let top: number, bottom: number, start: number | null = null, end: number | null = null;
+      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+        const box = field.getBoundingClientRect(); top = box.top; bottom = box.bottom;
+        start = field.selectionStart; end = field.selectionEnd;
+      } else {
+        const selection = window.getSelection()!;
+        const range = selection.getRangeAt(0).cloneRange();
+        range.setStart(selection.focusNode!, selection.focusOffset); range.collapse(true);
+        let rect = Array.from(range.getClientRects()).find(r => r.height > 0);
+        if (!rect && selection.focusNode instanceof Text && selection.focusNode.length) {
+          const index = Math.min(selection.focusOffset, selection.focusNode.length - 1);
+          range.setStart(selection.focusNode, index); range.setEnd(selection.focusNode, index + 1);
+          rect = range.getBoundingClientRect();
+        }
+        top = rect?.top ?? field.getBoundingClientRect().top;
+        bottom = rect?.bottom ?? field.getBoundingClientRect().bottom;
+        const before = document.createRange(); before.selectNodeContents(field);
+        if (field.contains(selection.focusNode)) { before.setEnd(selection.focusNode!, selection.focusOffset); start = end = before.toString().length; }
+      }
+      const bounds = owner.getBoundingClientRect();
+      return { top, bottom, canvasTop: bounds.top, canvasBottom: bounds.bottom, scroll: owner.scrollTop,
+        focused: document.activeElement === field, start, end, value: field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement ? field.value : field.textContent };
+    });
+  }
+  async function visible(target: Locator) {
+    await expect.poll(async () => {
+      const state = await position(target);
+      return state.focused && state.top >= state.canvasTop + 7 && state.bottom <= state.canvasBottom - 7;
+    }).toBe(true);
+  }
+  async function renderHeight(page: Page, height: number) {
+    await page.setViewportSize({ width: 375, height });
+    await page.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
+    // The adapter commits after the browser's resize event. Do not accept a
+    // target against the previous canvas bounds while that frame is pending.
+    await expect.poll(() => page.locator(".main-content").evaluate(node => node.getBoundingClientRect().bottom)).toBeCloseTo(height, 0);
+  }
+  async function opening(page: Page, heights = [740, 650, 540, 430, 350]) {
+    for (const height of heights) {
+      await renderHeight(page, height);
+      await expectHeaderDock(page);
+    }
+  }
+
+  for (const name of ["Question", "Answer 1 for question 1", "Explanation (optional)", "code", "prose", "table"]) {
+    test(`${name}: focus stays still before opening and reveals only the clipped edge afterward`, async ({ page }, info) => {
+      const kind = ["code", "prose", "table"].includes(name) ? name : "quiz";
+      await fixture(page, info.project.name.startsWith("production"), kind);
+      const target = name === "code" ? page.getByRole("textbox", { name: "Code block", exact: true })
+        : name === "prose" ? page.locator('.writing-content > p').last()
+        : name === "table" ? page.locator('.writing-table-block tbody tr:last-child td [contenteditable="true"]').last()
+        : page.getByRole("textbox", { name, exact: true });
+      await lower(target); await target.tap(); await settle(page);
+      const before = await position(target);
+      expect(before.focused).toBe(true);
+      expect(await calls(page)).toHaveLength(0);
+      await opening(page);
+      await visible(target); await settle(page);
+      const after = await position(target);
+      expect(await calls(page)).toHaveLength(1);
+      expect((await calls(page))[0].behavior).toBe("smooth");
+      expect([after.start, after.end, after.value]).toEqual([before.start, before.end, before.value]);
+      // Minimum reveal stops at the lower visible edge, not canvas top +24.
+      expect(after.bottom).toBeGreaterThan(after.canvasBottom - 32);
+      expect(after.scroll).toBeGreaterThan(before.scroll);
+      await expect(page.locator(".course-quiz-focus-space")).toHaveCount(0);
+      if (name === "Question" || name === "code") await page.screenshot({ path: info.outputPath(`focus-${name}-350.png`) });
+      await page.setViewportSize({ width: 375, height: 490 }); await settle(page);
+      expect(await calls(page)).toHaveLength(1);
     });
   }
 
-  test("label taps and native mid-text caret placement survive the early Quiz reveal", async ({ page }, info) => {
-    await quiz(page, info.project.name.startsWith("production"), 1100);
-    const question = page.getByRole("textbox", { name: "Question", exact: true });
-    // This viewport is taller than the entire unreserved Quiz, exposing min-height mistakes.
-    await question.evaluate(node => {
-      const owner = node.closest<HTMLElement>(".main-content")!;
-      owner.scrollTop = 0;
-    });
-    await page.locator(".course-quiz-canvas label").filter({ hasText: /^Question$/ }).tap();
-    expect((await visible(question)).calls).toBe(1);
-    expect((await snapshot(question)).reserve).toBeGreaterThan(0);
-    for (const name of ["Question", "Answer 1 for question 1", "Explanation (optional)"]) {
-      const field = page.getByRole("textbox", { name, exact: true });
-      await field.evaluate(node => {
-        (document.activeElement as HTMLElement)?.blur();
-        const owner = node.closest<HTMLElement>(".main-content")!;
-        owner.scrollTop = 0;
-      });
-      await settle(page);
-      await lower(field, 450);
-      // Block this hook's document click listener for one native tap. Focus waits
-      // for click; propagation changes neither native focus nor default caret placement.
-      const initial = await snapshot(field);
-      await field.evaluate(node => node.addEventListener("click", event => event.stopPropagation(), { once: true }));
-      await field.tap({ position: { x: 58, y: 15 } });
-      const baseline = await snapshot(field);
-      expect(baseline.calls).toBe(initial.calls);
-      expect(baseline.top).toBeCloseTo(initial.top, 0);
-      await field.evaluate(node => (node as HTMLElement).blur());
-      // A different inert tap separates the two trials from native double-tap
-      // word selection without adding a timing dependency.
-      await page.locator(".editor-save-status").tap();
-      await lower(field, baseline.top);
-      await field.tap({ position: { x: 58, y: 15 } });
-      const after = await visible(field);
-      expect([after.start, after.end, after.direction]).toEqual([baseline.start, baseline.end, baseline.direction]);
-    }
-  });
-
-  test("Quiz keyboard target changes reveal once while popup return and resize do not", async ({ page }, info) => {
-    await quiz(page, info.project.name.startsWith("production"));
-    const question = page.getByRole("textbox", { name: "Question", exact: true });
-    await question.tap();
-    const first = (await snapshot(question)).calls;
-    const correct = page.getByRole("checkbox", { name: "Correct answer 1 for question 1", exact: true });
-    // macOS WebKit's default Tab policy skips checkbox buttons; focus one
-    // explicitly to cover leaving and returning to the same text field.
-    await correct.focus();
-    await lower(question, 400);
-    await page.keyboard.press("Shift+Tab");
-    await expect(question).toBeFocused();
-    const calls = (await snapshot(question)).calls;
-    expect(calls).toBe(first + 1);
-    await question.press("Tab");
-    if (await correct.evaluate(node => document.activeElement === node)) await page.keyboard.press("Tab");
-    const answer = page.getByRole("textbox", { name: "Answer 1 for question 1", exact: true });
-    await expect(answer).toBeFocused();
-    expect((await visible(answer)).calls).toBe(calls + 1);
-    await answer.press("Shift+Tab");
-    if (await correct.evaluate(node => document.activeElement === node)) await page.keyboard.press("Shift+Tab");
-    await expect(question).toBeFocused();
-    const explanation = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
-    // Native focus models keyboard Next's focus transition, not its physical OS UI.
-    await explanation.evaluate(node => (node as HTMLElement).focus({ preventScroll: true }));
-    await explanation.evaluate(node => (node as HTMLTextAreaElement).setSelectionRange(4, 18, "backward"));
-    const before = await snapshot(explanation);
-    const details = page.getByRole("button", { name: "Details", exact: true });
-    await details.tap(); await details.tap();
-    await expect(explanation).toBeFocused();
-    expect((await snapshot(explanation)).calls).toBe(before.calls);
-    await details.tap();
-    await page.keyboard.press("Tab");
-    // WebKit may tab to the course title outside the overlay; it belongs to
-    // the ordinary title policy, never to the Quiz field reveal handler.
-    expect((await snapshot(explanation)).calls).toBe(before.calls);
-    await page.keyboard.press("Escape");
-    await expect(explanation).toBeFocused();
-    expect((await snapshot(explanation)).calls).toBe(before.calls);
-    for (const height of [490, 350, 250, 490, 812]) {
-      await page.setViewportSize({ width: 375, height }); await settle(page);
-      const after = await snapshot(explanation);
-      expect([after.start, after.end, after.direction, after.value]).toEqual([before.start, before.end, before.direction, before.value]);
-      expect(after.calls).toBe(before.calls);
-      await expectHeaderDock(page);
-    }
-    // Same focused field may reopen a keyboard; a fresh tap is a new deliberate action.
-    await lower(explanation, 500); await settle(page);
-    await explanation.tap();
-    expect((await visible(explanation)).calls).toBe(before.calls + 1);
-  });
-
-  test("Quiz reserve follows manual position and content changes, then disappears on navigation", async ({ page }, info) => {
-    await quiz(page, info.project.name.startsWith("production"));
+  test("delayed and reversing opening reports share one focus transaction", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"));
     const field = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
-    await field.tap();
-    const before = await snapshot(field);
-    await field.evaluate(node => (node as HTMLElement).blur());
-    await settle(page);
-    expect((await snapshot(field)).scroll).toBeCloseTo(before.scroll, 0);
-    expect((await snapshot(field)).calls).toBe(before.calls);
-    // Content grows and shrinks without re-revealing the previous field.
-    await page.getByRole("button", { name: "Add answer", exact: true }).tap();
-    await page.getByRole("button", { name: "Remove answer 3", exact: true }).tap();
-    await settle(page);
-    expect((await snapshot(field)).calls).toBe(before.calls);
-    await page.setViewportSize({ width: 430, height: 812 }); await settle(page);
-    expect((await snapshot(field)).calls).toBe(before.calls);
-    await page.locator(".main-content").evaluate(owner => { owner.scrollTop = 0; }); await settle(page);
-    expect((await snapshot(field)).reserve).toBe(0);
-    // A canceled touch gesture cannot acquire an automatic focus correction.
-    await field.dispatchEvent("pointerdown", { isPrimary: true, button: 0, clientX: 20, clientY: 30 });
-    await field.dispatchEvent("pointercancel");
-    await field.dispatchEvent("click");
-    expect((await snapshot(field)).calls).toBe(before.calls);
-    const outline = page.getByRole("button", { name: "Outline", exact: true });
-    await outline.tap();
-    await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: /First lesson/ }).tap();
-    await expect(page.locator(".course-quiz-focus-space")).toHaveCount(0);
-    await page.setViewportSize({ width: 375, height: 350 });
+    await lower(field); await field.tap();
+    const initial = await position(field);
+    // Model a delayed first geometry report; this is not an emulated OS keyboard.
+    await page.waitForTimeout(240);
+    expect((await position(field)).scroll).toBe(initial.scroll);
+    expect(await calls(page)).toHaveLength(0);
+    await opening(page, [740, 490, 350, 420, 390]);
+    await visible(field); await settle(page);
+    expect(await calls(page)).toHaveLength(1);
+    const corrected = await position(field);
+    expect(corrected.bottom).toBeCloseTo(382, 0);
+    // A later pulse still belongs to the original intent, even after one reveal.
+    await opening(page, [350, 250]); await visible(field); await settle(page);
+    expect(await calls(page)).toHaveLength(2);
+    expect((await position(field)).scroll).toBeGreaterThan(corrected.scroll);
+    expect((await position(field)).bottom).toBeCloseTo(242, 0);
+  });
+
+  for (const path of ["visible between pulses", "clipped between pulses", "interrupted between pulses", "expired between pulses"]) {
+    test(`${path}: sparse height reports retain only the original focus permission`, async ({ page }, info) => {
+      await fixture(page, info.project.name.startsWith("production"));
+      const field = page.getByRole("textbox", { name: path === "visible between pulses" ? "Answer 1 for question 1" : "Explanation (optional)", exact: true });
+      await field.evaluate((node, top) => {
+        const owner = node.closest<HTMLElement>(".main-content")!;
+        owner.scrollTop += node.getBoundingClientRect().top - top;
+      }, path === "visible between pulses" ? 400 : 500);
+      await field.tap();
+      const initial = await position(field);
+      await renderHeight(page, 490);
+      if (path !== "visible between pulses") await visible(field);
+      await page.waitForTimeout(200);
+      const first = await position(field);
+      let count = (await calls(page)).length;
+      expect(count).toBe(path === "visible between pulses" ? 0 : 1);
+      if (path === "interrupted between pulses") {
+        await page.locator(".main-content").dispatchEvent("touchmove");
+        // Cancellation may abort an unfinished native animation at its current
+        // position. Subsequent geometry must add no corrective movement.
+        count = (await calls(page)).length;
+      }
+      if (path === "expired between pulses") await page.waitForTimeout(2200);
+      await renderHeight(page, 350);
+      if (path.startsWith("visible") || path.startsWith("clipped")) {
+        await visible(field); await settle(page);
+        const last = await position(field);
+        expect(await calls(page)).toHaveLength(count + 1);
+        expect(last.scroll).toBeGreaterThan(first.scroll);
+        expect([last.start, last.end, last.value]).toEqual([initial.start, initial.end, initial.value]);
+        expect(last.bottom).toBeCloseTo(342, 0);
+        const destinations = (await calls(page)).filter(call => call.behavior === "smooth").map(call => call.top);
+        expect(destinations).toEqual([...destinations].sort((a, b) => a - b));
+      } else {
+        await page.waitForTimeout(260);
+        // Geometry after explicit interruption or expiry cannot start another reveal.
+        expect(await calls(page)).toHaveLength(count);
+      }
+      await expectHeaderDock(page);
+    });
+  }
+
+  test("long code retains its internally scrolled caret while the outer canvas reveals it", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"), "long code");
+    const code = page.getByRole("textbox", { name: "Code block", exact: true });
+    await code.tap(); await code.press("ControlOrMeta+End");
+    const port = page.locator(".writing-code-block .cm-scroller");
+    await expect.poll(() => port.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+    const metrics = await port.evaluate(node => ({ height: node.clientHeight, scroll: node.scrollTop, content: node.scrollHeight }));
+    expect(metrics.content).toBeGreaterThan(metrics.height * 2);
+    expect(metrics.height).toBeLessThanOrEqual(384);
+    // Start a fresh tap on the visible final line, low in the closed-keyboard canvas.
+    const line = code.locator(".cm-line").last();
+    await code.evaluate(node => (node as HTMLElement).blur());
+    await lower(line); await line.tap(); await settle(page);
+    const before = await position(code);
+    const internal = await port.evaluate(node => node.scrollTop);
+    expect(internal).toBeGreaterThan(0);
+    await page.locator(".main-content").evaluate(node => {
+      (node as HTMLElement & { focusCalls: unknown[] }).focusCalls = [];
+    });
+    await opening(page); await visible(code); await settle(page);
+    const after = await position(code);
+    expect([after.start, after.end, after.value]).toEqual([before.start, before.end, before.value]);
+    expect(await port.evaluate(node => node.scrollTop)).toBeCloseTo(internal, 0);
+    const portBox = (await port.boundingBox())!;
+    expect(after.top).toBeGreaterThanOrEqual(portBox.y);
+    expect(after.bottom).toBeLessThanOrEqual(portBox.y + portBox.height);
+    expect((await calls(page)).filter(call => call.behavior === "smooth")).toHaveLength(1);
     await expectHeaderDock(page);
-    await returnToContent(page);
-    await expect(page.locator(".editor")).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath("focus-long-code-350.png") });
+  });
+
+  test("reduced motion reveals a clipped field without smooth animation", async ({ page }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await fixture(page, info.project.name.startsWith("production"));
+    const field = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
+    await lower(field); await field.tap();
+    const before = await position(field);
+    await renderHeight(page, 350); await visible(field);
+    expect(await calls(page)).toEqual([expect.objectContaining({ behavior: "instant" })]);
+    const after = await position(field);
+    expect([after.start, after.end, after.value]).toEqual([before.start, before.end, before.value]);
+    await expectHeaderDock(page);
+  });
+
+  test("prose input during opening retains its live caret and becomes visible", async ({ page }, info) => {
+    const result = await fixture(page, info.project.name.startsWith("production"), "prose");
+    const paragraph = page.locator(".writing-content > p").last();
+    await lower(paragraph); await paragraph.tap();
+    const before = await position(paragraph);
+    await page.setViewportSize({ width: 375, height: 650 });
+    await page.keyboard.insertText(" Initial input.");
+    await opening(page, [540, 430, 350]);
+    await visible(paragraph);
+    const after = await position(paragraph);
+    expect(after.start).toBe(before.start! + " Initial input.".length);
+    await waitForDraftSaved(page);
+    expect((await result.read()).content[0].lessons[0].body).toContain(" Initial input.");
+    expect((await calls(page)).length).toBeLessThanOrEqual(1);
+  });
+
+  test("typing during opening reads the live Quiz field and saves every edit", async ({ page }, info) => {
+    const result = await fixture(page, info.project.name.startsWith("production"));
+    const field = page.getByRole("textbox", { name: "Question", exact: true });
+    await field.tap(); await field.press("End");
+    const initial = await position(field);
+    await page.setViewportSize({ width: 375, height: 650 });
+    await page.keyboard.insertText(" edited during opening");
+    await opening(page, [540, 430, 350]);
+    await visible(field);
+    await waitForDraftSaved(page);
+    expect((await result.read()).content[0].questions[0].prompt).toContain(" edited during opening");
+    expect((await position(field)).start).toBe(initial.start! + " edited during opening".length);
+    // Native field editing may already reveal it; avoid a duplicate movement.
+    expect((await calls(page)).length).toBeLessThanOrEqual(1);
+  });
+
+  for (const reason of ["manual gesture", "keyboard selection", "blur", "rotation", "expiry"]) {
+    test(`${reason}: canceled focus cannot revive on later resize`, async ({ page }, info) => {
+      await fixture(page, info.project.name.startsWith("production"));
+      const field = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
+      await lower(field); await field.tap(); await settle(page);
+      const before = await position(field);
+      expect(before.top).toBeGreaterThanOrEqual(before.canvasTop + 8);
+      expect(before.bottom).toBeLessThanOrEqual(before.canvasBottom - 8);
+      if (reason === "manual gesture") await page.locator(".main-content").dispatchEvent("touchmove");
+      else if (reason === "keyboard selection") await field.press("Shift+ArrowLeft");
+      else if (reason === "blur") await field.evaluate(node => (node as HTMLElement).blur());
+      else if (reason === "rotation") {
+        await page.setViewportSize({ width: 667, height: 375 }); await settle(page);
+        await page.setViewportSize({ width: 375, height: 812 }); await settle(page);
+      } else {
+        // Hardware-keyboard focus can have no resize; permission must expire.
+        await page.waitForTimeout(2200);
+      }
+      await opening(page); await page.waitForTimeout(240);
+      expect(await calls(page)).toHaveLength(0);
+    });
+  }
+
+  test("label, native Next and popup range return preserve selection and one-owner reveal", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"));
+    const question = page.getByRole("textbox", { name: "Question", exact: true });
+    await page.locator('.course-quiz-content label').filter({ hasText: /^Question$/ }).tap();
+    await expect(question).toBeFocused(); expect(await calls(page)).toHaveLength(0);
+    const field = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
+    // Model OS Next's native focus transition, not its platform UI.
+    await field.evaluate(node => (node as HTMLElement).focus({ preventScroll: true }));
+    await opening(page); await visible(field); await settle(page);
+    const count = (await calls(page)).length;
+    await field.evaluate(node => (node as HTMLTextAreaElement).setSelectionRange(4, 18, "backward"));
+    const before = await position(field);
+    const details = page.getByRole("button", { name: "Details", exact: true });
+    await details.tap(); await page.keyboard.press("Tab"); await page.keyboard.press("Escape");
+    await expect(field).toBeFocused();
+    await settle(page);
+    const returned = await position(field);
+    expect([returned.start, returned.end]).toEqual([before.start, before.end]);
+    expect((await calls(page)).filter(call => call.behavior === "smooth")).toHaveLength(count);
+    // A restored range does not grant permission to follow a new user selection.
+    await field.press("Shift+ArrowRight");
+    const selected = await position(field);
+    await page.setViewportSize({ width: 375, height: 250 }); await page.waitForTimeout(200);
+    expect((await calls(page)).filter(call => call.behavior === "smooth")).toHaveLength(count);
+    expect([(await position(field)).start, (await position(field)).end]).toEqual([selected.start, selected.end]);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.getByRole("button", { name: "Outline", exact: true }).tap();
+    await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: /First lesson/ }).tap();
+    await expect(page.locator(".course-quiz-canvas")).toHaveCount(0);
+    await expectHeaderDock(page);
+  });
+
+  test("oversized source uses its first focused line without resizing the control", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"), "source");
+    const field = page.locator(".writing-source");
+    await field.tap({ position: { x: 20, y: 16 } });
+    await field.evaluate(node => { const field = node as HTMLTextAreaElement; field.setSelectionRange(0, 0); field.scrollTop = 0; });
+    const before = await field.inputValue();
+    await opening(page);
+    await expect.poll(async () => {
+      const box = (await field.boundingBox())!;
+      const owner = (await page.locator(".main-content").boundingBox())!;
+      return box.y >= owner.y - 1 && box.y + 32 <= owner.y + owner.height;
+    }).toBe(true);
+    await expect(field).toBeFocused(); await expect(field).toHaveValue(before);
+    expect(await field.evaluate(node => (node as HTMLTextAreaElement).selectionStart)).toBe(0);
+    expect((await calls(page)).filter(call => call.behavior === "smooth").length).toBeLessThanOrEqual(1);
   });
 
   test("touch code stays at readable focus size and retains code editing and Markdown", async ({ page }, info) => {
@@ -5456,5 +5577,5 @@ test("desktop code font and Quiz focus keep their existing layout", async ({ pag
   if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
   await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: "Quiz", exact: true }).click();
   await page.getByRole("textbox", { name: "Question", exact: true }).click();
-  await expect(page.locator(".course-quiz-focus-space")).toHaveCSS("height", "0px");
+  await expect(page.locator(".course-quiz-focus-space")).toHaveCount(0);
 });

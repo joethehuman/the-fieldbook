@@ -12,6 +12,7 @@ import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWr
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { EditorAppDockContext, EditorAppOverlayContext } from "./editor-app-header";
 import { useMobileEditorViewport } from "./use-mobile-editor-viewport";
+import { useMobileEditorFocus } from "./use-mobile-editor-focus";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
 export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
@@ -73,6 +74,7 @@ export function EditorFrame({
   const panelState = useRef(panels);
   panelState.current = panels;
   useMobileEditorViewport(frame);
+  useMobileEditorFocus(canvas);
   const lastWritingCursor = useRef<WritingCursor | null>(null);
   const panelReturn = useRef<WritingCursor | null>(null);
   const preparedPanel = useRef<"outline" | "details" | null>(null);
