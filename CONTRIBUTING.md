@@ -38,7 +38,7 @@ The demo uses fictional identities and data. It is useful for interface work, bu
 
 ## Keep Fieldbook portable
 
-Portability is a project goal. Next.js on Vercel, hosted Supabase, and Google sign-in was the first supported stack. The candidate DigitalOcean recipe uses App Platform, Managed PostgreSQL, Supabase Auth/REST/Storage, private Spaces and Google sign-in; it still needs hosted validation before support. Hosting and AI routing are configured independently. Further combinations need an implementation, repeatable instructions, and direct verification before being described as supported.
+Portability is a project goal. Next.js on Vercel, hosted Supabase, and Google sign-in is the released configuration. The unreleased DigitalOcean recipe uses App Platform, Managed PostgreSQL, Supabase Auth/REST/Storage, private Spaces and Google sign-in. The [installation guide](docs/installation.md) defines the recipe configurations and tested component versions. Hosting and AI routing are configured independently. Further combinations need an implementation, repeatable instructions, and direct verification before being described as supported.
 
 The code separates application behavior from provider integrations:
 

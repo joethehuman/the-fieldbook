@@ -2,12 +2,12 @@
 
 The Fieldbook is a source-available learning and knowledge platform for teams that want to run their own installation. It gives each kind of content a job: **Updates** share news and perspective, **Courses** teach through lessons and knowledge checks, and **Docs** hold maintained reference material. Authors work in the built-in admin interface; readers use the same site.
 
-The supported installation uses **Vercel with hosted Supabase**. The installation guide also describes the candidate **DigitalOcean App Platform recipe with Managed PostgreSQL, self-hosted Supabase Auth/REST/Storage and private Spaces**; this recipe is not yet supported for production. Both use Google sign-in. Optional Ask AI can use Vercel AI Gateway or a configured DigitalOcean Inference Router independently of hosting. Each operator supplies and controls their own accounts, data, media, domain, and content. The optional interactive demo uses fictional data stored in the browser; it does not create a working installation or persist learner records on a server.
+The released installation uses **Vercel with hosted Supabase**. The [installation recipes](docs/installation.md) also describe **DigitalOcean App Platform with Managed PostgreSQL, self-hosted Supabase Auth/REST/Storage and private Spaces**; the DigitalOcean recipe has not yet shipped in a Fieldbook release. Both use Google sign-in. Optional Ask AI can use Vercel AI Gateway or a configured DigitalOcean Inference Router independently of hosting. Each operator supplies and controls their own accounts, data, media, domain, and content. The optional interactive demo uses fictional data stored in the browser; it does not create a working installation or persist learner records on a server.
 
 ## Start here
 
-- [Install Fieldbook](docs/installation.md) from your own accounts. The guide covers the single database setup command, hosting, sign-in, media, and first-use checks.
-- [Upgrade an installation](docs/upgrading.md), including any database changes required by the release.
+- Choose an [installation recipe](docs/installation.md): [Vercel with hosted Supabase](docs/installation.md#vercel-with-hosted-supabase) or [DigitalOcean App Platform](docs/installation.md#digitalocean-app-platform).
+- [Update and maintain an installation](docs/upgrading.md), including Fieldbook migrations, backend component updates, cleanup and recovery.
 - [Contribute](CONTRIBUTING.md) or read the [agent instructions](AGENTS.md) and [design system](docs/design-system.md) before changing the software.
 - Read the [license](LICENSE), [third-party notices](docs/third-party-notices.md), and [security reporting instructions](SECURITY.md).
 

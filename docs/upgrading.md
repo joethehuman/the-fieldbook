@@ -1,10 +1,16 @@
 # Upgrade a Fieldbook installation
 
-Choose the release you want to run. Read its release information for configuration changes, database migrations and any required deployment order. Preserve your installation's environment settings and custom source changes.
+Choose the release you want to run and read its configuration, migration and deployment-order notes. Preserve your environment settings and custom source changes. Application updates, Fieldbook database migrations and upstream backend updates are separate operations.
+
+| Change                 | Vercel with hosted Supabase                           | DigitalOcean recipe                                             |
+| ---------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
+| Fieldbook application  | Deploy the selected source through Vercel             | Deploy the selected source through App Platform                 |
+| Fieldbook database     | Apply pending migrations with the pinned Supabase CLI | Apply pending migrations with `setup-self-hosted.mjs --upgrade` |
+| Auth, REST and Storage | Managed by hosted Supabase                            | Update the pinned component images separately                   |
 
 ## Application updates
 
-Bring the selected release into your deployment branch. From your local copy, replace the placeholders with the release tag and your deployment branch:
+Bring the selected release into your deployment branch. From your local copy, replace the placeholders with the release tag and branch:
 
 ```sh
 git fetch https://github.com/joethehuman/the-fieldbook.git tag RELEASE_TAG
@@ -13,17 +19,19 @@ git merge RELEASE_TAG
 git push origin YOUR_DEPLOYMENT_BRANCH
 ```
 
-Resolve any conflicts with your custom changes before pushing.
+Resolve conflicts with your custom changes before pushing. A push to Vercel's configured production branch starts its deployment. On App Platform, use your source integration's deployment trigger or request a deployment of the latest source. The example's public `git` source needs an explicit deployment after a push. If updating the app through its API, `update_all_source_versions: true` also fetches new source; the default retains the existing source revisions.
 
-A push to the configured production branch starts Vercel's deployment. On DigitalOcean, use your configured source integration's deployment trigger or deploy the latest commit from App Platform. With the app spec's public `git` source, request a new deployment after pushing. When updating configuration through the app API, set `update_all_source_versions: true` to fetch current source too; its default preserves existing source revisions. Verify the deployment's source commit and `/fieldbook-build.json`, then check the changed behavior in your installation. A separate preview is available if you want to try the update first.
+Check the deployed commit in `/fieldbook-build.json` and the affected behavior. A separate preview is available if you want to try an update first.
 
-If the release has no new database migrations, no database command is needed. Fresh installations apply the SQL files shipped with the selected source version, beginning with `20261006061752_initial_install.sql`. Existing installations apply only their pending migrations.
+If the release has no new database migrations, no database command is needed. Existing installations apply only pending files, starting from the released `20261006061752_initial_install.sql` baseline. A build does not migrate the database.
 
-## Releases with database changes
+## Fieldbook database migrations
 
-New SQL files in `supabase/migrations/` are applied separately from application deployment. Follow the release's compatibility and deployment order. Use a maintenance window only if the change requires one. Choose backups or a rehearsal according to the change and the data you need to protect.
+Use the selected release's `supabase/migrations/` and follow its compatibility order. Choose backups and any rehearsal according to the change and your data. A maintenance window is needed only when the migration requires one.
 
-For hosted Supabase, use the pinned CLI from a local copy of the target release without installing it globally:
+### Hosted Supabase
+
+From a local copy of the target release, use the pinned CLI:
 
 ```sh
 npx --yes supabase@2.119.0 --agent no --output-format text login --no-browser
@@ -32,61 +40,81 @@ npx --yes supabase@2.119.0 --agent no --output-format text db push --linked --dr
 npx --yes supabase@2.119.0 --agent no --output-format text db push --linked
 ```
 
-Confirm the project reference and pending migrations before applying them. An application build does not migrate the database. Never run `supabase db reset --linked` or the fresh-install setup command against an installation with data. Stop and read the error if a migration fails.
+Confirm the project reference and pending files before applying. The CLI records applied versions in `supabase_migrations.schema_migrations`. Retain the installed cleanup configuration and hourly job; check the next accepted execution after the update.
 
-After the update, check the affected features and existing records. Keep the deployed version and migration record available for the next update.
+### DigitalOcean
 
-For the DigitalOcean backend, use the target source checkout's migration command with an authorized private administrator connection. The private environment file supplies `FIELDBOOK_SETUP_DATABASE_URL` and `FIELDBOOK_SETUP_DATABASE_CA`; the update command preserves the installed cleanup URL and does not need `FIELDBOOK_URL`.
+The private setup environment supplies `FIELDBOOK_SETUP_DATABASE_URL` and `FIELDBOOK_SETUP_DATABASE_CA`. The update command uses the installed cleanup address and does not need `FIELDBOOK_URL`.
 
 ```sh
 node --env-file=/private/path/database.env scripts/setup-self-hosted.mjs --upgrade --dry-run
 node --env-file=/private/path/database.env scripts/setup-self-hosted.mjs --upgrade
 ```
 
-Review the displayed target and pending filenames before typing `UPGRADE`. The dry run reads state/history without executing pending SQL. The apply operation takes an advisory lock, requires the installed ledger to be an exact prefix of the selected release's migrations, and applies only pending files plus their ledger entries in one transaction. Unknown, missing or out-of-order history is an error to investigate, never permission to reset or repair history blindly. A current installation is a no-op. A failed migration rolls back that update set.
+Review the target and pending filenames before typing `UPGRADE`. The dry run reads the installation and migration ledger without executing pending SQL. Applying takes an advisory lock and records pending migrations in the same transaction as their SQL. A failed update set rolls back; an installation with no pending files is a no-op.
 
-The installer verifies its pinned immutable baseline and refuses unreviewed additions of database HTTP scheduling or nontransactional migrations. A release requiring those operations needs an explicitly reviewed self-hosted procedure. Application writes are not paused by the advisory lock; use a maintenance window if the particular migration requires one. Do not run fresh setup or backend preparation on a database containing data.
+The installed ledger must be an exact prefix of the selected source's migrations. Missing, unknown or out-of-order history needs investigation. The command verifies the immutable baseline and rejects unreviewed extension, database HTTP scheduling and nontransactional changes; a release needing those operations must supply its own compatible procedure. The lock does not pause application writes.
 
-The update operation verifies that `fb_cleanup_config.endpoint` and its worker credential remain unchanged and retains the private media bucket. Keep the separate App Platform hourly job configured. Check its next scheduled execution and the affected saved records after the update; a passing dry run proves neither migration execution nor cleanup. Archive the chosen application revision, applied migration versions, app spec and component pins privately for the next update.
+The update preserves the cleanup endpoint, worker secret and private media bucket. Retain the separate App Platform hourly job and check its next accepted run. Auth and Storage maintain their own vendor migration ledgers; Fieldbook's update command does not update them.
+
+### After applying
+
+Check the changed flows and existing records, and retain the deployed source revision and migration versions for the next update. If a migration fails, investigate the error before retrying. Fresh setup, backend preparation and linked resets are not upgrade commands and must not run against an installation with data.
 
 ## Backend component updates on DigitalOcean
 
-Supabase Auth and Storage maintain their own schema migration ledgers; these are separate from `supabase_migrations.schema_migrations`. Rebuilding Fieldbook does not update those services, and updating their images does not apply Fieldbook migrations. Managed PostgreSQL maintenance and major upgrades are another separate operation.
+Review [Supabase's update guidance](https://supabase.com/docs/guides/self-hosting/updating), its release changes and relevant security advisories. Upstream's `update.sh` merges configuration for Docker Compose deployments; it does not update this App Platform recipe.
 
-Review [Supabase's current update guidance](https://supabase.com/docs/guides/self-hosting/updating), its self-hosted release manifest/changelog, and security advisories before changing a pin. Upstream's `update.sh` performs a version-based three-way merge for a **Docker Compose** deployment; it does not deploy this App Platform recipe. Use its release/configuration changes as a review reference. Do not run it against the Fieldbook checkout or replace the app spec with upstream Compose.
+1. Compare the proposed versions with the [tested component table](installation.md#pinned-components-and-compatibility). Review vendor migrations, removed settings and compatibility requirements.
+2. Choose a database, file and configuration recovery point appropriate to the change. Check any risky transition using an existing test installation or a temporary restore if useful.
+3. Update tags and digests deliberately. Preserve database CA settings, service roles, signing keys, Google URLs, token hook, Storage configuration and ingress aliases. Auth and Storage can apply vendor SQL when they start. If that SQL is incompatible with old writers, stop the affected writers before the new version starts; removing public ingress alone does not stop background workers. Pause cleanup or writes when the transition requires it.
+4. Check service health and affected flows with existing records. Auth changes affect sign-in, refresh and optional MCP; Storage changes affect private reads and ordinary/resumable uploads; database/REST changes affect permissions, content and progress. Restore any paused job and confirm an accepted scheduled run.
 
-1. Compare the recorded upstream snapshot and component versions in the [installation compatibility table](installation.md#pinned-components-and-compatibility) with the proposed upstream release. Review migrations, removed configuration, API/SDK compatibility and deprecations. Preserve the documented CA, roles, Google URLs, asymmetric keys, OAuth hook, Storage/S3/TUS settings and ingress adjustments.
-2. Back up the database, private file bytes and essential configuration before an update that could affect them. Use a temporary restore or an existing authorized test installation for risky backend/schema changes. No permanent extra environment is required.
-3. Update component tags **and digests** deliberately and keep the accepted set recorded together. Apply required vendor prerequisites first. Auth/Storage may migrate their schemas as they start, so container recreation can itself be a database change. Rolling deployments can briefly run both versions: pause affected writes and cleanup when a migration removes compatibility with the older writer, and stop old writers before changing their schema. On App Platform, Storage can temporarily be made internal by removing its public `http_port` and ingress rules and retaining internal port 5000. This blocks public traffic but does not stop background workers or old database writers; establish their shutdown separately before incompatible schema changes. Restore both public aliases and the cleanup schedule after verification. Disable automatic image tracking and never regenerate keys during deployment.
-4. Check service readiness, then real affected flows. Auth changes need sign-in/session refresh, preregistration, inactive/deleted accounts and MCP consent/refresh/revocation. Storage changes need ordinary and resumable uploads, private signed reads and deletion. REST/database changes need permissions, publication and saved progress. Inference routing changes need actual forced-tool planning, cited streaming answers, cancellation and controlled route/fallback checks.
-5. Restart/redeploy with existing records and confirm durable state and the external cleanup schedule survive. Update the compatibility table only with the versions and checks actually exercised. A green build, container health check or fresh installation alone does not demonstrate an upgrade.
+Record the component set you deployed. An application patch does not update backend images, and reverting an image does not undo its vendor SQL. Managed PostgreSQL maintenance and major upgrades are also separate from Fieldbook updates.
 
-Keep the pinned set current through a short periodic security/deprecation review and promptly assess relevant advisories. Do not upgrade every component merely because a Fieldbook application patch is available. Conversely, an application-only patch does not remediate a vulnerable backend image. Further PostgreSQL majors and independently mixed component sets require a compatibility review.
+If Storage reports a migration checksum mismatch, compare the old/new image migrations and recorded ledger before proceeding. Keep `DB_ALLOW_MIGRATION_REFRESH=false`; clearing the ledger or allowing blanket refresh is not an update procedure.
 
-If Storage stops on a migration checksum mismatch, keep `DB_ALLOW_MIGRATION_REFRESH=false` and compare the exact old and new image files with the recorded ledger before proceeding. Its checksum includes the filename as well as SQL, so a renamed file can produce a mismatch even when its SQL is unchanged. Do not erase the ledger, rerun old migrations, or enable blanket hash refresh to bypass the error. Any reconciliation needs a backed-up, reviewed procedure for that exact version transition.
+## Routine operations
 
-## Routine health and recovery
+Periodically review relevant security advisories and deprecations, credential expiration, deployment/job failures and database capacity. The interval and monitoring arrangements are yours. Backend component updates do not need to accompany every application patch.
 
-Check App Platform service health and failed deployments/jobs after changes, and include database capacity/connections, Spaces availability, credential expiration and upstream advisories in routine operations. Auth `/health`, Storage `/status`, internal REST `:3001/ready`, and `/fieldbook-build.json` are useful first checks. Use the expected deployment revision in the build marker; do not treat it as proof of real authentication or private media. Watch the next scheduled cleanup execution and the **Recently deleted** warning. Keep logs access-controlled and redact tokens, connection strings and signed URLs before sharing diagnostics.
+Useful checks include:
 
-Inspect abandoned Spaces multipart uploads as part of storage maintenance. An expired TUS URL or upload signature denies further transfer; expiration does not establish that incomplete parts or TUS metadata have been deleted. Identify the configured bucket/tenant and expired upload before aborting an incomplete multipart transfer or removing its associated metadata. Preserve active transfers and completed private files. Fieldbook's deletion job and this provider-level housekeeping serve different purposes.
+- The application and `/fieldbook-build.json` for its source revision.
+- On App Platform, Auth `/backend/auth/v1/health`, Storage `/backend/storage/v1/status` and internal PostgREST `:3001/ready`.
+- **Recently deleted** and the next accepted cleanup job, rather than scheduling history alone.
+- A relevant sign-in, saved record or private-file operation after changes affecting it.
 
-Back up three things together:
+Health endpoints show process readiness, not successful user flows. Keep tokens, connection strings and signed URLs out of shared diagnostics.
 
-- **Database:** Fieldbook tables and migration ledger, Auth accounts/sessions/OAuth state, Storage object metadata/vendor ledgers, roles/grants and extensions. Use Managed PostgreSQL backup/restore plus logical exports when needed. Use a dump client at least as new as the database's major version. A [pg_dump archive](https://www.postgresql.org/docs/17/app-pgdump.html) contains one database and excludes global roles; separately record installation-owned role attributes, memberships, credentials and ownership/grants. Do not blindly replay provider-managed roles. A database restore alone does not restore media bytes. [Deleting a DO cluster also deletes its managed backups](https://docs.digitalocean.com/products/databases/postgresql/how-to/restore-from-backups/); retain an independent recovery copy before destroying a cluster.
-- **Private files:** all Spaces objects, including the backend's tenant/object layout. Choose and verify an independent copy or versioning/retention arrangement. Do not infer that a database backup or bucket metadata includes these files.
-- **Essential configuration:** private app spec, exact application/component revisions and image digests, signing keys/API keys and their expiration dates, service database credentials, CA, Google client settings, canonical URLs/DNS, bucket/tenant IDs, cleanup endpoint/secret/schedule, MCP flags/hook, and AI router configuration/credential scopes. Keep encrypted configuration backups separate from source control.
+On Spaces, review abandoned multipart uploads when needed. Expiration of an upload URL prevents further transfer but does not prove partial bytes have been removed. Provider housekeeping and Fieldbook's record/media deletion job cover different things; preserve active transfers when cleaning up partial uploads.
 
-For recovery, pause application writes, cleanup and backend startup while reconciling matching database and file recovery points. A managed-cluster restore creates a new cluster; a logical restore needs the recorded installation-owned roles and memberships before restoring the database archive with its ownership, grants and default privileges. Restore Fieldbook's migration ledger and both vendor ledgers together; do not use fresh backend preparation, the fresh installer or replayed vendor migrations as a restore strategy. Restore the exact private object keys and corresponding configuration, including original signing keys, person mappings, Storage tenant/bucket names, database credentials and trusted sources. Check ownership and RLS, then start the matching pinned components. Resume the hourly job only after confirming the restored cleanup secret and endpoint, and test a scheduled run. Verify account access, content/progress, private files and optional MCP/AI before directing user traffic to the recovered installation.
+## Backups and recovery
 
-Restoring an earlier database snapshot can invalidate refresh credentials held by browsers and MCP clients; affected users must sign in or reconnect, retaining the existing client registration where supported. It can also restore later-revoked sessions and MCP grants, disabled or deleted accounts, and older Fieldbook roles. Reapply security changes made after the recovery point before reopening access. If those changes cannot be established, keep affected access disabled until reviewed and reauthorized. Do not reconstruct refresh-token rows or weaken token rotation to recover a session. Session continuity across a restart or redeployment does not establish continuity across a database restore.
+Choose recovery arrangements for these three parts:
 
-Rehearse recovery in proportion to the data at risk. Record privately which recovery points and services were actually restored and any lost-data window. Do not promise zero data loss or continuous service from backups alone.
+| Part          | Include                                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database      | Fieldbook records and migration ledger, Auth accounts/sessions/OAuth state, Storage metadata and vendor ledgers                                      |
+| Private files | Uploaded object bytes and their exact keys/tenant layout                                                                                             |
+| Configuration | Source/component versions, private app spec, signing/API keys, service credentials, CA, Google URLs, bucket settings and cleanup URL/secret/schedule |
+
+Database backups do not include uploaded file bytes. Hosted Supabase's [backup options](https://supabase.com/docs/guides/platform/backups) depend on the plan. On DO, choose [Managed PostgreSQL recovery](https://docs.digitalocean.com/products/databases/postgresql/how-to/restore-from-backups/) or logical exports as appropriate. Deleting a managed cluster also deletes its managed backups.
+
+A [logical database archive](https://www.postgresql.org/docs/17/app-pgdump.html) excludes global roles. Retain installation-owned role attributes, memberships, ownership and grants separately. Restore those roles before the archive; do not blindly replay provider-managed roles. Use a dump client at least as new as the server's major version. Protect configuration backups containing credentials.
+
+For recovery, keep writes, cleanup and backend startup paused while matching the database, files and configuration to a recovery point. Restore migration ledgers with their data, exact private object keys and original signing keys. Fresh preparation or setup is not a restore procedure. Before reopening access, check database ownership/grants, service health, accounts, saved content/progress and private files, plus optional AI/MCP if used. Resume cleanup with the restored endpoint and secret and confirm a scheduled run.
+
+Restoring older Auth state can invalidate refresh credentials: users may need to sign in or reconnect MCP. It can also restore subsequently revoked grants, disabled accounts or older roles. Reapply relevant access changes made after the recovery point. A restart retaining sessions does not establish session continuity across a database restore.
 
 ## Rollback
 
-The prior application deployment can be restored if it remains compatible with the current database. Rolling back code does not reverse migrations, provider settings or later data writes. An incompatible database change may need a forward fix or a chosen recovery point; restoring older data can lose newer records and uploads. Auth/Storage migrations can also make an older container incompatible: reverting the image tag does not reverse its SQL. Restore a mutually compatible database, files and configuration set, or apply a reviewed forward fix. Cancelled or interrupted resumable uploads may need to restart after a restore.
+Restore a prior application deployment only if it remains compatible with the current database. Rolling back code does not reverse migrations, settings or later writes. An incompatible change may need a forward fix or a matching database/file/configuration recovery point; older backups can lose later records and uploads. The same limitation applies to Auth/Storage image rollback. Interrupted uploads may need to restart after recovery.
+
+## Changing the hostname
+
+Update DNS, the primary app domain, `FIELDBOOK_URL`, Google callbacks and Auth URLs together. On DO, supply the new literal public backend URL at build and runtime and rebuild Fieldbook. Change `fb_cleanup_config.endpoint` to the new origin's `/api/internal/purge-deleted`, preserve its worker secret, and update the external job's URL. Verify the next scheduled run. The migration command deliberately preserves that configuration.
+
+Browser sessions and MCP connections tied to the former issuer/resource may need sign-in or reconnection. Retain the signing keys and check the affected flows at the new hostname.
 
 For first-time setup, follow [installation](installation.md).
-
-When changing an installation's canonical hostname, update DNS, the app's primary domain, Google origin/callback and Auth URLs together. Supply the new literal public backend URL at build and runtime and rebuild Fieldbook. Through the authorized private database connection, change `fb_cleanup_config.endpoint` to the new origin's `/api/internal/purge-deleted`, preserving its worker secret, then update the external job's URL and verify a scheduled run. The migration update command deliberately preserves this configuration; do not rerun fresh setup to change it. Browser sessions and MCP connections tied to the former issuer/resource may need fresh sign-in or reconnection. Retain the original signing keys and verify the affected flows on the new hostname.
