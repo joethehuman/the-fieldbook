@@ -337,6 +337,65 @@ test("Router discovery paginates independently of the foundation catalog and nev
   }
 });
 
+test("Opaque router identifiers accept non-RFC version bits and reject unsafe path syntax", async () => {
+  const originalFetch = globalThis.fetch;
+  const environment = { ...process.env };
+  Object.assign(process.env, {
+    DIGITALOCEAN_MODEL_ACCESS_KEY: "synthetic-model-key",
+    DIGITALOCEAN_INFERENCE_ROUTER: "router:fieldbook",
+    DIGITALOCEAN_ROUTER_READ_TOKEN: "synthetic-read-key",
+    DIGITALOCEAN_VERIFIED_MODELS: "test-chat,test-backup",
+  });
+  const opaqueId = "123e4567-e89b-abcd-a456-426614174000";
+  let id = opaqueId;
+  const calls: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes("/routers?"))
+      return Response.json({
+        model_routers: [{ uuid: id, name: "fieldbook" }],
+        meta: { pages: 1 },
+      });
+    if (url.endsWith(`/routers/${opaqueId}`))
+      return Response.json({ model_router: { ...routerConfig, uuid: id } });
+    return metadataResponse(url);
+  };
+  const signal = new AbortController().signal;
+  try {
+    const [entry] = await digitaloceanAi.models(signal);
+    assert.equal(entry.validation?.ready, true);
+    assert.ok(
+      calls.includes(
+        `https://api.digitalocean.com/v2/gen-ai/models/routers/${opaqueId}`,
+      ),
+    );
+    for (const malformed of [
+      "../catalog",
+      `${opaqueId}/../catalog`,
+      `${opaqueId}?page=1`,
+      `${opaqueId}#fragment`,
+      `${opaqueId}\n`,
+      "https://untrusted.example/router",
+      opaqueId.replace("a", "g"),
+    ]) {
+      id = malformed;
+      calls.length = 0;
+      await assert.rejects(digitaloceanAi.models(signal), { status: 503 });
+      assert.deepEqual(
+        calls,
+        [
+          "https://api.digitalocean.com/v2/gen-ai/models/routers?page=1&per_page=100",
+        ],
+        "invalid identifiers must fail before any detail request",
+      );
+    }
+  } finally {
+    process.env = environment;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("DO configuration requires a custom router and separate read credential, never a deployment token", async () => {
   const originalFetch = globalThis.fetch;
   const environment = { ...process.env };

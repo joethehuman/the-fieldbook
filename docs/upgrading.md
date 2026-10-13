@@ -15,7 +15,7 @@ git push origin YOUR_DEPLOYMENT_BRANCH
 
 Resolve any conflicts with your custom changes before pushing.
 
-A push to the configured production branch starts Vercel's deployment. On DigitalOcean, use your configured source integration's deployment trigger or deploy the latest commit from App Platform. With the app spec's public `git` source, request a new deployment after pushing; updating the app specification alone can reuse an earlier source revision. Verify the deployment's source commit and `/fieldbook-build.json`, then check the changed behavior in your installation. A separate preview is available if you want to try the update first.
+A push to the configured production branch starts Vercel's deployment. On DigitalOcean, use your configured source integration's deployment trigger or deploy the latest commit from App Platform. With the app spec's public `git` source, request a new deployment after pushing. When updating configuration through the app API, set `update_all_source_versions: true` to fetch current source too; its default preserves existing source revisions. Verify the deployment's source commit and `/fieldbook-build.json`, then check the changed behavior in your installation. A separate preview is available if you want to try the update first.
 
 If the release has no new database migrations, no database command is needed. Fresh installations apply the SQL files shipped with the selected source version, beginning with `20261006061752_initial_install.sql`. Existing installations apply only their pending migrations.
 

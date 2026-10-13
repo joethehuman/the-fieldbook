@@ -15,7 +15,12 @@ const controlURL = "https://api.digitalocean.com/v2/gen-ai/models";
 // inference-router target has a changing pool we cannot validate for Ask AI.
 const targetSchema = z.string().regex(/^router:[a-z0-9][a-z0-9-]{0,152}$/);
 const routerSummarySchema = z.object({
-  uuid: z.string().uuid(),
+  // DO returns opaque hex identifiers, including non-RFC UUID version bits.
+  // Keep the exact shape so an identifier is always a single safe path segment.
+  uuid: z
+    .string()
+    .length(36)
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
   name: z.string(),
 });
 const routerSchema = routerSummarySchema.extend({
