@@ -201,7 +201,10 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
     assert.ok(
       catalog.every((entry) => !entry.capabilities.includes("streaming")),
     );
-    assert.match(digitaloceanAi.routerSelection!.description, /public preview/);
+    assert.equal(
+      digitaloceanAi.routerSelection!.description,
+      "Managed in DigitalOcean.",
+    );
     await digitaloceanAi.validateModel("router:fieldbook", input.signal);
     await assert.rejects(
       digitaloceanAi.validateModel("not-configured", input.signal),

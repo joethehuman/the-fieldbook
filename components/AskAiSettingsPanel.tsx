@@ -19,6 +19,7 @@ import { Checkbox } from "./ui/checkbox";
 import { Field, FieldDescription, FieldGroup } from "./ui/field";
 import { Alert } from "./ui/alert";
 import { Badge } from "./ui/badge";
+import { Spinner } from "./ui/spinner";
 import { ChevronDown } from "lucide-react";
 import {
   Collapsible,
@@ -119,6 +120,7 @@ export function AskAiSettingsPanel({
     ? setup.router
     : (initialRouter ?? (production ? null : demoSetup.router));
   const routerSelection = router?.routerSelection;
+  const routingLoading = production && !setup && !notice;
   const primaryRequired = "Choose a primary model to enable AI.";
   const boundRouter = value.router ?? setup?.selectionRouter ?? "vercel";
   const routerChanged = Boolean(
@@ -311,25 +313,27 @@ export function AskAiSettingsPanel({
               {routerSelection ? (
                 <>
                   <div className="grid gap-2 text-copy">
-                    <p className="font-medium">Configured inference router</p>
+                    <p className="font-medium">Router</p>
                     <p className="break-words">
                       {target || "No router configured"}
                     </p>
                   </div>
-                  <FieldDescription>{routerSelection.details}</FieldDescription>
-                  <FieldDescription role="status" className="min-h-10">
-                    {!setup && !notice
-                      ? "Checking router metadata…"
+                  <p role="status" className="sr-only">
+                    {routingLoading
+                      ? "Loading router models…"
                       : configuredTarget?.validation?.ready
-                        ? "Model metadata checked."
-                        : "Router metadata is unavailable or needs attention. View the details below."}
-                  </FieldDescription>
+                        ? "Router models loaded."
+                        : "Router models unavailable or incompatible."}
+                  </p>
+                  {configuredTarget?.validation?.ready === false && (
+                    <Alert role="alert" variant="destructive">
+                      {configuredTarget.validation.message}
+                    </Alert>
+                  )}
                   {needsRouterSelection && (
                     <FieldGroup className="gap-2">
                       <FieldDescription>
-                        Use this installation’s configured router before saving.
-                        This replaces any previously saved model or fallback
-                        choice.
+                        Use this router before saving.
                       </FieldDescription>
                       <ActionGroup>
                         <Button
@@ -355,22 +359,32 @@ export function AskAiSettingsPanel({
                       </ActionGroup>
                     </FieldGroup>
                   )}
-                  <Collapsible>
+                  <Collapsible
+                    className="overflow-hidden rounded-control border border-border"
+                    aria-busy={routingLoading}
+                    data-slot="ai-router-details"
+                  >
                     <CollapsibleTrigger asChild>
                       <Button
                         type="button"
                         variant="ghost"
-                        className="group justify-start"
+                        className="group w-full justify-start rounded-none px-4 py-3 text-left focus-visible:ring-inset focus-visible:ring-offset-0 [&>span]:w-full [&>span]:justify-between"
                       >
-                        <ChevronDown
-                          aria-hidden="true"
-                          className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none"
-                        />
-                        Model pools and fallback order
+                        <span className="min-w-0">
+                          Model pools and fallback order
+                        </span>
+                        {routingLoading ? (
+                          <Spinner />
+                        ) : (
+                          <ChevronDown
+                            aria-hidden="true"
+                            className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none"
+                          />
+                        )}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <div className="grid gap-4 pt-3 text-copy">
+                      <div className="grid gap-5 border-t border-border p-4 text-copy @md/admin-surface:grid-cols-2">
                         {configuredTarget?.routing ? (
                           <>
                             <div className="grid gap-2">
@@ -379,8 +393,10 @@ export function AskAiSettingsPanel({
                                 configuredTarget.routing.pools.map(
                                   (pool, index) => (
                                     <div key={index} className="grid gap-1">
-                                      <p>{pool.label}</p>
-                                      <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                                      <p className="break-words text-caption text-muted-foreground">
+                                        {pool.label}
+                                      </p>
+                                      <ul className="list-disc space-y-1 pl-5">
                                         {pool.models.map((id, modelIndex) => (
                                           <li
                                             key={modelIndex}
@@ -402,7 +418,7 @@ export function AskAiSettingsPanel({
                             </div>
                             <div className="grid gap-2">
                               <p className="font-medium">Fallback order</p>
-                              <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+                              <ol className="list-decimal space-y-1 pl-5">
                                 {configuredTarget.routing.fallbacks.map(
                                   (id, index) => (
                                     <li key={index} className="break-words">
@@ -415,14 +431,9 @@ export function AskAiSettingsPanel({
                           </>
                         ) : (
                           <FieldDescription>
-                            {!setup && !notice
-                              ? "Checking router metadata…"
+                            {routingLoading
+                              ? "Loading router models…"
                               : "Model pools and fallback order could not be loaded."}
-                          </FieldDescription>
-                        )}
-                        {configuredTarget?.validation && (
-                          <FieldDescription>
-                            {configuredTarget.validation.message}
                           </FieldDescription>
                         )}
                       </div>

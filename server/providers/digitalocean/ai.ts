@@ -269,10 +269,7 @@ export const digitaloceanAi: AiProvider = {
     const configured = target();
     return {
       target: configured.success ? configured.data : "",
-      description:
-        "Model pools, priorities and fallbacks are managed through the DigitalOcean API. Inference Router is in public preview.",
-      details:
-        "Fieldbook sends both search planning and answer generation to this router. Pricing and data handling depend on the model that answers; router-wide pricing, retention and training assurances are unavailable.",
+      description: "Managed in DigitalOcean.",
     };
   },
   connection,

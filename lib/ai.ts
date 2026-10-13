@@ -42,7 +42,6 @@ export type AiRouter = {
   routerSelection?: {
     target: string;
     description: string;
-    details: string;
   };
 };
 export type AiSetup = {
