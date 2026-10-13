@@ -18,6 +18,8 @@ Its foundations are shadcn/ui source composition, Radix interaction primitives, 
 
 Before building a control, card, or page pattern, check the shared components and the `/ui` examples. Reuse or extend an existing component when it already owns the behavior. For example, `CourseCard` and `CurriculumCard` compose the shared `LearningCard`; the demo and installed Updates pages both use `UpdateCard`.
 
+Single-choice dropdowns dismiss when any enabled option is activated, including the current or default selection. The shared Select preserves its value without firing a value-change callback on reselection. Keep disabled choices unavailable, return focus to the trigger, and distinguish a completed touch from scrolling or cancellation. Select owns this behavior for sorting, filters, forms, compact section navigation and editor language controls. Multiple-selection lists retain their existing selection workflow.
+
 Generated card artwork uses a consistent 1.5rem short title at every browser width. Horizontally scrolling CourseRow strips use a subtle 0.5rem edge fade only where more content is hidden, using the shared header fade’s tapered profile and reaching full transparency at the clipping edge to avoid a hard cutoff.
 
 CourseCard owns the deadline cue in both apps. Overdue assigned courses show “N days past due” in the semantic destructive color; upcoming deadlines and “Due today” use muted text. Completed courses, guests and disabled due dates omit the cue.
