@@ -362,25 +362,29 @@ export function AskAiSettingsPanel({
                     aria-busy={routingLoading}
                     data-slot="ai-router-details"
                   >
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="group w-full justify-start rounded-none px-4 py-3 text-left focus-visible:ring-inset focus-visible:ring-offset-0 [&>span]:w-full [&>span]:justify-between"
-                      >
-                        <span className="min-w-0">
-                          Model pools and fallback order
-                        </span>
-                        {routingLoading ? (
-                          <Spinner />
-                        ) : (
-                          <ChevronDown
-                            aria-hidden="true"
-                            className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none"
-                          />
-                        )}
-                      </Button>
-                    </CollapsibleTrigger>
+                    <div className="flex items-center justify-between gap-3 px-4 py-2">
+                      <span className="min-w-0 text-label font-medium">
+                        Model pools and fallback order
+                      </span>
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Model pools and fallback order"
+                          className="group"
+                        >
+                          {routingLoading ? (
+                            <Spinner />
+                          ) : (
+                            <ChevronDown
+                              aria-hidden="true"
+                              className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none"
+                            />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
                     <CollapsibleContent>
                       <div className="grid gap-5 border-t border-border p-4 text-copy @md/admin-surface:grid-cols-2">
                         {configuredTarget?.routing ? (

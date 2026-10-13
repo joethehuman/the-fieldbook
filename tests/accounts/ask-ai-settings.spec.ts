@@ -653,6 +653,15 @@ test("DigitalOcean shows a stable router summary before discovery, preserves set
   ).toBeVisible();
   const details = page.locator('[data-slot="ai-router-details"]');
   await expect(details).toHaveAttribute("aria-busy", "true");
+  const trigger = details.getByRole("button", {
+    name: "Model pools and fallback order",
+    exact: true,
+  });
+  const label = details.getByText("Model pools and fallback order", {
+    exact: true,
+  });
+  const loadingTrigger = await trigger.boundingBox();
+  expect(loadingTrigger).not.toBeNull();
   await expect(
     page.getByText("Managed in DigitalOcean.", { exact: true }),
   ).toBeVisible();
@@ -674,10 +683,38 @@ test("DigitalOcean shows a stable router summary before discovery, preserves set
   ).toBeDisabled();
   release();
   await expect(details).toHaveAttribute("aria-busy", "false");
+  const loadedTrigger = await trigger.boundingBox();
+  expect(loadedTrigger).not.toBeNull();
+  expect(loadedTrigger!.width).toBe(loadedTrigger!.height);
+  expect(loadedTrigger).toEqual(loadingTrigger);
+  const detailsBox = await details.boundingBox();
+  expect(detailsBox).not.toBeNull();
+  expect(loadedTrigger!.width).toBeLessThan(detailsBox!.width / 4);
   const after = await content.boundingBox();
   expect(before).not.toBeNull();
   expect(after).not.toBeNull();
   expect(Math.abs(after!.y - before!.y)).toBeLessThanOrEqual(1);
+  await label.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  if (await page.evaluate(() => matchMedia("(hover: hover)").matches)) {
+    await label.hover();
+    const header = label.locator("..");
+    const headerBackground = await header.evaluate(
+      (el) => getComputedStyle(el).backgroundColor,
+    );
+    const idleBackground = await trigger.evaluate(
+      (el) => getComputedStyle(el).backgroundColor,
+    );
+    await trigger.hover();
+    await expect
+      .poll(() =>
+        trigger.evaluate((el) => getComputedStyle(el).backgroundColor),
+      )
+      .not.toBe(idleBackground);
+    expect(
+      await header.evaluate((el) => getComputedStyle(el).backgroundColor),
+    ).toBe(headerBackground);
+  }
   await expect(
     page.getByRole("button", { name: "Use configured router", exact: true }),
   ).toHaveCount(0);
@@ -710,13 +747,9 @@ test("DigitalOcean shows a stable router summary before discovery, preserves set
       { exact: true },
     ),
   ).toHaveCount(0);
-  const trigger = page.getByRole("button", {
-    name: "Model pools and fallback order",
-    exact: true,
-  });
-  const headerInset = await trigger
-    .locator("span > span")
-    .evaluate((el) => el.getBoundingClientRect().x);
+  const headerInset = await label.evaluate(
+    (el) => el.getBoundingClientRect().x,
+  );
   const bodyInset = await page
     .getByText("Model pools", { exact: true })
     .evaluate((el) => el.getBoundingClientRect().x);
