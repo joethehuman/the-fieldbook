@@ -91,7 +91,7 @@ export const contentData: Pick<
       db()
         .from("fb_documents")
         .select(
-          "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,sectionOrder:draft->sectionOrder,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,feedAt:draft->>feedAt,cardArt:draft->cardArt,groups:draft->groups,updateTeams:draft->updateTeams,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
+          "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,sectionOrder:draft->sectionOrder,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,feedAt:draft->>feedAt,cardArt:draft->cardArt,groups:draft->groups,updateTeams:draft->updateTeams,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl,publishedRequirePassing:published->requirePassing",
           { count: "exact" },
         )
         .is("deleted_at", null)

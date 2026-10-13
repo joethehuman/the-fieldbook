@@ -11,9 +11,11 @@ import type { AdminScope } from "@/lib/admin-scope";
 import { progressReport } from "./progress-report";
 export type { AdminScope } from "@/lib/admin-scope";
 
-const contentIndex = async (): Promise<Content[]> => {
+const contentIndex = async (): Promise<
+  Pick<Workspace, "content" | "publishedContent">
+> => {
   const rows = await dataStore().listDraftIndex();
-  return rows.map((row) => ({
+  const content = rows.map((row) => ({
     id: row.id,
     title: row.title || "",
     summary: row.summary || "",
@@ -39,6 +41,23 @@ const contentIndex = async (): Promise<Content[]> => {
     lessons: [],
     questions: [],
   })) as unknown as Content[];
+  return {
+    content,
+    publishedContent: content.flatMap((item, index) =>
+      item.publishedRevision
+        ? [{
+            ...item,
+            status: "published" as const,
+            revision: item.publishedRevision,
+            // The draft can stage a different rule. Compare against the saved
+            // publication without loading full lesson bodies or quiz answers.
+            ...(item.kind === "course"
+              ? { requirePassing: rows[index].publishedRequirePassing ?? true }
+              : {}),
+          }]
+        : [],
+    ),
+  };
 };
 
 /** Return only the requested, authorized publishing/administration data. Never cache it. */
@@ -61,7 +80,7 @@ export async function adminSnapshot(
   // Housekeeping cannot delay or fail an unrelated account/content list.
   const [
     config,
-    content,
+    { content, publishedContent },
     governance,
     courseRows,
     publishedAssignmentRows,
@@ -118,13 +137,7 @@ export async function adminSnapshot(
     revision: config.revision,
     governanceRevision: admin ? config.governance_revision : undefined,
     content,
-    publishedContent: content
-      .filter((item) => item.publishedRevision)
-      .map((item) => ({
-        ...item,
-        status: "published" as const,
-        revision: item.publishedRevision ?? undefined,
-      })),
+    publishedContent,
     users: [user],
     groups: admin
       ? config.groups || []
