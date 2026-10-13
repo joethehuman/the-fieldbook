@@ -1,5 +1,5 @@
 "use client";
-import type { MouseEvent, KeyboardEvent } from "react";
+import type { MouseEvent, KeyboardEvent, ReactNode } from "react";
 import { BookOpen, GraduationCap, Newspaper } from "lucide-react";
 import type {
   SearchSuggestion,
@@ -52,6 +52,7 @@ export function SearchSuggestions({
   clientNavigation,
   onOpen,
   onBrowse,
+  escapeHint,
 }: {
   items: SearchSuggestion[];
   loading: boolean;
@@ -59,6 +60,7 @@ export function SearchSuggestions({
   clientNavigation: boolean;
   onOpen: (item: SearchSuggestion) => void;
   onBrowse?: (href: SearchBrowsePath) => void;
+  escapeHint?: ReactNode;
 }) {
   const Link = clientNavigation ? IntentLink : "a";
   const href = (path: string) =>
@@ -125,33 +127,36 @@ export function SearchSuggestions({
         }
       >
         <h2 className="text-label font-medium text-muted-foreground">Browse</h2>
-        <div className="flex flex-wrap gap-1">
-          {browse.map((item) => (
-            <Button asChild variant="ghost" key={item.href}>
-              <Link
-                href={href(item.href)}
-                data-fieldbook-local-navigation={
-                  clientNavigation && onBrowse ? "true" : undefined
-                }
-                onClick={
-                  onBrowse
-                    ? (event) => {
-                        if (ordinaryClick(event)) {
-                          event.preventDefault();
-                          onBrowse(item.href);
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <div className={escapeHint ? "flex shrink-0 gap-1" : "flex flex-wrap gap-1"}>
+            {browse.map((item) => (
+              <Button asChild variant="ghost" key={item.href}>
+                <Link
+                  href={href(item.href)}
+                  data-fieldbook-local-navigation={
+                    clientNavigation && onBrowse ? "true" : undefined
+                  }
+                  onClick={
+                    onBrowse
+                      ? (event) => {
+                          if (ordinaryClick(event)) {
+                            event.preventDefault();
+                            onBrowse(item.href);
+                          }
                         }
-                      }
-                    : undefined
-                }
-              >
-                <item.icon
-                  aria-hidden="true"
-                  className="text-muted-foreground"
-                />
-                {item.label}
-              </Link>
-            </Button>
-          ))}
+                      : undefined
+                  }
+                >
+                  <item.icon
+                    aria-hidden="true"
+                    className="text-muted-foreground"
+                  />
+                  {item.label}
+                </Link>
+              </Button>
+            ))}
+          </div>
+          {escapeHint}
         </div>
       </nav>
     </section>

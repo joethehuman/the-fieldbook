@@ -21,7 +21,7 @@ import type { AiCitation } from "@/lib/ai";
 import type { AskAiSessionHandle, AskAiSessionProps } from "./AskAiSession";
 import { ContentSearch } from "./ContentSearch";
 import { SearchSuggestions } from "./SearchSuggestions";
-import { SearchPanel } from "./patterns/search-panel";
+import { SearchPanel, SearchEscapeHint } from "./patterns/search-panel";
 import { SearchField } from "./patterns/search-field";
 import { useCompactLayout } from "./patterns/use-compact-layout";
 import { AppBarSearchCompactContext } from "./patterns/app-bar";
@@ -31,7 +31,7 @@ import { Button } from "./ui/button";
 import { Alert } from "./ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 
-function AskAiUnavailable({ target, onReady }: AskAiSessionProps) {
+function AskAiUnavailable({ target, onReady, escapeHint }: AskAiSessionProps) {
   useEffect(() => {
     onReady(true);
   }, [onReady]);
@@ -45,6 +45,7 @@ function AskAiUnavailable({ target, onReady }: AskAiSessionProps) {
         <Button type="button" variant="outline" onClick={() => window.location.reload()}>
           Reload page
         </Button>
+        {escapeHint && <div className="flex justify-end">{escapeHint}</div>}
       </div>,
       target,
     )
@@ -104,6 +105,7 @@ export function SearchExperience({
   const visible = open;
   const fitContent = view === "search" && !query.trim();
   const fitPanel = fitContent && !compactLayout;
+  const escapeHint = compactLayout ? null : <SearchEscapeHint />;
   const showSuggestions = visible && fitContent;
   const [suggested, setSuggested] = useState<{
     items: SearchSuggestion[];
@@ -260,6 +262,7 @@ export function SearchExperience({
       clientNavigation={clientNavigation}
       onOpen={(item) => void openResult(item)}
       onBrowse={onBrowse ? (href) => void browse(href) : undefined}
+      escapeHint={escapeHint}
     />
   );
   return (
@@ -269,6 +272,7 @@ export function SearchExperience({
       compact={compact}
       fullScreen={compactLayout}
       fitContent={fitPanel}
+      showEscapeHint={view === "search" ? !fitContent : !aiReady}
       onDismiss={() => setOpen(false)}
       returnFocus={compact ? searchTrigger : undefined}
       persistentContent={
@@ -283,6 +287,7 @@ export function SearchExperience({
             onSource={openSource}
             draft={draft}
             setDraft={setDraft}
+            escapeHint={escapeHint}
           />
         ) : null
       }

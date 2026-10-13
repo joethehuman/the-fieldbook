@@ -9,6 +9,19 @@ import {
 import { Card } from "../ui/card";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 
+/** A passive keyboard hint; its surrounding row owns placement and spacing. */
+export function SearchEscapeHint() {
+  return (
+    <p
+      data-slot="search-escape-hint"
+      className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs text-muted-foreground"
+    >
+      <kbd className="search-keycap">Esc</kbd>
+      <span>to close</span>
+    </p>
+  );
+}
+
 /** Responsive surfaces share one owner for the search query and chat session. */
 export function SearchPanel({
   id,
@@ -16,6 +29,7 @@ export function SearchPanel({
   compact = false,
   fullScreen = false,
   fitContent = false,
+  showEscapeHint = true,
   onDismiss,
   trigger,
   children,
@@ -27,6 +41,7 @@ export function SearchPanel({
   compact?: boolean;
   fullScreen?: boolean;
   fitContent?: boolean;
+  showEscapeHint?: boolean;
   onDismiss: () => void;
   trigger: ReactNode;
   children: ReactNode;
@@ -86,12 +101,6 @@ export function SearchPanel({
     document.addEventListener("pointerdown", dismiss);
     return () => document.removeEventListener("pointerdown", dismiss);
   }, [open, fullScreen, onDismiss]);
-  const escapeHint = (
-    <p className="flex shrink-0 items-center justify-start gap-2 px-4 py-3 text-xs text-muted-foreground">
-      <kbd className="search-keycap">Esc</kbd>
-      <span>to close</span>
-    </p>
-  );
   return (
     <div
       ref={root}
@@ -167,7 +176,11 @@ export function SearchPanel({
             className={`absolute right-0 top-full z-40 mt-2 flex flex-col max-h-[min(40rem,75dvh,var(--search-viewport-height,100dvh),var(--editor-popup-available-height,calc(100dvh-var(--app-bar-height,4rem)-1rem)))] ${fitContent ? "h-auto" : "h-[min(40rem,75dvh,var(--editor-popup-available-height,calc(100dvh-var(--app-bar-height,4rem)-1rem)))]"} w-[var(--search-panel-width,min(48rem,calc(100vw-2rem)))] overflow-hidden p-0 sm:p-0 shadow-xl group-data-[compact=true]/search-panel:inset-x-4 group-data-[compact=true]/search-panel:w-auto`}
           >
             {children}
-            {escapeHint}
+            {showEscapeHint && (
+              <div className="flex shrink-0 justify-end px-4 py-3">
+                <SearchEscapeHint />
+              </div>
+            )}
           </Card>
         )
       )}
