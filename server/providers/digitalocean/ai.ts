@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText, smoothStream, streamText, tool } from "ai";
 import { z } from "zod";
@@ -229,6 +230,10 @@ function model(id: string, fallback: string | undefined) {
     name: "digitalocean",
     baseURL,
     apiKey: process.env.DIGITALOCEAN_MODEL_ACCESS_KEY,
+    // Full context is sent for each independent planning/answer call. A fresh
+    // opaque affinity prevents common prompts from reusing an older routing
+    // decision across questions or pool edits; it is not a cache opt-out.
+    headers: { "X-Model-Affinity": randomUUID() },
     // DigitalOcean documents max_completion_tokens; the generic provider emits
     // the older max_tokens field. Both reasoning and visible output use this cap.
     transformRequestBody: ({ max_tokens, ...body }) => ({

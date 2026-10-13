@@ -250,6 +250,12 @@ services:
         scope: RUN_TIME
       - key: TUS_PART_SIZE
         value: "6"
+      # Seconds for path-bound authorization; milliseconds for resumable state.
+      # Storage's default 60-second signature is too short for large uploads.
+      - key: UPLOAD_SIGNED_URL_EXPIRATION_TIME
+        value: "7200"
+      - key: TUS_URL_EXPIRY_MS
+        value: "7200000"
       - key: TUS_ALLOW_S3_TAGS
         value: "false"
       - key: TUS_LOCK_TYPE

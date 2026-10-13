@@ -53,6 +53,7 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
   });
   console.warn = (...args) => logs.push(args);
   const calls: Record<string, any>[] = [];
+  const affinities: string[] = [];
   let failure = false;
   const input = {
     model: "router:fieldbook",
@@ -68,6 +69,7 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
       );
       assert.equal(init?.redirect, "error");
       assert.equal(init?.method ?? "GET", "GET");
+      assert.equal(new Headers(init?.headers).get("x-model-affinity"), null);
       return metadataResponse(String(url));
     }
     assert.equal(
@@ -78,6 +80,13 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
       new Headers(init?.headers).get("authorization"),
       "Bearer synthetic-model-key",
     );
+    const affinity = new Headers(init?.headers).get("x-model-affinity");
+    assert.ok(affinity);
+    assert.match(
+      affinity,
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    affinities.push(affinity);
     const body = JSON.parse(String(init?.body));
     calls.push(body);
     assert.equal(body.model, "router:fieldbook");
@@ -229,6 +238,12 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
       message: aiUnavailableMessage,
     });
     assert.equal(calls.length, before + 1, "provider refusals are not retried");
+    assert.equal(affinities.length, calls.length);
+    assert.equal(
+      new Set(affinities).size,
+      affinities.length,
+      "planning, answers and later questions must use independent opaque affinity",
+    );
     const aborted = new AbortController();
     aborted.abort();
     await assert.rejects(

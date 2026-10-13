@@ -69,6 +69,8 @@ If Storage stops on a migration checksum mismatch, keep `DB_ALLOW_MIGRATION_REFR
 
 Check App Platform service health and failed deployments/jobs after changes, and include database capacity/connections, Spaces availability, credential expiration and upstream advisories in routine operations. Auth `/health`, Storage `/status`, internal REST `:3001/ready`, and `/fieldbook-build.json` are useful first checks. Use the expected deployment revision in the build marker; do not treat it as proof of real authentication or private media. Watch the next scheduled cleanup execution and the **Recently deleted** warning. Keep logs access-controlled and redact tokens, connection strings and signed URLs before sharing diagnostics.
 
+Inspect abandoned Spaces multipart uploads as part of storage maintenance. An expired TUS URL or upload signature denies further transfer; expiration does not establish that incomplete parts or TUS metadata have been deleted. Identify the configured bucket/tenant and expired upload before aborting an incomplete multipart transfer or removing its associated metadata. Preserve active transfers and completed private files. Fieldbook's deletion job and this provider-level housekeeping serve different purposes.
+
 Back up three things together:
 
 - **Database:** Fieldbook tables and migration ledger, Auth accounts/sessions/OAuth state, Storage object metadata/vendor ledgers, roles/grants and extensions. Use Managed PostgreSQL backup/restore plus logical exports when needed. A database restore alone does not restore media bytes.
