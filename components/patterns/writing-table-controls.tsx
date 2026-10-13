@@ -37,8 +37,10 @@ type Box = { left: number; top: number; width: number; height: number };
 type Geometry = { rows: Box[]; columns: Box[]; grid: Box };
 function position(element: HTMLElement | null, box: Partial<Box>) {
   if (element)
-    for (const [property, value] of Object.entries(box))
-      element.style.setProperty(property, `${value}px`);
+    for (const [property, value] of Object.entries(box)) {
+      const next = `${value}px`;
+      if (element.style.getPropertyValue(property) !== next) element.style.setProperty(property, next);
+    }
 }
 type Drag = {
   axis: Axis;
@@ -79,7 +81,9 @@ function GutterActions({
   useLayoutEffect(() => {
     if (!frame) return;
     const table = align === "table" ? host.querySelector("table") : null;
+    let frameId = 0;
     const measure = () => {
+      frameId = 0;
       const origin = frame.getBoundingClientRect();
       const bounds = host.getBoundingClientRect();
       const tableBounds = table?.getBoundingClientRect();
@@ -92,25 +96,24 @@ function GutterActions({
           - origin.top + frame.scrollTop,
       });
     };
+    const schedule = () => { if (!frameId) frameId = requestAnimationFrame(measure); };
     const show = () => setHovered(true);
     const hide = () => setHovered(false);
     measure();
-    const resize = new ResizeObserver(measure);
+    const resize = new ResizeObserver(schedule);
     resize.observe(frame);
     resize.observe(host);
     if (table) resize.observe(table);
-    let frameId = 0;
-    const unregister = editor.registerUpdateListener(() => {
-      cancelAnimationFrame(frameId);
-      frameId = requestAnimationFrame(measure);
+    const unregister = editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+      if (dirtyElements.size || dirtyLeaves.size) schedule();
     });
     host.addEventListener("pointerenter", show);
     host.addEventListener("pointerleave", hide);
     host.addEventListener("focusin", show);
     host.addEventListener("focusout", hide);
-    host.addEventListener("scroll", measure, { passive: true });
-    document.addEventListener("scroll", measure, true);
-    window.addEventListener("resize", measure);
+    host.addEventListener("scroll", schedule, { passive: true });
+    document.addEventListener("scroll", schedule, true);
+    window.addEventListener("resize", schedule);
     return () => {
       cancelAnimationFrame(frameId);
       unregister();
@@ -119,9 +122,9 @@ function GutterActions({
       host.removeEventListener("pointerleave", hide);
       host.removeEventListener("focusin", show);
       host.removeEventListener("focusout", hide);
-      host.removeEventListener("scroll", measure);
-      document.removeEventListener("scroll", measure, true);
-      window.removeEventListener("resize", measure);
+      host.removeEventListener("scroll", schedule);
+      document.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("resize", schedule);
     };
   }, [editor, host, align, frame]);
   if (!frame) return null;
@@ -172,6 +175,7 @@ function TableControls({
   const fadeRef = useRef<HTMLSpanElement>(null);
   const resizePreview = useRef(false);
   const refresh = useRef<() => void>(() => {});
+  const positionFade = useRef<() => void>(() => {});
   useWritingInteraction(!!menu || !!pressed || resizing !== null);
   useEffect(() => () => gesture.current?.(), []);
   useLayoutEffect(() => {
@@ -179,10 +183,25 @@ function TableControls({
     const table = host.querySelector("table");
     if (!table) return;
     host.classList.add("writing-table-block");
+    let frameId = 0;
+    let geometryDirty = false;
+    let measured: Geometry | null = null;
     const updateFade = () => {
       const left = host.scrollLeft > 2;
       const right = host.scrollWidth - host.scrollLeft - host.clientWidth > 2;
       setFade((current) => current.left === left && current.right === right ? current : { left, right });
+    };
+    const placeFade = () => {
+      const frame = editor.getRootElement()?.parentElement;
+      if (!frame || !measured) return;
+      const origin = frame.getBoundingClientRect();
+      const bounds = host.getBoundingClientRect();
+      position(fadeRef.current, {
+        left: bounds.left - origin.left + frame.scrollLeft,
+        top: bounds.top + measured.grid.top - host.scrollTop - origin.top + frame.scrollTop,
+        width: bounds.width,
+        height: measured.grid.height,
+      });
     };
     const measure = () => {
       if (!resizePreview.current) editor.getEditorState().read(() => {
@@ -192,7 +211,8 @@ function TableControls({
         const total = sized?.reduce((sum, width) => sum + width, 0);
         const tableWidth = total ? `${total}px` : "";
         if (table.style.width !== tableWidth) table.style.width = tableWidth;
-        table.style.tableLayout = sized ? "fixed" : "";
+        const layout = sized ? "fixed" : "";
+        if (table.style.tableLayout !== layout) table.style.tableLayout = layout;
         columns.forEach((column, index) => {
           const width = sized?.[index] ? `${sized[index]}px` : "";
           if (column.style.width !== width) column.style.width = width;
@@ -233,47 +253,56 @@ function TableControls({
           height: grid.height,
         })),
       };
+      measured = next;
       setGeometry((previous) =>
         JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
       );
-      const frame = editor.getRootElement()?.parentElement;
-      if (frame) {
-        const origin = frame.getBoundingClientRect();
-        const bounds = host.getBoundingClientRect();
-        const top = firstCell.getBoundingClientRect().top;
-        const bottom = lastCell.getBoundingClientRect().bottom;
-        position(fadeRef.current, {
-          left: bounds.left - origin.left + frame.scrollLeft,
-          top: top - origin.top + frame.scrollTop,
-          width: bounds.width,
-          height: bottom - top,
-        });
-      }
+      placeFade();
       updateFade();
     };
-    refresh.current = measure;
+    const schedule = (full = true) => {
+      geometryDirty ||= full;
+      if (!frameId) frameId = requestAnimationFrame(() => {
+        frameId = 0;
+        const full = geometryDirty;
+        geometryDirty = false;
+        if (full) measure(); else placeFade();
+      });
+    };
+    const invalidateGeometry = () => schedule();
+    refresh.current = invalidateGeometry;
+    positionFade.current = placeFade;
     measure();
-    const resize = new ResizeObserver(measure);
+    const resize = new ResizeObserver(invalidateGeometry);
     resize.observe(table);
     resize.observe(host);
-    const mutation = new MutationObserver(measure);
+    const mutation = new MutationObserver(invalidateGeometry);
     mutation.observe(table, {
       childList: true,
       subtree: true,
       characterData: true,
     });
-    const unregister = editor.registerUpdateListener(measure);
+    const unregister = editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+      if (!dirtyElements.size && !dirtyLeaves.size) return;
+      // Edits above this table move its portaled fade and gutter, but its
+      // host-relative rows and columns only change with the table itself.
+      schedule(dirtyElements.has(nodeKey) || dirtyLeaves.has(nodeKey));
+    });
     host.addEventListener("scroll", updateFade, { passive: true });
     return () => {
       unregister();
+      cancelAnimationFrame(frameId);
       host.removeEventListener("scroll", updateFade);
       refresh.current = () => {};
+      positionFade.current = () => {};
       resize.disconnect();
       mutation.disconnect();
       host.classList.remove("writing-table-block");
     };
-  }, [host, disabled]);
-  useLayoutEffect(() => { if (geometry) refresh.current(); }, [geometry]);
+  }, [editor, host, nodeKey, disabled]);
+  // The first geometry render mounts the portaled fade. Position that element
+  // before paint without measuring every row and column a second time.
+  useLayoutEffect(() => { if (geometry) positionFade.current(); }, [geometry]);
   function change(
     run: (node: NonNullable<ReturnType<typeof getTable>>) => void,
   ) {
@@ -738,8 +767,9 @@ function WritingTableControls({ initialWidths, onRootEditor, onWidthsChange }: {
     if (!editor) return;
     let frame = 0;
     const update = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() =>
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
         editor.getEditorState().read(() => {
           if (!initialized.current && initialWidths.length) {
             const nodes = $getRoot().getChildren().filter($isTableNode);
@@ -783,11 +813,13 @@ function WritingTableControls({ initialWidths, onRootEditor, onWidthsChange }: {
               ? previous
               : next,
           );
-        }),
-      );
+        });
+      });
     };
     update();
-    const unregister = editor.registerUpdateListener(update);
+    const unregister = editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+      if (dirtyElements.size || dirtyLeaves.size) update();
+    });
     return () => {
       unregister();
       cancelAnimationFrame(frame);

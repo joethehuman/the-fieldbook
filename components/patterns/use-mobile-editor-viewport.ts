@@ -1,23 +1,22 @@
 "use client";
 
 import { useLayoutEffect, type RefObject } from "react";
+import { mobileEditorLayout } from "./mobile-editor-layout";
 
 /** One browser viewport boundary for the mobile header, scroller and overlays. */
 export function useMobileEditorViewport(
   ref: RefObject<HTMLElement | null>,
   enabled: boolean,
-  afterLayout: RefObject<(() => void) | null>,
 ) {
   useLayoutEffect(() => {
     const shell = ref.current?.closest<HTMLElement>(".main-shell");
     if (!enabled || !shell) return;
     const viewport = window.visualViewport;
+    const layout = mobileEditorLayout(shell);
     let width = document.documentElement.clientWidth;
     let fullHeight = Math.max(document.documentElement.clientHeight, viewport?.height || window.innerHeight);
     let keyboard = false;
-    let request = 0;
     const measure = () => {
-      request = 0;
       const height = viewport?.height || document.documentElement.clientHeight;
       const nextWidth = document.documentElement.clientWidth;
       if (nextWidth !== width) {
@@ -43,25 +42,27 @@ export function useMobileEditorViewport(
         shell.style.removeProperty("--editor-viewport-top");
         shell.style.removeProperty("--editor-viewport-height");
       }
-      afterLayout.current?.();
     };
-    const schedule = () => { if (!request) request = requestAnimationFrame(measure); };
-    measure();
+    const schedule = () => layout.schedule("viewport");
+    const unsubscribe = layout.subscribe("viewport", measure);
     viewport?.addEventListener("resize", schedule);
     viewport?.addEventListener("scroll", schedule);
     window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, { passive: true });
     document.addEventListener("focusin", schedule);
     document.addEventListener("focusout", schedule);
     return () => {
-      cancelAnimationFrame(request);
+      unsubscribe();
       viewport?.removeEventListener("resize", schedule);
       viewport?.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule);
       document.removeEventListener("focusin", schedule);
       document.removeEventListener("focusout", schedule);
       shell.style.removeProperty("--editor-viewport-top");
       shell.style.removeProperty("--editor-viewport-height");
       delete shell.dataset.editorKeyboard;
+      layout.band = null;
     };
-  }, [ref, enabled, afterLayout]);
+  }, [ref, enabled]);
 }

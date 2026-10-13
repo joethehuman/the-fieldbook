@@ -6,6 +6,7 @@ import { writingTableControlsPlugin } from "./writing-table-controls";
 import { $createWritingVideoNode, writingVideoPlugin } from "./writing-video";
 import { WritingMediaLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
 import { useScrollFade } from "./use-scroll-fade";
+import { mobileEditorLayout, mobileEditorOpeningReady } from "./mobile-editor-layout";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
 import { $applyWritingBlockStyle, $isMediaParagraph, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
@@ -304,12 +305,24 @@ function WritingToolbar({
   }, [editor, onEditorReady, divider]);
   useEffect(() => {
     if (!editor) return;
+    const skipMobileScroll = () => {
+      const surface = editor.getRootElement();
+      if (surface?.closest(".writing-root[data-mobile-caret-owner]")
+        && !surface.closest(".writing-code-block") && window.visualViewport?.scale === 1) {
+        // The mobile layout phase reveals the committed native caret after the
+        // shell and dock agree. Preserve selection reconciliation and focus.
+        $addUpdateTag(SKIP_SCROLL_INTO_VIEW_TAG);
+      }
+    };
+    const unregisterTransform = editor.registerNodeTransform(RootNode, skipMobileScroll);
     // Native selectionchange can arrive after a keyboard menu takes focus.
     // Keep the canvas selection synchronized without stealing menu focus.
-    return editor.registerCommand(SELECTION_CHANGE_COMMAND, () => {
+    const unregisterSelection = editor.registerCommand(SELECTION_CHANGE_COMMAND, () => {
+      skipMobileScroll();
       if (ownsMenuFocus()) $addUpdateTag(SKIP_SELECTION_FOCUS_TAG);
       return false;
     }, COMMAND_PRIORITY_HIGH);
+    return () => { unregisterTransform(); unregisterSelection(); };
   }, [editor, ownsMenuFocus]);
   useEffect(() => {
     if (!editor) return;
@@ -578,18 +591,17 @@ export default function WritingEditorEngine({
     const dock = root.current?.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]');
     const menu = mediaChooser ? mediaMenu.current : slashMenu.current;
     if (!dock || !menu) return;
+    const layout = mobileEditorLayout(dock);
     if (paletteSession.current?.menu !== menu) paletteSession.current = {
       menu, ready: false, mode: null, deadline: performance.now() + 350, fallbackElapsed: false,
     };
     const session = paletteSession.current;
     const waitsForKeyboard = !!mediaChooser || slashFromToolbar;
-    let request = 0;
     let fallback = 0;
     const setStyle = (name: string, value: string) => {
       if (menu.style.getPropertyValue(name) !== value) menu.style.setProperty(name, value);
     };
     const place = () => {
-      request = 0;
       if (!menu.isConnected || paletteSession.current !== session) return;
       const anchor = dock.getBoundingClientRect();
       const viewport = window.visualViewport;
@@ -598,8 +610,8 @@ export default function WritingEditorEngine({
       const visibleBottom = Math.min((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight), bounds?.bottom || window.innerHeight);
       const visibleTop = Math.max(0, visibleBottom - (viewport?.height || window.innerHeight), app?.querySelector(".topbar")?.getBoundingClientRect().bottom || 0);
       const dockPosition = dock.dataset.dockPosition === "top" ? "top" : "bottom";
-      const usableTop = parseFloat(dock.style.getPropertyValue("--editor-usable-top"));
-      const usableBottom = parseFloat(dock.style.getPropertyValue("--editor-usable-bottom"));
+      const usableTop = layout.band?.top ?? NaN;
+      const usableBottom = layout.band?.bottom ?? NaN;
       // The frame owns the permitted popup band. Even a constrained chooser
       // stays in that band, with the dock visible and its own list scrolling.
       const top = Number.isFinite(usableTop) ? usableTop
@@ -620,8 +632,7 @@ export default function WritingEditorEngine({
       const candidate = dockPosition === "top" ? "below" : "above";
       const mode = session.mode || candidate;
       const wasReady = session.ready;
-      session.ready ||= !waitsForKeyboard || dock.dataset.keyboardVisible !== "true" && dock.dataset.dockSettled !== "false" && available >= preferred
-        || session.fallbackElapsed || performance.now() >= session.deadline;
+      session.ready ||= !waitsForKeyboard || mobileEditorOpeningReady(layout.band, preferred, session.deadline, session.fallbackElapsed);
       // Choose a lane once the opening is ready. Native keyboard dismissal
       // may grow its room, but cannot flip the visible menu to another lane.
       if (session.ready && !session.mode) session.mode = mode;
@@ -655,19 +666,17 @@ export default function WritingEditorEngine({
         }
       }
     };
-    const schedule = () => { if (!request) request = requestAnimationFrame(place); };
-    const afterDock = () => { cancelAnimationFrame(request); place(); };
-    place();
+    const schedule = () => layout.schedule("overlay");
+    const unsubscribe = layout.subscribe("overlay", place);
     // Hardware keyboards and static viewport simulations may never emit a
     // dismissal resize. Keep their constrained chooser reachable as well.
     if (!session.ready) fallback = window.setTimeout(() => {
       // Fractional timer delays can fire just before the clock deadline.
       // The fallback itself ends the wait even without another viewport event.
       session.fallbackElapsed = true;
-      afterDock();
+      schedule();
     }, Math.max(0, session.deadline - performance.now()));
     const cancelOpening = () => {
-      cancelAnimationFrame(request);
       clearTimeout(fallback);
       if (paletteSession.current === session) paletteSession.current = null;
     };
@@ -675,27 +684,12 @@ export default function WritingEditorEngine({
     const observer = new ResizeObserver(schedule);
     observer.observe(dock);
     observer.observe(menu);
-    // The dock's position can change without its dimensions changing.
-    const movement = new MutationObserver(schedule);
-    movement.observe(dock, { attributes: true, attributeFilter: ["style", "data-keyboard-visible", "data-dock-position", "data-dock-settled"] });
-    const owner = root.current?.closest(".main-content");
-    owner?.addEventListener("fieldbook:editor-dock-change", afterDock);
-    owner?.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.visualViewport?.addEventListener("resize", schedule);
-    window.visualViewport?.addEventListener("scroll", schedule);
     return () => {
-      cancelAnimationFrame(request);
+      unsubscribe();
       clearTimeout(fallback);
       observer.disconnect();
-      movement.disconnect();
       if (session.cancel === cancelOpening) session.cancel = undefined;
       if (!menu.isConnected && paletteSession.current?.menu === menu) paletteSession.current = null;
-      owner?.removeEventListener("fieldbook:editor-dock-change", afterDock);
-      owner?.removeEventListener("scroll", schedule);
-      window.removeEventListener("scroll", schedule);
-      window.visualViewport?.removeEventListener("resize", schedule);
-      window.visualViewport?.removeEventListener("scroll", schedule);
     };
   }, [canvas, !!compactControls, slashOpen, slashFromToolbar, mediaChooser, mediaTab]);
 
@@ -1321,7 +1315,7 @@ export default function WritingEditorEngine({
           {error}
         </Alert>
       )}
-      {slashOpen && createPortal(<div ref={slashMenu} role="menu" aria-label={slashFromToolbar ? "Insert content" : "Insert content. Type to search, use arrow keys to choose, then press Enter."} className="writing-slash-menu" data-touch-motion={canvas && !!compactControls && slashFromToolbar || undefined} data-palette-ready={canvas && compactControls ? String(!slashFromToolbar) : undefined} onKeyDown={(event) => {
+      {slashOpen && createPortal(<div ref={slashMenu} role="menu" aria-label={slashFromToolbar ? "Insert content" : "Insert content. Type to search, use arrow keys to choose, then press Enter."} className="writing-slash-menu" data-touch-motion={canvas && !!compactControls && slashFromToolbar || undefined} data-palette-ready={canvas && compactControls ? "false" : undefined} onKeyDown={(event) => {
         if (!slashFromToolbar) return;
         if (event.key === "Tab") setSlashOpen(false);
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {

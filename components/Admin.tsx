@@ -111,7 +111,7 @@ import {
   type AdminDestination,
   type AdminTab,
 } from "@/lib/admin-destination";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   NavigationGuard,
   RegisterNavigationGuard,
@@ -2287,13 +2287,15 @@ export function Editor({
     queue.current!.reset(baseline.current);
     setC(current.current);
   }, [assignmentSave, latestAssignmentContent]);
-  const signature = contentSignature(c);
+  const signature = useMemo(() => contentSignature(c), [c]);
+  const baselineContent = baseline.current;
+  const baselineSignature = useMemo(() => contentSignature(baselineContent), [baselineContent]);
   const observedSignature = useRef(signature);
   if (observedSignature.current !== signature) {
     observedSignature.current = signature;
     queue.current.markEdited();
   }
-  const dirty = signature !== contentSignature(baseline.current);
+  const dirty = signature !== baselineSignature;
   const needsRecovery = queue.current.blocked;
   async function flushDraft(intent: SaveIntent = "draft") {
     if (pendingUploads.current || recoveringNow.current) return false;
@@ -2341,7 +2343,7 @@ export function Editor({
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy, saving, needsRecovery]);
-  const upload: UploadMedia | undefined = onUpload
+  const upload = useMemo<UploadMedia | undefined>(() => onUpload
     ? async (file, onProgress) => {
         pendingUploads.current++;
         setUploadCount(pendingUploads.current);
@@ -2352,7 +2354,7 @@ export function Editor({
           setUploadCount(pendingUploads.current);
         }
       }
-    : undefined;
+    : undefined, [onUpload]);
   function downloadDraft() {
     const url = URL.createObjectURL(
       new Blob(

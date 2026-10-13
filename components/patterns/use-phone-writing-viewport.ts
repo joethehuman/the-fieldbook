@@ -4,6 +4,7 @@ import { useLayoutEffect, type RefObject } from "react";
 import { readWritingCaretLine } from "./writing-cursor";
 import { touchWritingQuery } from "./use-editor-cards-layout";
 import { compactLayoutQuery } from "./use-compact-layout";
+import { mobileEditorLayout } from "./mobile-editor-layout";
 
 /** Protect the measured phone writing band without taking over native gestures. */
 export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
@@ -13,6 +14,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     const owner = root?.closest<HTMLElement>(".main-content");
     const viewport = window.visualViewport;
     if (!root || !editor || !owner || !viewport) return;
+    const layout = mobileEditorLayout(owner);
     const phone = window.matchMedia(compactLayoutQuery);
     const touch = window.matchMedia(touchWritingQuery);
     let dragging = false;
@@ -23,7 +25,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     let returningSelection = false;
     let caretNode: Node | null = null;
     let caretOffset = -1;
-    let request = 0;
+    let pendingReveal = false;
     let space = -1;
     let correctionsLeft = 0;
     let appliedScroll: number | null = null;
@@ -38,13 +40,12 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     }
     function writingBottom(margin: number) {
       const bounds = owner!.getBoundingClientRect();
-      const dock = editor!.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]');
-      const published = parseFloat(dock?.style.getPropertyValue("--editor-usable-bottom") || "");
-      return Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height,
-        Number.isFinite(published) ? published : dock?.getBoundingClientRect().top ?? Infinity) - margin;
+      return Math.min(bounds.bottom, layout.band?.bottom ?? bounds.bottom) - margin;
     }
     function reserveSpace() {
-      if (!phone.matches || !touch.matches || viewport!.scale !== 1) {
+      const managed = phone.matches && touch.matches && viewport!.scale === 1;
+      root!.toggleAttribute("data-mobile-caret-owner", managed);
+      if (!managed || !layout.band) {
         space = -1;
         geometry = null;
         clear();
@@ -55,10 +56,10 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       // the dock on phones whose clientHeight already shrank for the keyboard.
       const bounds = owner!.getBoundingClientRect();
       const bottom = writingBottom(lineMargin());
-      const dock = editor!.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]');
-      const usableTop = parseFloat(dock?.style.getPropertyValue("--editor-writing-top") || "")
-        || parseFloat(dock?.style.getPropertyValue("--editor-usable-top") || "") || bounds.top;
-      const nextGeometry = [bounds.top, bounds.bottom, bottom, usableTop, viewport!.offsetTop, viewport!.height]
+      // Translation moves the shell and caret together. Only a changed usable
+      // band may grant another check; browser panning never acquires ownership.
+      const usableTop = layout.band.top;
+      const nextGeometry = [bounds.height, bounds.width, bottom - bounds.top, usableTop - bounds.top]
         .map(Math.round).join(":");
       const changed = nextGeometry !== geometry;
       geometry = nextGeometry;
@@ -90,8 +91,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       if (dock && getComputedStyle(dock).visibility === "hidden") return;
       const bounds = owner!.getBoundingClientRect();
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const publishedTop = parseFloat(dock?.style.getPropertyValue("--editor-usable-top") || "") || bounds.top;
-      const rawTop = Math.max(bounds.top, viewport!.offsetTop, publishedTop);
+      const rawTop = Math.max(bounds.top, layout.band?.top ?? bounds.top);
       // Protect the actual toolbar boundary, including native app panning,
       // rather than deriving its location from a viewport height difference.
       const bottom = writingBottom(lineMargin());
@@ -113,32 +113,24 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       // A correction's own scroll event cannot replenish this finite budget.
       if (Math.abs(owner!.scrollTop - previous) >= 1) schedule();
     }
-    function cancelReveal() {
-      cancelAnimationFrame(request);
-      request = 0;
-    }
+    function cancelReveal() { pendingReveal = false; }
     function schedule() {
-      if (request || !protecting || dragging || !phone.matches || !touch.matches || viewport!.scale !== 1) return;
-      // Input and a stream of keyboard resize events share one next-paint
-      // correction. Later viewport events must never postpone an active edit.
-      request = requestAnimationFrame(() => { request = 0; revealCaret(); });
+      if (!protecting || dragging || !phone.matches || !touch.matches || viewport!.scale !== 1) return;
+      pendingReveal = true;
+      layout.schedule("caret");
     }
     function renewProtection() { awaitingCaret = false; protecting = true; correctionsLeft = 2; }
-    function resize() {
+    function measure() {
       const changed = reserveSpace();
-      if (changed && !manualGesture) { renewProtection(); schedule(); }
-    }
-    function pan() {
-      const changed = reserveSpace();
-      if (changed && !manualGesture) { renewProtection(); schedule(); }
-    }
-    // The frame has already placed the dock for this paint. Protect that
-    // measured boundary immediately rather than waiting for another frame.
-    function dockChanged() {
-      const changed = reserveSpace();
-      if (changed && !manualGesture) renewProtection();
+      if (changed && protecting && !manualGesture && !awaitingCaret) {
+        correctionsLeft = Math.max(correctionsLeft, 1);
+        pendingReveal = true;
+      }
+      if (!pendingReveal) return;
+      pendingReveal = false;
       revealCaret();
     }
+    const resize = () => layout.schedule("viewport");
     function ownerScrolled() {
       if (appliedScroll !== null && Math.abs(owner!.scrollTop - appliedScroll) < 1) {
         appliedScroll = null;
@@ -152,9 +144,6 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     }
     function editing(event?: Event) {
       returningSelection = false;
-      // Focus and viewport movement own keyboard geometry. Text input is
-      // followed by the rendered-text observer, without another layout read.
-      if (event?.type !== "input") reserveSpace();
       // Native focus can precede the caret chosen by a touch tap. Input itself
       // is an explicit edit and may resume protection without a caret change.
       if (event?.type === "focusin" && (dragging || awaitingCaret)) return;
@@ -167,7 +156,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       }
       else cancelReveal();
     }
-    function blur() { returningSelection = false; protecting = false; cancelReveal(); reserveSpace(); }
+    function blur() { returningSelection = false; protecting = false; cancelReveal(); layout.schedule("caret"); }
     function resumeWriting() {
       const active = document.activeElement;
       const selection = window.getSelection();
@@ -175,7 +164,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
         || !selection?.rangeCount || !root!.contains(selection.focusNode) || !root!.contains(selection.anchorNode)) return;
       returningSelection = !selection.isCollapsed;
       manualGesture = false;
-      reserveSpace(); renewProtection(); revealCaret(); schedule();
+      renewProtection(); schedule();
     }
     function selectionMoved() {
       if (dragging) return;
@@ -228,14 +217,10 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       })) return;
       // Lexical may commit a wrapped row after the input handler's frame.
       // Observe the actual rendered text, without changing its selection.
-      correctionsLeft = 2;
-      revealCaret();
+      schedule();
     });
     writing.observe(root, { childList: true, characterData: true, subtree: true });
-    reserveSpace();
-    viewport.addEventListener("resize", resize);
-    viewport.addEventListener("scroll", pan);
-    window.addEventListener("scroll", pan, { passive: true });
+    const unsubscribe = layout.subscribe("caret", measure);
     phone.addEventListener("change", resize);
     touch.addEventListener("change", resize);
     editor.addEventListener("focusin", editing);
@@ -244,7 +229,6 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     root.addEventListener("fieldbook:writing-resume", resumeWriting);
     root.addEventListener("keydown", navigateCaret, true);
     document.addEventListener("selectionchange", selectionMoved);
-    owner.addEventListener("fieldbook:editor-dock-change", dockChanged);
     owner.addEventListener("scroll", ownerScrolled, { passive: true });
     owner.addEventListener("wheel", wheel, { passive: true });
     owner.addEventListener("touchstart", startDrag, { passive: true });
@@ -255,9 +239,8 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       cancelReveal();
       writing.disconnect();
       clear();
-      viewport.removeEventListener("resize", resize);
-      viewport.removeEventListener("scroll", pan);
-      window.removeEventListener("scroll", pan);
+      unsubscribe();
+      root.removeAttribute("data-mobile-caret-owner");
       phone.removeEventListener("change", resize);
       touch.removeEventListener("change", resize);
       editor.removeEventListener("focusin", editing);
@@ -266,7 +249,6 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       root.removeEventListener("fieldbook:writing-resume", resumeWriting);
       root.removeEventListener("keydown", navigateCaret, true);
       document.removeEventListener("selectionchange", selectionMoved);
-      owner.removeEventListener("fieldbook:editor-dock-change", dockChanged);
       owner.removeEventListener("scroll", ownerScrolled);
       owner.removeEventListener("wheel", wheel);
       owner.removeEventListener("touchstart", startDrag);

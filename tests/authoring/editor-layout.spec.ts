@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import type { ElementNode, LexicalEditor, RangeSelection } from "lexical";
+import type { ElementNode, LexicalEditor, RangeSelection, TextNode } from "lexical";
 import type { Content } from "../../lib/types";
 import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -3003,9 +3003,23 @@ test("two-position mobile fine-pointer attachment preserves the active writing r
   await installCommandViewport(page, { height: 700, offsetTop: 0, clientHeight: 700, appPan: 0 });
   await expectKeyboardTopDock(page);
   await page.locator(".main-content").evaluate(async () => { await new Promise(resolve => setTimeout(resolve, 200)); });
-  const before = await restoredCommandGeometry(page);
   const text = await writer.textContent();
   const cursor = await writer.evaluate(() => ({ text: window.getSelection()!.focusNode!.textContent, offset: window.getSelection()!.focusOffset }));
+  const settled = await restoredCommandGeometry(page);
+  const manualScroll = await page.locator(".main-content").evaluate(async (owner, caretTop) => {
+    const before = owner.scrollTop;
+    owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
+    owner.scrollTop += caretTop > 180 ? 60 : -60;
+    window.dispatchEvent(new Event("touchend"));
+    await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+    return { before, after: owner.scrollTop };
+  }, settled.focusTop);
+  expect(Math.abs(manualScroll.after - manualScroll.before)).toBeCloseTo(60, 0);
+  // Pointer attachment must preserve the latest manually chosen row position,
+  // even though the native selection has not changed since the initial tap.
+  expect(await writer.evaluate(() => ({ text: window.getSelection()!.focusNode!.textContent, offset: window.getSelection()!.focusOffset }))).toEqual(cursor);
+  const before = await restoredCommandGeometry(page);
   await page.evaluate(() => (window as unknown as { setFinePointer: (value: boolean) => void }).setFinePointer(true));
   await expect(page.locator('.editor-frame-controls[data-dock="true"]')).toHaveCount(0);
   await expect(page.locator(".editor-canvas-navigation")).toBeVisible();
@@ -3755,6 +3769,122 @@ async function nativeWritingSelectionMatches(page: Page) {
       && selection.isCollapsed() === native.isCollapsed;
   });
 }
+
+test("a mobile edit waits for current viewport geometry and scrolls at most once per paint", async ({ page }, info) => {
+  const { writer } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+  await expectMobileWritingBand(page);
+  const result = await writer.evaluate(async writer => {
+    const owner = writer.closest<HTMLElement>(".main-content")!;
+    const shell = writer.closest<HTMLElement>(".main-shell")!;
+    const dock = document.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]')!;
+    const selection = window.getSelection()!;
+    const caret = Array.from(selection.getRangeAt(0).getClientRects()).find(rect => rect.height > 0)!;
+    const margin = parseFloat(getComputedStyle(writer).lineHeight);
+    // Begin at the lower writing boundary so a smaller keyboard viewport
+    // requires a real correction instead of passing without any movement.
+    owner.scrollTop += caret.bottom - (parseFloat(dock.style.getPropertyValue("--editor-usable-bottom")) - margin);
+    await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+
+    const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+    const before = owner.scrollTop;
+    const target = { height: 320, offsetTop: 16, clientHeight: 812, appPan: 0 };
+    let frame = 0;
+    let recordRequest = 0;
+    const scrolls: { frame: number; shellTop: number; shellHeight: number; dockBottom: number; writingTop: number }[] = [];
+    const recordFrame = () => { frame++; recordRequest = requestAnimationFrame(recordFrame); };
+    recordRequest = requestAnimationFrame(recordFrame);
+    const originalScrollTo = owner.scrollTo;
+    const scrollTo = originalScrollTo.bind(owner);
+    owner.scrollTo = ((options: ScrollToOptions | number, y?: number) => {
+      const bounds = shell.getBoundingClientRect();
+      scrolls.push({ frame, shellTop: bounds.top, shellHeight: bounds.height,
+        dockBottom: dock.getBoundingClientRect().bottom,
+        writingTop: parseFloat(dock.style.getPropertyValue("--editor-usable-top")) });
+      if (typeof options === "number") scrollTo(options, y!);
+      else scrollTo(options);
+    }) as typeof owner.scrollTo;
+    try {
+      Object.assign(fixture.viewport, target);
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      window.visualViewport!.dispatchEvent(new Event("scroll"));
+      window.dispatchEvent(new Event("scroll"));
+      // Commit through Lexical so its rendered-text observer participates in
+      // the same edit as input and keyboard geometry notifications.
+      const editor = (writer as HTMLElement & { __lexicalEditor: LexicalEditor }).__lexicalEditor;
+      editor.update(() => {
+        const state = editor.getEditorState();
+        const range = state._selection as RangeSelection;
+        const text = state._nodeMap.get(range.anchor.key) as TextNode;
+        text.setTextContent(`${text.getTextContent()} Coalesced edit.`);
+      }, { discrete: true });
+      for (let index = 0; index < 3; index++) writer.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve();
+      const beforePaint = scrolls.slice();
+      const beforePaintScroll = owner.scrollTop;
+      for (let index = 0; index < 5; index++) await new Promise(requestAnimationFrame);
+      return { before, after: owner.scrollTop, beforePaint, beforePaintScroll, scrolls, target };
+    } finally {
+      cancelAnimationFrame(recordRequest);
+      owner.scrollTo = originalScrollTo;
+    }
+  });
+  expect(result.beforePaint).toEqual([]);
+  // Also catch direct scrollTop writes, including editor-library scrolling
+  // that does not pass through the application's scrollTo correction.
+  expect(result.beforePaintScroll).toBeCloseTo(result.before, 0);
+  expect(result.scrolls.length).toBeGreaterThan(0);
+  expect(result.after).toBeGreaterThan(result.before);
+  for (const scroll of result.scrolls) {
+    expect(scroll.shellTop).toBeCloseTo(result.target.offsetTop, 0);
+    expect(scroll.shellHeight).toBeCloseTo(result.target.height, 0);
+    expect(scroll.dockBottom).toBeLessThan(scroll.writingTop);
+  }
+  expect(new Set(result.scrolls.map(scroll => scroll.frame)).size).toBe(result.scrolls.length);
+  await expect(writer).toContainText("Coalesced edit.");
+  await expectMobileWritingBand(page);
+});
+
+test("a new touch gesture cancels a queued mobile correction before the next paint", async ({ page }, info) => {
+  const { writer } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+  await expectMobileWritingBand(page);
+  const paragraph = writer.locator("p").nth(5);
+  const result = await paragraph.evaluate(async paragraph => {
+    const owner = paragraph.closest<HTMLElement>(".main-content")!;
+    const writer = paragraph.closest<HTMLElement>('[contenteditable="true"]')!;
+    const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+    Object.assign(fixture.viewport, { height: 400, offsetTop: 16, clientHeight: 812 });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+    writer.dispatchEvent(new Event("input", { bubbles: true }));
+    // A manual scroll arriving before the queued correction owns the view.
+    owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
+    owner.scrollTop += paragraph.getBoundingClientRect().top - 140;
+    window.dispatchEvent(new Event("touchend"));
+    const chosenScroll = owner.scrollTop;
+    for (let index = 0; index < 4; index++) await new Promise(requestAnimationFrame);
+    const afterScroll = owner.scrollTop;
+    // A later tap may leave the old selection in place for several paints.
+    // Geometry notifications during that interval must not revive its row.
+    paragraph.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    window.dispatchEvent(new Event("touchend"));
+    window.visualViewport!.dispatchEvent(new Event("scroll"));
+    owner.dispatchEvent(new Event("scroll"));
+    for (let index = 0; index < 4; index++) await new Promise(requestAnimationFrame);
+    const beforeNewCaret = owner.scrollTop;
+    const text = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT).nextNode()!;
+    window.getSelection()!.setBaseAndExtent(text, 2, text, 2);
+    document.dispatchEvent(new Event("selectionchange"));
+    for (let index = 0; index < 4; index++) await new Promise(requestAnimationFrame);
+    return { chosenScroll, afterScroll, beforeNewCaret, afterNewCaret: owner.scrollTop };
+  });
+  expect(result.afterScroll).toBeCloseTo(result.chosenScroll, 0);
+  expect(result.beforeNewCaret).toBeCloseTo(result.chosenScroll, 0);
+  expect(result.afterNewCaret).toBeCloseTo(result.chosenScroll, 0);
+  await expect.poll(() => nativeWritingSelectionMatches(page)).toBe(true);
+  await page.keyboard.type("NEW-TARGET ");
+  await expect(paragraph).toContainText("PaNEW-TARGET ragraph 6.");
+  await expectMobileWritingBand(page);
+});
 
 test("native caret synchronizes after a repeated programmatic selection", async ({ page }, info) => {
   const { writer } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));

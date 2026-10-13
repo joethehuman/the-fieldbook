@@ -12,6 +12,7 @@ import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWr
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { EditorAppDockContext } from "./editor-app-header";
 import { useMobileEditorViewport } from "./use-mobile-editor-viewport";
+import { mobileEditorLayout, mobileEditorOpeningReady } from "./mobile-editor-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
 export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
@@ -75,7 +76,7 @@ export function EditorFrame({
   const panelState = useRef(panels);
   panelState.current = panels;
   const measureDock = useRef<(() => void) | null>(null);
-  useMobileEditorViewport(frame, dock, measureDock);
+  useMobileEditorViewport(frame, dock);
   const lastWritingCursor = useRef<WritingCursor | null>(null);
   const panelReturn = useRef<WritingCursor | null>(null);
   const preparedPanel = useRef<"outline" | "details" | null>(null);
@@ -145,12 +146,13 @@ export function EditorFrame({
     const app = frame.current?.closest<HTMLElement>(".app");
     const header = app?.querySelector<HTMLElement>(".topbar");
     const shell = frame.current?.closest<HTMLElement>(".main-shell");
+    const layout = dock && shell ? mobileEditorLayout(shell) : null;
     let active = true;
-    let request = 0;
     let releaseRequest = 0;
     let lastBand = "";
     let lastPosition: string | null = null;
     let lastCaret: { node: Node; offset: number; top: number } | null = null;
+    let caretSnapshotNeeded = false;
     let fade: Animation | undefined;
     const setStyle = (target: HTMLElement | null | undefined, name: string, value: string) => {
       if (target && target.style.getPropertyValue(name) !== value) target.style.setProperty(name, value);
@@ -186,6 +188,7 @@ export function EditorFrame({
       const nativeGap = keyboard ? (appleTouch ? 8 : 3) * rem : 0;
       const usableTop = (header?.getBoundingClientRect().bottom || rootBounds?.top || 0) + 8;
       const usableBottom = (keyboard ? bottom - nativeGap : rect.top) - 8;
+      if (layout) layout.band = { top: usableTop, bottom: usableBottom, keyboard };
       const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
       const panelTop = dock ? usableTop : rect.bottom + 8;
       const panelBottom = dock ? usableBottom : bottom - 16;
@@ -200,7 +203,7 @@ export function EditorFrame({
         if (pending) {
           const panel = overlayLayer.current?.querySelector<HTMLElement>('[data-open="true"]');
           const preferred = Math.min(360, panel?.scrollHeight || 360);
-          if (!keyboard && usableBottom - usableTop >= preferred || pending.elapsed || performance.now() >= pending.deadline) cancelPanelOpening();
+          if (mobileEditorOpeningReady(layout?.band || null, preferred, pending.deadline, pending.elapsed)) cancelPanelOpening();
         }
       }
       setStyle(frame.current, "--editor-navigation-height", `${dock ? 0 : rect.height}px`);
@@ -227,17 +230,25 @@ export function EditorFrame({
           lastBand = band;
           owner?.dispatchEvent(new Event("fieldbook:editor-dock-change"));
         }
-        const selection = window.getSelection();
-        const line = canvas.current && readWritingCaretLine(canvas.current, true);
-        lastCaret = selection?.focusNode && canvas.current?.contains(selection.focusNode) && line
-          ? { node: selection.focusNode, offset: selection.focusOffset, top: line.top } : null;
+        caretSnapshotNeeded = true;
       }
     };
     const schedule = () => {
       if (!active) return;
       if (!dock) { measure(); return; }
-      if (!request) request = requestAnimationFrame(() => { request = 0; measure(); });
+      layout?.schedule("dock");
     };
+    // Pointer-layout handoff needs the last painted row, including intentional
+    // scrolling. Updating that snapshot must not remeasure the entire dock.
+    const rememberCaret = () => {
+      if (!caretSnapshotNeeded) return;
+      caretSnapshotNeeded = false;
+      const selection = window.getSelection();
+      const line = canvas.current && readWritingCaretLine(canvas.current, true);
+      lastCaret = selection?.focusNode && canvas.current?.contains(selection.focusNode) && line
+        ? { node: selection.focusNode, offset: selection.focusOffset, top: line.top } : null;
+    };
+    const scheduleCaretSnapshot = () => { caretSnapshotNeeded = true; layout?.schedule("overlay"); };
     const remember = () => {
       const cursor = captureWritingCursor(canvas.current);
       const focused = document.activeElement;
@@ -250,8 +261,10 @@ export function EditorFrame({
       releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; schedule(); });
     };
     const observer = new ResizeObserver(schedule);
-    measureDock.current = measure;
-    measure();
+    measureDock.current = schedule;
+    const unsubscribe = layout?.subscribe("dock", measure);
+    const unsubscribeCaret = layout?.subscribe("overlay", rememberCaret);
+    if (!dock) measure();
     observer.observe(element);
     if (dock && owner) observer.observe(owner);
     const editor = frame.current?.closest(".editor");
@@ -259,12 +272,14 @@ export function EditorFrame({
     if (phone && header) observer.observe(header);
     const mutations = new MutationObserver(schedule);
     if (dock && header) mutations.observe(header, { childList: true, characterData: true, subtree: true });
-    owner?.addEventListener("scroll", schedule, { passive: true });
+    if (!dock) owner?.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     if (!dock) {
       window.visualViewport?.addEventListener("resize", schedule);
       window.visualViewport?.addEventListener("scroll", schedule);
     } else {
+      owner?.addEventListener("scroll", scheduleCaretSnapshot, { passive: true });
+      document.addEventListener("selectionchange", scheduleCaretSnapshot);
       element.addEventListener("pointerdown", remember, true);
       canvas.current?.addEventListener("fieldbook:writing-handoff", remember);
       document.addEventListener("keydown", rememberKeyboard, true);
@@ -273,10 +288,11 @@ export function EditorFrame({
     }
     return () => {
       active = false;
-      cancelAnimationFrame(request);
+      unsubscribe?.();
+      unsubscribeCaret?.();
       cancelAnimationFrame(releaseRequest);
       fade?.cancel();
-      if (measureDock.current === measure) measureDock.current = null;
+      if (measureDock.current === schedule) measureDock.current = null;
       observer.disconnect();
       mutations.disconnect();
       if (dock) {
@@ -312,6 +328,8 @@ export function EditorFrame({
         window.visualViewport?.removeEventListener("resize", schedule);
         window.visualViewport?.removeEventListener("scroll", schedule);
       } else {
+        owner?.removeEventListener("scroll", scheduleCaretSnapshot);
+        document.removeEventListener("selectionchange", scheduleCaretSnapshot);
         element.removeEventListener("pointerdown", remember, true);
         canvas.current?.removeEventListener("fieldbook:writing-handoff", remember);
         document.removeEventListener("keydown", rememberKeyboard, true);
