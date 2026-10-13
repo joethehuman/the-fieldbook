@@ -285,7 +285,7 @@ export default function LearningGroups({
     .filter(
       (person) =>
         matches(
-          `${person.name} ${person.email} ${teams.find((team) => team.id === reportingTeamId(person.teamId, teams))?.name || ""}`,
+          `${person.name} ${person.email}`,
         ) &&
         (!sourceFilter ||
           (sourceFilter === "direct"
@@ -345,14 +345,7 @@ export default function LearningGroups({
           "Unavailable course",
       );
     const curriculum = curricula.find((candidate) => candidate.id === item.id);
-    return matches(
-      [
-        curriculum?.name || "Unavailable curriculum",
-        ...(curriculum?.courseIds || []).map(
-          (id) => content.find((candidate) => candidate.id === id)?.title || "",
-        ),
-      ].join(" "),
-    );
+    return matches(curriculum?.name || "Unavailable curriculum");
   });
   const updates = group
     ? sortGroupBrowseItems(
@@ -957,6 +950,7 @@ export default function LearningGroups({
             id: `user:${user.id}`,
             label: user.name,
             description: user.email,
+            searchText: user.email,
           })),
         ],
         apply: async (values) => {
@@ -1508,7 +1502,7 @@ export default function LearningGroups({
                     <FormField label="Find a user" visuallyHiddenLabel>
                       <Input
                         type="search"
-                        placeholder="Search name, email or team"
+                        placeholder="Search name or email"
                         value={query}
                         onChange={(event) => {
                           setQuery(event.target.value);
@@ -2001,12 +1995,13 @@ export default function LearningGroups({
                     bounded="compact"
                     key={`${group?.id}:people`}
                     label="Find a user"
-                    placeholder="Search name, email or team"
+                    placeholder="Search name or email"
                     emptyMessage="No matching people."
                     disabled={busy}
                     options={[...data.users].sort(byName).map((person) => ({
                       id: person.id,
                       label: person.name,
+                      searchText: person.email,
                       description: `${person.email} · ${teams.find((team) => team.id === reportingTeamId(person.teamId, teams))?.name || "No direct team"}${!person.active ? " · Inactive" : ""}`,
                     }))}
                     value={editor.people}

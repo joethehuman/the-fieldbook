@@ -703,9 +703,9 @@ export default function Admin({
             ),
           )?.id === contentSection) &&
         (category === "all" || c.category === category) &&
-        `${c.title} ${c.summary} ${c.folder}`
+        c.title
           .toLowerCase()
-          .includes(query.toLowerCase()),
+          .includes(query.trim().toLowerCase()),
     )
     .sort((a, b) => {
       const title = a.title.localeCompare(b.title);
@@ -730,7 +730,7 @@ export default function Admin({
   const peopleRows = data.users
     .filter(
       (u) =>
-        `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()) &&
+        `${u.name} ${u.email}`.toLowerCase().includes(query.trim().toLowerCase()) &&
         (peopleTeam === "all" ||
           (peopleTeam === "none"
             ? !u.teamId
@@ -1479,7 +1479,7 @@ export default function Admin({
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search content by title, summary, or folder"
+                        placeholder="Search content by title"
                       />
                     </FormField>
                   }

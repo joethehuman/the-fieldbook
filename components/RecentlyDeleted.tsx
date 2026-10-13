@@ -57,7 +57,7 @@ export function RecentlyDeleted({
   const rows = (displayData.deletedItems || []).filter(
     (d) =>
       (filter === "all" || d.entity === filter) &&
-      d.name.toLowerCase().includes(query.toLowerCase()),
+      d.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
   const selection = useBulkSelection(
     filter + query,

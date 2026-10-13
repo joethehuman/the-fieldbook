@@ -1058,6 +1058,7 @@ export function TeamsAdmin({
                     options={eligible.map((u) => ({
                       id: u.id,
                       label: u.name,
+                      searchText: u.email,
                       description: u.email + " · " + teamName(u.teamId),
                     }))}
                     actionLabel="Review changes"
@@ -1396,6 +1397,7 @@ export function TeamsAdmin({
                           id: item.id,
                           label: item.name,
                           description: teamPath(item.id, teams),
+                          searchText: teamPath(item.id, teams),
                         }))
                     : [
                         ...(team.parentId && !organization
@@ -1419,6 +1421,7 @@ export function TeamsAdmin({
                             id: item.id,
                             label: item.name,
                             description: teamPath(item.id, teams),
+                            searchText: teamPath(item.id, teams),
                           })),
                       ]
                 }

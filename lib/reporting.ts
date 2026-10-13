@@ -38,7 +38,7 @@ export function teamProgressRows(
           ancestorIds(reportingTeamId(u.teamId, teams) || "", teams).has(
             teamId,
           )) &&
-        `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()),
+        `${u.name} ${u.email}`.toLowerCase().includes(query.trim().toLowerCase()),
     )
     .map((u) => {
       const assigned = assignedCourses(
@@ -194,7 +194,7 @@ export function feedbackRows(
         (rating === "all" || f.rating === rating) &&
         `${f.contentId ? c?.title || "" : "Fieldbook feedback"} ${f.comment}`
           .toLowerCase()
-          .includes(query.toLowerCase())
+          .includes(query.trim().toLowerCase())
       );
     })
     .sort((a, b) =>

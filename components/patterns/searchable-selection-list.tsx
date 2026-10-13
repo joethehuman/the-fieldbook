@@ -15,6 +15,8 @@ export type SelectionOption = {
   id: string;
   label: string;
   description?: string;
+  /** Explicit name, email, or hierarchy fields; display descriptions are not searchable. */
+  searchText?: string;
   labelContent?: ReactNode;
   detail?: ReactNode;
 };
@@ -64,7 +66,7 @@ export function SearchableSelectionList({
   const matches = (visibleOptions || options).filter(
     (option) =>
       (!selectedOnly || value.includes(option.id)) &&
-      `${option.label} ${option.description || ""}`
+      `${option.label} ${option.searchText || ""}`
         .toLowerCase()
         .includes(query.trim().toLowerCase()),
   );

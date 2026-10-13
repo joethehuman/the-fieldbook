@@ -90,7 +90,7 @@ export function LearningAudienceReview({
   const rows = impact.rows.filter((r) =>
     `${r.person} ${r.course} ${r.status}`
       .toLowerCase()
-      .includes(query.toLowerCase()),
+      .includes(query.trim().toLowerCase()),
   );
   return (
     <div className="grid gap-4">
