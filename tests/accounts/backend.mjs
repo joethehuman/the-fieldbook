@@ -384,6 +384,7 @@ createServer(async (req, res) => {
         revision: row.revision,
         published_revision: row.published_revision,
         updated_at: row.updated_at,
+        publishedRequirePassing: row.published?.requirePassing ?? null,
         ...Object.fromEntries(
           [
             "title",
