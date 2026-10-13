@@ -87,7 +87,7 @@ export function SearchPanel({
     return () => document.removeEventListener("pointerdown", dismiss);
   }, [open, fullScreen, onDismiss]);
   const escapeHint = (
-    <p className="flex shrink-0 items-center justify-end gap-2 px-4 pb-3 text-xs text-muted-foreground">
+    <p className="flex shrink-0 items-center justify-start gap-2 px-4 py-3 text-xs text-muted-foreground">
       <kbd className="search-keycap">Esc</kbd>
       <span>to close</span>
     </p>
