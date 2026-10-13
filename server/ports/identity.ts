@@ -1,3 +1,6 @@
+import type { NextRequest, NextResponse } from "next/server";
+import type { SignInPresentation } from "@/lib/identity";
+
 /** Subject is opaque within the configured identity provider; it is not a Fieldbook person ID.
  * Application roles and access never come from this record. */
 export type VerifiedIdentity = {
@@ -42,7 +45,8 @@ export type ProfileRecord = {
   email: string;
   role: "admin" | "learner" | "manager" | "contributor";
   active: boolean;
-  auth_user_id?: string | null;
+  /** Whether a verified external login is linked; the provider subject stays in its adapter. */
+  registered: boolean;
   added_at?: string | null;
   hire_date?: string | null;
   onboarding_days?: number | null;
@@ -74,3 +78,66 @@ export type ProfileRegistration = {
   name: string;
   owner: boolean;
 };
+
+/** Selected sign-in integration. It owns verification, session cookies and external
+ * account lifecycle; Fieldbook services still decide roles and access. */
+export interface IdentityProvider {
+  signInPresentation(): SignInPresentation;
+  verifyIdentity(
+    token?: string,
+    readOnly?: boolean,
+  ): Promise<VerifiedIdentity | null>;
+  verifyReaderIdentity(): Promise<ReaderIdentity>;
+  startSignIn(redirectTo: string, optionId?: string): Promise<string>;
+  exchangeSignInCode(code: string): Promise<boolean>;
+  /** End this browser session without revoking separately authorized MCP sessions. */
+  signOutIdentity(): Promise<void>;
+  refreshIdentitySession(
+    request: NextRequest,
+    requestHeaders: Headers,
+  ): Promise<NextResponse>;
+  authorizationDetails(id: string): Promise<AuthorizationDetails | null>;
+  decideAuthorization(
+    id: string,
+    allow: boolean,
+  ): Promise<AuthorizationRedirect | null>;
+  revokeAuthorization(clientId: string): Promise<boolean>;
+  authorizationServer(): string;
+  /** Human session tokens must never satisfy the MCP resource/client contract. */
+  verifyMcpIdentity(
+    token: string,
+    resource: string,
+  ): Promise<McpIdentity | null>;
+  lockIdentity(personId: string): Promise<void>;
+  unlockIdentity(personId: string): Promise<void>;
+  deleteIdentity(personId: string): Promise<void>;
+}
+
+/** Fieldbook-owned identity mapping and connection permissions. A replacement
+ * integration must preserve person IDs and supply a compatible account mapping. */
+export interface IdentityStore {
+  findProfileBySubject(
+    subject: string,
+    activeOnly?: boolean,
+  ): Promise<ProfileRecord | null>;
+  registerProfile(input: ProfileRegistration): Promise<ProfileRecord | null>;
+  hasConnectionGrantForSubject(
+    subject: string,
+    clientId: string,
+  ): Promise<boolean>;
+  connectionGrantForPerson(
+    personId: string,
+    clientId: string,
+  ): Promise<ConnectionGrant | null>;
+  connectionGrants(personId: string): Promise<ConnectionGrant[] | null>;
+  enableConnectionGrant(
+    personId: string,
+    clientId: string,
+    clientName: string,
+    capabilities: import("@/lib/mcp-access").McpCapability[],
+    requireEnabled?: boolean,
+  ): Promise<void>;
+  disableConnectionGrant(personId: string, clientId: string): Promise<void>;
+  setMcpResource(resource: string): Promise<void>;
+  allowMcpRequest(personId: string): Promise<boolean>;
+}

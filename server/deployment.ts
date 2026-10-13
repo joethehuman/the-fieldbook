@@ -5,7 +5,10 @@ import {
   vercelDeployment,
   vercelClientAddress,
 } from "./providers/vercel/deployment";
-import { nodeDeployment } from "./providers/node/deployment";
+import {
+  nodeDeployment,
+  nodeRequestMatchesOrigin,
+} from "./providers/node/deployment";
 
 export function deployment(environment: DeploymentEnvironment = process.env) {
   // Preserve existing installations without adding a required environment value.
@@ -25,4 +28,10 @@ export function deployment(environment: DeploymentEnvironment = process.env) {
 /** Only use address headers the selected host establishes as trusted. */
 export function clientAddress(request: Request) {
   return deployment().host === "vercel" ? vercelClientAddress(request) : null;
+}
+
+export function requestMatchesOrigin(request: Request, origin: string) {
+  return deployment().host === "node"
+    ? nodeRequestMatchesOrigin(request, origin)
+    : new URL(request.url).origin === new URL(origin).origin;
 }

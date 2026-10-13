@@ -10,6 +10,13 @@ import type { Progress } from "@/lib/types";
 import { db, check } from "../client";
 import { readAll } from "../read-all";
 import { HttpError } from "../../../errors";
+import { fieldbookProfile, type SupabaseProfile } from "../profile";
+
+function governanceRecord(
+  record: Omit<GovernanceRecord, "users"> & { users: SupabaseProfile[] },
+): GovernanceRecord {
+  return { ...record, users: record.users.map(fieldbookProfile) };
+}
 
 export const learningData: Pick<
   DataStore,
@@ -37,23 +44,25 @@ export const learningData: Pick<
       p_user: userId || null,
     });
     check(error);
-    return data as GovernanceRecord;
+    return governanceRecord(data);
   },
   async readGovernanceSnapshot(actorId) {
     const { data, error } = await db().rpc("fb_governance_snapshot", {
       p_actor: actorId,
     });
     check(error);
-    return data as GovernanceRecord;
+    return governanceRecord(data);
   },
   async listProfiles() {
-    return await readAll<ProfileRecord>((from, to) =>
-      db()
-        .from("fb_profiles")
-        .select("*", { count: "exact" })
-        .order("id")
-        .range(from, to),
-    );
+    return (
+      await readAll<SupabaseProfile>((from, to) =>
+        db()
+          .from("fb_profiles")
+          .select("*", { count: "exact" })
+          .order("id")
+          .range(from, to),
+      )
+    ).map(fieldbookProfile);
   },
   async readProfileNames(ids) {
     const unique = [...new Set(ids)];

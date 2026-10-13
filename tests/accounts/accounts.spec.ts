@@ -13,7 +13,7 @@ async function bounds(page: Page) {
 async function simulateOAuthReturn(page: Page, next: string) {
   // Intercept the first-party request: Chromium does not reliably route a
   // subsequent redirect request, which could otherwise reach a real hostname.
-  await page.route("**/auth/login", async (route) => {
+  await page.route("**/auth/login?option=google", async (route) => {
     const response = await route.fetch({ maxRedirects: 0 });
     expect(response.status()).toBe(302);
     const provider = new URL(response.headers().location);
@@ -147,8 +147,8 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
   expect(content.status()).toBe(401);
   expect(await content.json()).toMatchObject({ error: "Sign in to view this Fieldbook." });
   expect((await request.get(`/api/media/${file}`)).status()).toBe(401);
-  await expect(page.locator(".logo")).toHaveText("Acme Learning");
-  await expect(page.locator(".logo img, .logo svg")).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("heading", { name: "Sign in to Acme Learning" })).toBeVisible();
+  await expect(page.locator(".logo")).toHaveCount(0);
   const html = await page.content();
   expect(html).not.toContain("SECRET POLICY DRAFT");
   expect(html).not.toContain('"registration"');
@@ -219,10 +219,8 @@ test("public browse, alternate brand and long-name fallback", async ({
     },
   });
   await page.reload();
-  await expect(page.locator(".logo")).toHaveText(
-    "A very long installation name for accessible account layouts",
-  );
-  await expect(page.locator(".logo img, .logo svg")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Sign in to A very long installation name for accessible account layouts" })).toBeVisible();
+  await expect(page.locator(".logo")).toHaveCount(0);
   await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
   await bounds(page);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -243,7 +241,7 @@ test("public browse, alternate brand and long-name fallback", async ({
   await expect(
     page.getByRole("heading", { name: "Sign in to Fieldbook" }),
   ).toBeVisible();
-  await expect(page.locator(".logo")).toHaveText("Fieldbook");
+  await expect(page.locator(".logo")).toHaveCount(0);
 });
 test("provider failure stays recoverable, cancellation preserves return, unsafe redirects rejected", async ({
   page,
@@ -575,14 +573,14 @@ test("expired, denied and provider-failed callback outcomes remain distinct", as
   await page.request.get("/auth/login", { maxRedirects: 0 });
   await page.goto("/auth/callback?code=provider-error&next=%2Fdocs%2Fguide");
   await expect(page.locator("[data-slot=alert]")).toContainText(
-    "services are unavailable",
+    "Sign-in is unavailable",
   );
   await expect(page.locator("[data-slot=alert]")).toContainText("Reference:");
   await request.post(backend, { data: { role: "inactive" } });
   await page.request.get("/auth/login", { maxRedirects: 0 });
   await page.goto("/auth/callback?code=synthetic&next=%2Fdocs%2Fguide");
   await expect(page.locator("[data-slot=alert]")).toContainText(
-    "not allowed to join",
+    "This account doesn’t have access. Use an approved Google account or contact an administrator.",
   );
   expect(
     decodeURIComponent(
@@ -886,4 +884,15 @@ test("shared settings library and connection states work in the server app", asy
     path: info.outputPath("server-connections-empty.png"),
     fullPage: true,
   });
+});
+
+
+test("browser sign-out requests local scope and clears its session cookies", async ({ page, request }) => {
+  await login(page);
+  expect((await page.context().cookies()).some((cookie) => cookie.name.startsWith("sb-") && cookie.value)).toBe(true);
+  const response = await page.request.post("/auth/logout", { headers: { Origin: "http://localhost:3131" } });
+  expect(response.status()).toBe(200);
+  const reads = await (await request.get("http://127.0.0.1:3130/reads")).json();
+  expect(reads.logoutScopes).toEqual(["local"]);
+  expect((await page.context().cookies()).some((cookie) => cookie.name.startsWith("sb-") && cookie.value)).toBe(false);
 });

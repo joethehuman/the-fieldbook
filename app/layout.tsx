@@ -1,3 +1,5 @@
+import { IdentityPresentation } from "../components/IdentityPresentation";
+import { signInPresentation } from "@server/identity";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { ToastProvider } from "../components/ui/toast";
 import { InteractionDialogProvider } from "../components/ui/interaction-dialog";
@@ -35,13 +37,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={GeistSans.variable}>
       <body>
-        <DesktopSidebarProvider>
-          <TooltipProvider>
-            <ToastProvider>
-              <InteractionDialogProvider>{children}</InteractionDialogProvider>
-            </ToastProvider>
-          </TooltipProvider>
-        </DesktopSidebarProvider>
+        <IdentityPresentation value={signInPresentation()}>
+          <DesktopSidebarProvider>
+            <TooltipProvider>
+              <ToastProvider>
+                <InteractionDialogProvider>
+                  {children}
+                </InteractionDialogProvider>
+              </ToastProvider>
+            </TooltipProvider>
+          </DesktopSidebarProvider>
+        </IdentityPresentation>
         <Telemetry />
       </body>
     </html>

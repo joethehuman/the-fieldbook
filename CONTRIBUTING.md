@@ -38,7 +38,7 @@ The demo uses fictional identities and data. It is useful for interface work, bu
 
 ## Keep Fieldbook portable
 
-Portability is a project goal. The documented installation uses Next.js on Vercel, hosted Supabase, and Google sign-in; that is the first supported stack, not a requirement that future integrations use those providers. Alternative configurations need an implementation, repeatable instructions, and direct verification before being described as supported.
+Portability is a project goal. Next.js on Vercel, hosted Supabase, and Google sign-in is the released configuration. The unreleased DigitalOcean recipe uses App Platform, Managed PostgreSQL, Supabase Auth/REST/Storage, private Spaces and Google sign-in. The [installation guide](docs/installation.md) defines the recipe configurations and tested component versions. Hosting and AI routing are configured independently. Further combinations need an implementation, repeatable instructions, and direct verification before being described as supported.
 
 The code separates application behavior from provider integrations:
 
@@ -51,6 +51,14 @@ The code separates application behavior from provider integrations:
 | Service entry points such as `server/data.ts` and `server/deployment.ts` | Select and connect implementations to application services. |
 
 Keep provider SDKs, query syntax, credentials, and host-specific behavior inside the appropriate adapter or configuration boundary. Application features must use the service interfaces rather than bypassing them. Extend an interface when a real requirement calls for it; do not build a speculative framework for every possible provider. Several current services select one implementation directly, so a new provider may also require changes to how it is selected and configured.
+
+### Identity and account boundaries
+
+`server/ports/identity.ts` defines the external identity module and the Fieldbook account store contracts; `server/identity.ts` is their composition point. `FIELDBOOK_IDENTITY_PROVIDER` defaults to `supabase`; that is currently the only implementation. Its serializable `SignInPresentation` describes available login choices, labels and registration instructions. Shared UI submits an option ID to Fieldbook's login route, which validates it before starting the provider flow.
+
+The Supabase integration translates its account fields and session errors before returning Fieldbook records. Its external subject maps through `fb_profiles.auth_user_id` to a stable person ID; a verified preregistered email activates that existing person. Fieldbook owns roles, activity, deletion state and MCP connection grants. Verification and refreshed cookies do not confer those permissions. Browser sign-out ends the local session; MCP separately requires a resource-bound OAuth token, client identity, current role and explicit connection consent. Inactive/deleted people are rejected by current account checks even if a token has not expired.
+
+A new identity module must implement verification, refresh, linking, lock/unlock/deletion and any advertised MCP authorization support. It also needs a deliberate account-mapping and data-preservation strategy; changing an environment variable cannot migrate existing identities. The two current recipes use the same mapping and need no identity schema migration.
 
 ### Contribute a provider integration
 

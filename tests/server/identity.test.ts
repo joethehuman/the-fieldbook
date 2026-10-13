@@ -1,19 +1,28 @@
-import test from "node:test";
+import test, { mock } from "node:test";
+import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { NextRequest } from "next/server";
-import { actor, HttpError } from "../../server/auth";
+import { actor, readerActor, HttpError } from "../../server/auth";
 import { ServiceError } from "../../server/errors";
 import {
   verifyIdentity,
+  verifyReaderIdentity,
   lockIdentity,
   unlockIdentity,
   deleteIdentity,
+  identityProvider,
+  signInPresentation,
+  startSignIn,
+  findProfileBySubject,
+  registerProfile,
 } from "../../server/identity";
 import { POST as mcp } from "../../app/api/mcp/route";
 import { proxy } from "../../proxy";
 import { LEGACY_MCP_CAPABILITIES } from "../../lib/mcp-access";
+import { data as dataStore } from "../../server/data";
 import { defaultSettings } from "../../lib/settings";
+import { isAbsentSession } from "../../server/providers/supabase/auth-errors";
 
 const subject = "11111111-1111-4111-8111-111111111111";
 const config = {
@@ -46,6 +55,7 @@ async function fixture(run: () => Promise<void>) {
   const originalEnvironment = { ...process.env };
   Object.assign(process.env, config);
   delete process.env.VERCEL_ENV;
+  delete process.env.FIELDBOOK_IDENTITY_PROVIDER;
   try {
     await run();
   } finally {
@@ -123,6 +133,55 @@ test("identity absence remains distinct from provider failure", async () => {
         e.service === "auth" &&
         !e.message.includes("private diagnostic"),
     );
+  });
+});
+
+test("provider-locked accounts are inactive, not guests or service outages, and retain identity after unlocking", async () => {
+  await fixture(async () => {
+    let locked = true;
+    let status = 403;
+    let code = "user_banned";
+    let profileReads = 0;
+    const personId = "22222222-2222-4222-8222-222222222222";
+    globalThis.fetch = async (input) => {
+      if (location(input).pathname === "/auth/v1/user")
+        return locked
+          ? Response.json(
+              { code, message: "private provider ban detail" },
+              { status, headers: { "x-supabase-api-version": "2024-01-01" } },
+            )
+          : Response.json(authUser);
+      assert.equal(location(input).pathname, "/rest/v1/fb_profiles");
+      profileReads++;
+      return Response.json({ ...person, id: personId });
+    };
+    assert.equal(isAbsentSession({ code }), false);
+    for (status of [403, 400]) {
+      for (const verify of [verifyIdentity, actor])
+        await assert.rejects(
+          verify("synthetic-token"),
+          (error: HttpError) =>
+            error instanceof HttpError &&
+            !(error instanceof ServiceError) &&
+            error.status === 403 &&
+            error.message === "This account is inactive.",
+        );
+    }
+    assert.equal(
+      profileReads,
+      0,
+      "locked identities cannot reach profile lookup or registration",
+    );
+    code = "unexpected_failure";
+    status = 403;
+    await assert.rejects(
+      verifyIdentity("synthetic-token"),
+      (error: ServiceError) =>
+        error instanceof ServiceError && error.status === 503,
+    );
+    locked = false;
+    assert.equal((await actor("synthetic-token"))?.id, personId);
+    assert.equal(profileReads, 1);
   });
 });
 
@@ -422,5 +481,357 @@ test("proxy refresh forwards the new session to rendering and the browser", asyn
       "/docs?topic=setup",
     );
     assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+  });
+});
+
+test("identity composition preserves Google presentation and rejects unimplemented providers and options", async () => {
+  await fixture(async () => {
+    const login = signInPresentation();
+    assert.deepEqual(login.options, [
+      { id: "google", label: "Continue with Google" },
+    ]);
+    assert.equal(login.signInLabel, "Sign in with Google");
+    assert.equal(login.registration.emailLabel, "Google email");
+    assert.match(login.registration.description, /verified Google email/);
+    assert.equal(
+      JSON.parse(JSON.stringify(login)).options[0].id,
+      "google",
+      "presentation contains only public serializable data",
+    );
+    await assert.rejects(
+      startSignIn("https://fieldbook.example/auth/callback", "unconfigured"),
+      /available sign-in option/,
+    );
+    process.env.FIELDBOOK_IDENTITY_PROVIDER = "supabase";
+    assert.equal(typeof identityProvider().refreshIdentitySession, "function");
+    process.env.FIELDBOOK_IDENTITY_PROVIDER = "unimplemented";
+    assert.throws(
+      identityProvider,
+      (error: ServiceError) =>
+        error.status === 503 && error.service === "configuration",
+    );
+  });
+});
+
+test("Supabase profile mapping hides external subjects in identity, roster and governance records", async () => {
+  await fixture(async () => {
+    const personId = "22222222-2222-4222-8222-222222222222";
+    let registered = true;
+    globalThis.fetch = async (input) => {
+      const url = location(input);
+      const raw = {
+        ...person,
+        id: personId,
+        auth_user_id: registered ? subject : null,
+      };
+      if (url.pathname.startsWith("/rest/v1/rpc/"))
+        return Response.json({
+          revision: 1,
+          users: [raw],
+          groups: [],
+          teams: [],
+          progress: [],
+          pending: [],
+        });
+      assert.equal(url.pathname, "/rest/v1/fb_profiles");
+      if (url.searchParams.has("auth_user_id")) return Response.json(raw);
+      return Response.json([raw], { headers: { "Content-Range": "0-0/1" } });
+    };
+    const check = (
+      record: Awaited<ReturnType<typeof findProfileBySubject>>,
+    ) => {
+      assert.ok(record);
+      assert.equal(record.id, personId);
+      assert.equal(record.registered, registered);
+      assert.equal("auth_user_id" in record, false);
+    };
+    for (registered of [true, false]) {
+      check(await findProfileBySubject(subject));
+      check((await dataStore().listProfiles())[0]);
+      check((await dataStore().readGovernanceSnapshot(personId)).users[0]);
+      check((await dataStore().readAdminPeopleSnapshot(personId)).users[0]);
+    }
+  });
+});
+
+test("registration delegates account linking to the existing transaction and retains the stable person ID", async () => {
+  await fixture(async () => {
+    const personId = "22222222-2222-4222-8222-222222222222";
+    let denied = false;
+    globalThis.fetch = async (input, init) => {
+      assert.equal(
+        location(input).pathname,
+        "/rest/v1/rpc/fb_register_profile",
+      );
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        p_id: subject,
+        p_email: person.email,
+        p_name: person.name,
+        p_owner: false,
+      });
+      return denied
+        ? Response.json(
+            { code: "P0001", message: "Account is pending deletion" },
+            { status: 400 },
+          )
+        : Response.json({ ...person, id: personId });
+    };
+    const registration = {
+      subject,
+      email: person.email,
+      name: person.name,
+      owner: false,
+    };
+    const linked = await registerProfile(registration);
+    assert.equal(linked?.id, personId);
+    assert.equal(linked?.registered, true);
+    assert.equal("auth_user_id" in linked!, false);
+    denied = true;
+    assert.equal(await registerProfile(registration), null);
+  });
+});
+
+test("reader verification preserves provider denial with legacy tokens and current Fieldbook inactivity", async () => {
+  await fixture(async () => {
+    const token = await new SignJWT({ sub: subject })
+      .setProtectedHeader({ alg: "HS256" })
+      .setExpirationTime("1h")
+      .sign(new TextEncoder().encode("synthetic-signing-key-for-reader-test"));
+    const cookie =
+      "base64-" +
+      Buffer.from(
+        JSON.stringify({
+          access_token: token,
+          refresh_token: "synthetic-refresh",
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          token_type: "bearer",
+          user: authUser,
+        }),
+      ).toString("base64url");
+    const request = new NextRequest("https://fieldbook.example/docs", {
+      headers: { cookie: `sb-identity-test-auth-token=${cookie}` },
+    });
+    const nextHeaders = createRequire(import.meta.url)("next/headers");
+    const cookies = mock.method(
+      nextHeaders,
+      "cookies",
+      async () => request.cookies,
+    );
+    let code: string | null = "user_banned";
+    let profileReads = 0;
+    globalThis.fetch = async (input) => {
+      if (location(input).pathname === "/auth/v1/user")
+        return code
+          ? Response.json(
+              { code, message: "private diagnostic" },
+              {
+                status: 403,
+                headers: { "x-supabase-api-version": "2024-01-01" },
+              },
+            )
+          : Response.json(authUser);
+      assert.equal(location(input).pathname, "/rest/v1/fb_profiles");
+      profileReads++;
+      return Response.json({ ...person, active: false });
+    };
+    const inactive = (error: HttpError) =>
+      error instanceof HttpError &&
+      error.status === 403 &&
+      error.message === "This account is inactive.";
+    try {
+      await assert.rejects(verifyReaderIdentity(), inactive);
+      await assert.rejects(readerActor(), inactive);
+      assert.equal(
+        profileReads,
+        0,
+        "provider denial stops before Fieldbook account lookup",
+      );
+      code = "user_not_found";
+      assert.deepEqual(await verifyReaderIdentity(), { status: "absent" });
+      assert.equal(await readerActor(), null);
+      assert.equal(await actor(), null);
+      assert.equal(
+        profileReads,
+        0,
+        "deleted external accounts cannot look up or register a Fieldbook person",
+      );
+      code = "unexpected_failure";
+      assert.deepEqual(await verifyReaderIdentity(), { status: "verify-user" });
+      await assert.rejects(
+        readerActor(),
+        (error: ServiceError) =>
+          error instanceof ServiceError && error.status === 503,
+      );
+      code = null;
+      assert.deepEqual(await verifyReaderIdentity(), {
+        status: "verified",
+        subject,
+      });
+      await assert.rejects(readerActor(), inactive);
+      assert.equal(
+        profileReads,
+        1,
+        "verified reader tokens still check current Fieldbook account status",
+      );
+    } finally {
+      cookies.mock.restore();
+    }
+  });
+});
+
+test("session refresh reports provider locks as denial and keeps genuine failures unavailable", async () => {
+  await fixture(async () => {
+    const providerLog = mock.method(console, "error", () => {});
+    try {
+      const token = await new SignJWT({ sub: subject })
+        .setProtectedHeader({ alg: "HS256" })
+        .setExpirationTime("1h")
+        .sign(
+          new TextEncoder().encode("synthetic-signing-key-for-refresh-test"),
+        );
+      const cookie =
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            access_token: token,
+            refresh_token: "synthetic-refresh",
+            expires_in: 1,
+            expires_at: 1,
+            token_type: "bearer",
+            user: authUser,
+          }),
+        ).toString("base64url");
+      let code = "user_banned";
+      globalThis.fetch = async (input) => {
+        assert.equal(location(input).pathname, "/auth/v1/token");
+        return Response.json(
+          { code, message: "private provider diagnostic" },
+          {
+            status: 403,
+            headers: { "x-supabase-api-version": "2024-01-01" },
+          },
+        );
+      };
+      const request = () =>
+        new NextRequest("https://fieldbook.example/docs", {
+          headers: { cookie: `sb-identity-test-auth-token=${cookie}` },
+        });
+      const denied = await proxy(request());
+      assert.equal(denied.status, 403);
+      assert.equal(await denied.text(), "This account is inactive.");
+      assert.equal(denied.headers.get("Cache-Control"), "private, no-store");
+      assert.equal(
+        denied.cookies.get("sb-identity-test-auth-token")?.value,
+        "",
+        "provider session-cookie removal survives the denial response",
+      );
+      code = "user_not_found";
+      assert.equal(isAbsentSession({ code }), true);
+      const deleted = await proxy(request());
+      assert.equal(
+        deleted.status,
+        200,
+        "the proxy passes a signed-out request to Fieldbook access checks",
+      );
+      assert.equal(deleted.headers.get("x-middleware-next"), "1");
+      assert.equal(
+        deleted.cookies.get("sb-identity-test-auth-token")?.value,
+        "",
+      );
+      assert.equal(
+        deleted.headers.get("x-middleware-request-cookie")?.includes(cookie),
+        false,
+        "deleted credentials must not reach reader rendering",
+      );
+      assert.equal(deleted.headers.get("Cache-Control"), "private, no-store");
+      code = "unexpected_failure";
+      const unavailable = await proxy(request());
+      assert.equal(unavailable.status, 503);
+      assert.equal(
+        await unavailable.text(),
+        "Sign-in verification is unavailable. Please try again.",
+      );
+      assert.equal(
+        unavailable.headers.get("Cache-Control"),
+        "private, no-store",
+      );
+    } finally {
+      providerLog.mock.restore();
+    }
+  });
+});
+
+test("an unexpired signed reader token cannot recreate a permanently deleted account", async () => {
+  await fixture(async () => {
+    const { publicKey, privateKey } = await generateKeyPair("ES256");
+    const jwk = {
+      ...(await exportJWK(publicKey)),
+      kid: "deleted-reader",
+      alg: "ES256",
+      use: "sig",
+    };
+    const token = await new SignJWT({ sub: subject, aud: "authenticated" })
+      .setProtectedHeader({ alg: "ES256", kid: "deleted-reader" })
+      .setExpirationTime("1h")
+      .sign(privateKey);
+    const cookie =
+      "base64-" +
+      Buffer.from(
+        JSON.stringify({
+          access_token: token,
+          refresh_token: "synthetic-deleted-refresh",
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          token_type: "bearer",
+          user: authUser,
+        }),
+      ).toString("base64url");
+    const request = new NextRequest("https://fieldbook.example/docs", {
+      headers: { cookie: `sb-identity-test-auth-token=${cookie}` },
+    });
+    const nextHeaders = createRequire(import.meta.url)("next/headers");
+    const cookies = mock.method(
+      nextHeaders,
+      "cookies",
+      async () => request.cookies,
+    );
+    const requests: string[] = [];
+    globalThis.fetch = async (input) => {
+      const pathname = location(input).pathname;
+      requests.push(pathname);
+      if (pathname === "/auth/v1/.well-known/jwks.json")
+        return Response.json({ keys: [jwk] });
+      if (pathname === "/rest/v1/fb_profiles") return Response.json(null);
+      assert.equal(
+        pathname,
+        "/auth/v1/user",
+        "deleted identities never reach registration",
+      );
+      return Response.json(
+        {
+          code: "user_not_found",
+          message: "User from sub claim does not exist",
+        },
+        {
+          status: 403,
+          headers: { "x-supabase-api-version": "2024-01-01" },
+        },
+      );
+    };
+    try {
+      assert.equal(await readerActor(), null);
+      assert.deepEqual(requests, [
+        "/auth/v1/.well-known/jwks.json",
+        "/rest/v1/fb_profiles",
+        "/auth/v1/user",
+      ]);
+      requests.length = 0;
+      assert.equal(await actor(), null);
+      assert.equal(await actor("synthetic-deleted-token"), null);
+      assert.deepEqual(requests, ["/auth/v1/user", "/auth/v1/user"]);
+    } finally {
+      cookies.mock.restore();
+    }
   });
 });

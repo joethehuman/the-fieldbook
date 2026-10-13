@@ -11,6 +11,7 @@ import { errorResponse } from "@server/errors";
 import { AccountUnavailable } from "../AccountUnavailable";
 import Link from "next/link";
 import { homePath } from "@/lib/navigation";
+import { signInPresentation } from "@server/identity";
 export const dynamic = "force-dynamic";
 export default async function SignIn({
   searchParams,
@@ -21,7 +22,9 @@ export default async function SignIn({
   if (q.next !== undefined)
     redirect(`/auth/sign-in?next=${encodeURIComponent(q.next)}`);
   let branding;
+  let login;
   try {
+    login = signInPresentation();
     branding = await publicBranding();
   } catch (e) {
     const response = errorResponse(e, "sign-in/branding");
@@ -58,20 +61,25 @@ export default async function SignIn({
           <p>Sign in to save course progress across devices.</p>
         )}
         {branding.welcomeDescription && <p>{branding.welcomeDescription}</p>}
+        {login.instructions && <p>{login.instructions}</p>}
       </header>
       {q.error && (
         <Alert variant="destructive" role="alert">
           {q.error === "access"
-            ? "This account doesn’t have access. Use an approved Google account or contact an administrator."
+            ? login.accessDeniedDescription
             : q.error === "service"
               ? "Sign-in is unavailable. Try again shortly or contact an administrator."
               : "Sign-in was cancelled or could not be completed. Try again."}
           {reference && <> Reference: {reference}.</>}
         </Alert>
       )}
-      <Button asChild variant="default" className="w-full">
-        <a href="/auth/login">Continue with Google</a>
-      </Button>
+      {login.options.map((option) => (
+        <Button key={option.id} asChild variant="default" className="w-full">
+          <a href={`/auth/login?option=${encodeURIComponent(option.id)}`}>
+            {option.label}
+          </a>
+        </Button>
+      ))}
     </BrandedAccount>
   );
 }

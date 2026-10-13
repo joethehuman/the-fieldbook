@@ -1,0 +1,15 @@
+.git
+node_modules
+.next
+demo/node_modules
+demo/.next
+demo/out
+.env*
+!.env.example
+.vercel
+artifacts
+test-results
+playwright-report
+*.log
+*.tsbuildinfo
+sources

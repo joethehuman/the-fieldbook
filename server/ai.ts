@@ -1,7 +1,9 @@
 import "server-only";
 import type { AiProvider } from "./ports/ai";
 import { vercelAi } from "./providers/vercel/ai";
+import { digitaloceanAi } from "./providers/digitalocean/ai";
 import { HttpError } from "./errors";
+import { aiRouterPresentation } from "./ai-setup";
 
 /** AI is optional. This composition creates no connection or generation at import. */
 export function ai(
@@ -10,8 +12,18 @@ export function ai(
   // Preserve existing installations. New connectors are explicitly wired here.
   const router = environment.FIELDBOOK_AI_ROUTER ?? "vercel";
   if (router === "vercel") return vercelAi;
+  if (router === "digitalocean") return digitaloceanAi;
   throw new HttpError(
     503,
     "The model router is unavailable. Check the installation's AI router configuration.",
   );
+}
+
+/** Render the configured interface before the slower live metadata check. */
+export function aiPresentation() {
+  try {
+    return aiRouterPresentation(ai());
+  } catch {
+    return null;
+  }
 }

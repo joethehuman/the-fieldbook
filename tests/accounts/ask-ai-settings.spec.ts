@@ -25,6 +25,22 @@ async function section(page: Page, name: string) {
     await page.getByRole("option", { name, exact: true }).click();
   } else await page.getByRole("tab", { name, exact: true }).click();
 }
+async function expectSearchPlaceholder(page: Page, placeholder: string) {
+  const compact = page.getByRole("button", {
+    name: "Open search",
+    exact: true,
+  });
+  const opened = await compact.isVisible();
+  if (opened) await compact.click();
+  await expect(
+    page.getByPlaceholder(placeholder, { exact: true }),
+  ).toBeVisible();
+  if (opened)
+    await page
+      .getByRole("button", { name: "Close search", exact: true })
+      .click();
+}
+
 async function signedIn(
   page: Page,
   request: APIRequestContext,
@@ -70,8 +86,12 @@ async function picture(
     .getByRole("switch", { name: "Enable Ask AI" })
     .evaluate(async (element) => {
       await Promise.all(
-        element
+        (element.closest("form") ?? element)
           .getAnimations({ subtree: true })
+          .filter(
+            (animation) =>
+              animation.effect?.getTiming().iterations !== Infinity,
+          )
           .map((animation) => animation.finished.catch(() => {})),
       );
     });
@@ -159,9 +179,7 @@ test("Admin configures and saves AI without generation; toggles restore search a
     0,
   );
   expect(await setupCalls(request)).toBe(0); // Opening Admin and saving never generate
-  await expect(
-    page.getByPlaceholder("Search or Ask AI", { exact: true }),
-  ).toBeVisible();
+  await expectSearchPlaceholder(page, "Search or Ask AI");
   await section(page, "Identity");
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await section(page, "Ask AI");
@@ -202,16 +220,12 @@ test("Admin configures and saves AI without generation; toggles restore search a
   await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
     0,
   );
-  await expect(
-    page.getByPlaceholder("Search Fieldbook", { exact: true }),
-  ).toBeVisible();
+  await expectSearchPlaceholder(page, "Search Fieldbook");
   await page.getByRole("switch", { name: "Enable Ask AI" }).check();
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
-  await expect(
-    page.getByPlaceholder("Search or Ask AI", { exact: true }),
-  ).toBeVisible();
+  await expectSearchPlaceholder(page, "Search or Ask AI");
   await expect(
     page.getByRole("combobox", { name: "Primary model", exact: true }),
   ).toContainText("Synthetic paid model");
@@ -299,9 +313,7 @@ test("Admin configures and saves AI without generation; toggles restore search a
     "A lost response is confirmed automatically.",
   );
   await page.goto("/courses");
-  await expect(
-    page.getByPlaceholder("Search or Ask AI", { exact: true }),
-  ).toBeVisible();
+  await expectSearchPlaceholder(page, "Search or Ask AI");
 });
 
 test("Admin setup API enforces origin, role and bounded input; learner data hides configuration", async ({
@@ -384,9 +396,7 @@ test("Demo Admin controls stay local; saved off state restores basic search", as
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
-  await expect(
-    page.getByPlaceholder("Search Fieldbook", { exact: true }),
-  ).toBeVisible();
+  await expectSearchPlaceholder(page, "Search Fieldbook");
   expect(calls).toBe(0);
   await picture(page, {
     path: info.outputPath("ask-ai-admin-demo.png"),
@@ -563,3 +573,279 @@ test("Missing router warns inline; late metadata cannot reveal controls after sw
   ).toHaveCount(0);
   expect(await setupCalls(request)).toBe(0);
 });
+
+test("DigitalOcean shows a stable router summary before discovery, preserves settings and explains model pools", async ({
+  page,
+  request,
+}, info) => {
+  test.skip(
+    process.env.FIELDBOOK_AI_ROUTER !== "digitalocean",
+    "Run with the DigitalOcean presentation selected.",
+  );
+  await signedIn(page, request);
+  await request.post("http://127.0.0.1:3130/fixture", {
+    data: {
+      settings: {
+        access: "public",
+        askAi: {
+          ...defaultAskAiSettings,
+          enabled: true,
+          router: "digitalocean",
+          model: "router:fieldbook",
+          fallbackModel: "",
+        },
+      },
+      role: "admin",
+    },
+  });
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/admin/ask-ai", async (route) => {
+    await waiting;
+    await route.fulfill({
+      json: {
+        setup: {
+          router: {
+            id: "digitalocean",
+            name: "DigitalOcean Inference Router",
+            supportsFallback: false,
+            routerSelection: {
+              target: "router:fieldbook",
+              description: "Managed in DigitalOcean.",
+            },
+          },
+          selectionRouter: "digitalocean",
+          checkedAt: "",
+          models: [
+            {
+              id: "router:fieldbook",
+              name: "router:fieldbook",
+              inputPerMillion: null,
+              outputPerMillion: null,
+              zeroRetention: "unknown",
+              noTraining: "unknown",
+              validation: {
+                ready: true,
+                message:
+                  "Synthetic metadata checked; routing and failover still need an inference check.",
+              },
+              routing: {
+                pools: [
+                  { label: "Published questions", models: ["test/primary"] },
+                ],
+                fallbacks: ["test/backup", "test/primary"],
+              },
+            },
+          ],
+          catalog: { ready: true, message: "" },
+          connection: { configured: true, message: "" },
+          retrieval: { ready: true, message: "" },
+        },
+      },
+    });
+  });
+  await page.goto("/admin/settings/ask-ai");
+  const content = page.locator("#settings-ai-content");
+  await expect(
+    page.getByRole("heading", { name: "Routing", exact: true }),
+  ).toBeVisible();
+  const details = page.locator('[data-slot="ai-router-details"]');
+  await expect(details).toHaveAttribute("aria-busy", "true");
+  await expect(
+    page.getByText("Managed in DigitalOcean.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      /public preview|Pricing and data handling|Model metadata checked/,
+    ),
+  ).toHaveCount(0);
+  for (const name of ["Primary model", "Fallback model", "Inference router"])
+    await expect(page.getByRole("combobox", { name, exact: true })).toHaveCount(
+      0,
+    );
+  await expect(
+    page.getByText("router:fieldbook", { exact: true }),
+  ).toBeVisible();
+  const before = await content.boundingBox();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
+  release();
+  await expect(details).toHaveAttribute("aria-busy", "false");
+  const after = await content.boundingBox();
+  expect(before).not.toBeNull();
+  expect(after).not.toBeNull();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThanOrEqual(1);
+  await expect(
+    page.getByRole("button", { name: "Use configured router", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
+  await picture(page, {
+    path: info.outputPath("ask-ai-digitalocean-router-collapsed.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", {
+      name: "Model pools and fallback order",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText("Published questions", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("#settings-ai-models ul li")).toHaveText([
+    "test/primary",
+  ]);
+  await expect(page.locator("#settings-ai-models ol li")).toHaveText([
+    "test/backup",
+    "test/primary",
+  ]);
+  await expect(
+    page.getByText(
+      "Synthetic metadata checked; routing and failover still need an inference check.",
+      { exact: true },
+    ),
+  ).toHaveCount(0);
+  const trigger = page.getByRole("button", {
+    name: "Model pools and fallback order",
+    exact: true,
+  });
+  const headerInset = await trigger
+    .locator("span > span")
+    .evaluate((el) => el.getBoundingClientRect().x);
+  const bodyInset = await page
+    .getByText("Model pools", { exact: true })
+    .evaluate((el) => el.getBoundingClientRect().x);
+  expect(Math.abs(headerInset - bodyInset)).toBeLessThanOrEqual(1);
+  await trigger.press("Enter");
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await trigger.press("Space");
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("Model pools", { exact: true })).toBeVisible();
+  await details.scrollIntoViewIfNeeded();
+  const fits = await details.evaluate((el) => el.scrollWidth <= el.clientWidth);
+  expect(fits).toBe(true);
+  expect(await setupCalls(request)).toBe(0);
+  await picture(page, {
+    path: info.outputPath("ask-ai-digitalocean-router.png"),
+    fullPage: true,
+  });
+});
+
+for (const compatible of [true, false]) {
+  test(
+    compatible
+      ? "DigitalOcean explicitly adopts the configured target and clears a saved legacy fallback"
+      : "DigitalOcean keeps compatibility errors visible and blocks adoption",
+    async ({ page, request }) => {
+      test.skip(
+        process.env.FIELDBOOK_AI_ROUTER !== "digitalocean",
+        "Run with the DigitalOcean presentation selected.",
+      );
+      await signedIn(page, request);
+      await request.post("http://127.0.0.1:3130/fixture", {
+        data: {
+          settings: {
+            access: "public",
+            askAi: {
+              ...defaultAskAiSettings,
+              enabled: true,
+              model: "test/primary",
+              fallbackModel: "test/backup",
+            },
+          },
+          role: "admin",
+        },
+      });
+      await page.route("**/api/admin/ask-ai", (route) =>
+        route.fulfill({
+          json: {
+            setup: {
+              router: {
+                id: "digitalocean",
+                name: "DigitalOcean Inference Router",
+                supportsFallback: false,
+                routerSelection: {
+                  target: "router:fieldbook",
+                  description: "Managed in DigitalOcean.",
+                },
+              },
+              selectionRouter: "vercel",
+              checkedAt: "",
+              catalog: { ready: true },
+              connection: { configured: true },
+              retrieval: { ready: true },
+              models: [
+                {
+                  id: "router:fieldbook",
+                  name: "router:fieldbook",
+                  validation: {
+                    ready: compatible,
+                    message: "Test the fallback model before enabling Ask AI.",
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      );
+      await page.goto("/admin/settings/ask-ai");
+      const use = page.getByRole("button", {
+        name: "Use configured router",
+        exact: true,
+      });
+      if (!compatible) {
+        await expect(use).toBeDisabled();
+        await expect(
+          page.locator("#settings-ai-models").getByRole("alert"),
+        ).toHaveText("Test the fallback model before enabling Ask AI.");
+        await expect(
+          page.getByRole("button", {
+            name: "Model pools and fallback order",
+            exact: true,
+          }),
+        ).toHaveAttribute("aria-expanded", "false");
+        await expect(
+          page.getByRole("button", { name: "Save settings", exact: true }),
+        ).toBeDisabled();
+        expect(await setupCalls(request)).toBe(0);
+        return;
+      }
+      await expect(use).toBeEnabled();
+      await expect(
+        page.getByRole("button", { name: "Save settings", exact: true }),
+      ).toBeDisabled();
+      let saves = 0;
+      page.on("request", (request) => {
+        if (
+          new URL(request.url()).pathname === "/api/settings" &&
+          request.method() === "POST"
+        )
+          saves++;
+      });
+      await use.click();
+      await expect(use).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Save settings", exact: true }),
+      ).toBeEnabled();
+      await expect(
+        page.getByText("The model router changed.", { exact: false }),
+      ).toHaveCount(0);
+      await page
+        .getByRole("button", {
+          name: "Model pools and fallback order",
+          exact: true,
+        })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Save settings", exact: true }),
+      ).toBeEnabled();
+      expect(saves).toBe(0);
+      expect(await setupCalls(request)).toBe(0);
+    },
+  );
+}

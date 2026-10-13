@@ -503,6 +503,37 @@ test("four supplied citations complete the SDK stream and retain every internal 
   assert.equal(f.calls.current, 2);
 });
 
+test("matching ASCII and Unicode citations verify once across streamed chunks", async () => {
+  const f = fixture();
+  f.provider.streamAnswer = async function* () {
+    yield "A quorum elects a leader. 【S";
+    yield "1】 Again [S1].";
+  };
+  const events = await collect(
+    await prepareAskAi(request(), user, new AbortController().signal, f.deps),
+  );
+  const final = events.at(-1)!;
+  assert.equal(final.type, "sources");
+  if (final.type === "sources") {
+    assert.deepEqual(
+      final.sources.map((source) => source.id),
+      ["S1"],
+    );
+    assert.equal(final.sources[0].lessonId, "quorum");
+    assert.equal("text" in final.sources[0], false);
+  }
+  assert.equal(f.calls.current, 2);
+});
+
+test("malformed or mismatched citation delimiters do not receive source metadata", async () => {
+  const f = fixture();
+  f.setAnswer("Malformed [S1】 【S1] 【S 1】 【s1】.");
+  const events = await collect(
+    await prepareAskAi(request(), user, new AbortController().signal, f.deps),
+  );
+  assert.deepEqual(events.at(-1), { type: "sources", sources: [] });
+});
+
 test("fresh account, settings and source checks guard generation and final citations", async () => {
   for (const change of ["off", "inactive", "content"] as const) {
     const f = fixture();
@@ -535,6 +566,9 @@ test("invalid citations and oversized answers never receive verified source meta
     " ",
     "An invented source. [S99]",
     "One supplied and one invented source. [S1][S99]",
+    "An invented source. 【S99】",
+    "One supplied and one invented source. 【S1】[S99]",
+    "One supplied and one invented source. [S1]【S99】",
     "x".repeat(12001),
   ]) {
     const f = fixture();

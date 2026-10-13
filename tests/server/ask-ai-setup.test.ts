@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { aiSetup } from "../../server/ai-setup";
-import { ai } from "../../server/ai";
+import { ai, aiPresentation } from "../../server/ai";
 import { requireAiRouter, selectionRouter } from "../../server/ai-router";
 import { defaultAskAiSettings, type AiModel } from "../../lib/ai";
 import { askAiSettingsSchema } from "../../lib/ai-schema";
@@ -96,6 +96,27 @@ test("Router selection is explicit, independent of host; unknown selectors fail 
   assert.equal(ai({}).id, "vercel"); // Existing installations remain compatible.
   for (const id of ["none", "unknown", ""])
     assert.throws(() => ai({ FIELDBOOK_AI_ROUTER: id }), { status: 503 });
+});
+
+test("Initial router presentation exposes configuration without discovery or inference", () => {
+  const environment = { ...process.env };
+  try {
+    process.env.FIELDBOOK_AI_ROUTER = "digitalocean";
+    process.env.DIGITALOCEAN_INFERENCE_ROUTER = "router:initial-target";
+    assert.equal(
+      aiPresentation()?.routerSelection?.target,
+      "router:initial-target",
+    );
+    process.env.DIGITALOCEAN_INFERENCE_ROUTER = "invalid target";
+    assert.equal(aiPresentation()?.routerSelection?.target, "");
+    process.env.FIELDBOOK_AI_ROUTER = "vercel";
+    assert.equal(aiPresentation()?.id, "vercel");
+    assert.equal(aiPresentation()?.routerSelection, undefined);
+    process.env.FIELDBOOK_AI_ROUTER = "unsupported";
+    assert.equal(aiPresentation(), null);
+  } finally {
+    process.env = environment;
+  }
 });
 test("Saved models belong to a router, including legacy Vercel choices; unsupported fallback is rejected", () => {
   const f = fixture();

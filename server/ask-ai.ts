@@ -8,6 +8,7 @@ import {
   type AiSource,
 } from "@/lib/ai";
 import { destination, plainText } from "@/lib/search";
+import { citationMarkers } from "@/lib/ai-citation-markers";
 import type { DataStore } from "./ports/data";
 import type { AiProvider } from "./ports/ai";
 import { HttpError } from "./errors";
@@ -167,9 +168,7 @@ export async function prepareAskAi(
     }
     await unchanged();
     const cited = [
-      ...new Set(
-        [...answer.matchAll(/\[S(\d+)\]/g)].map((match) => `S${match[1]}`),
-      ),
+      ...new Set([...citationMarkers(answer)].map((marker) => marker.id)),
     ];
     if (
       !answer.trim() ||
