@@ -281,7 +281,7 @@ test("recipe preserves verified TLS, persistent signing keys and runtime-only se
   }
   assert.equal(envs("fieldbook").JWT_KEYS, undefined);
   assert.equal(envs("fieldbook").DATABASE_URL, undefined);
-  assert.match(read("Dockerfile.supabase-auth"), /gotrue:v2\.196\.0@sha256:/);
+  assert.match(read("Dockerfile.supabase-auth"), /gotrue:v2\.197\.0@sha256:1736a63078f5922b198c4cbe50f80ab9a2d3b54fe8b7b6cfb2e9dc5dbbc12c6b/);
   assert.match(
     read("Dockerfile.supabase-rest"),
     /^FROM postgrest\/postgrest:v16\.4@sha256:d155c6718ed9a9f990d159a2ab7c0a3f16944dbb6d0a0344557421042acfe0df$/m,

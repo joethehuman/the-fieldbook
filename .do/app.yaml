@@ -120,6 +120,10 @@ services:
         value: "false"
       - key: GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED
         value: "false"
+      - key: GOTRUE_MFA_RECOVERY_CODES_ENROLL_ENABLED
+        value: "false"
+      - key: GOTRUE_MFA_RECOVERY_CODES_VERIFY_ENABLED
+        value: "false"
       - key: GOTRUE_EXTERNAL_GOOGLE_ENABLED
         value: "true"
       - key: GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID
