@@ -116,6 +116,19 @@ export function publicSettings(
       ?.filter((section) => sectionIds.has(section.id))
       .map((section) => ({
         ...section,
+        ...(section.itemOrder
+          ? {
+              itemOrder: section.itemOrder.filter((item) =>
+                item.kind === "doc"
+                  ? publishedPlacements.get(item.id) === section.id
+                  : sectionIds.has(item.id) &&
+                    all.some(
+                      (child) =>
+                        child.id === item.id && child.parentId === section.id,
+                    ),
+              ),
+            }
+          : {}),
         ...(section.docOrder
           ? {
               docOrder: section.docOrder.filter(

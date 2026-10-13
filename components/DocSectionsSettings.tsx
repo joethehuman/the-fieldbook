@@ -18,12 +18,14 @@ import {
   legacySectionConflict,
   moveDocSection,
   moveDocumentsInNavigation,
-  orderedSectionDocs,
+  orderedSectionItems,
+  navigationItemKey,
   renameDocSection,
-  reorderDocInSection,
+  reorderSectionItem,
   reorderDocSection,
   sectionForDoc,
   sectionPath,
+  type DocNavigationItem,
   type DocLink,
   type DocSection,
 } from "@/lib/docs-navigation";
@@ -98,17 +100,16 @@ export function DocSectionsSettings({
   const allRootsExpanded =
     expandableRoots.length > 0 &&
     expandableRoots.every((root) => expanded.has(root.id));
-  const sectionVisible = (section: DocSection) =>
-    !section.parentId || expanded.has(section.parentId);
-  const visibleIds = [
-    ...sections.filter(sectionVisible).map((section) => sectionKey(section.id)),
-    ...uniqueDocs
-      .filter((doc) => {
-        const section = sectionForDoc(doc, sections);
-        return section && sectionVisible(section) && expanded.has(section.id);
-      })
-      .map((doc) => docKey(doc.id)),
-  ];
+  const visibleIds: string[] = [];
+  function collectVisible(section: DocSection) {
+    visibleIds.push(sectionKey(section.id));
+    if (!expanded.has(section.id)) return;
+    for (const item of orderedSectionItems(uniqueDocs, sections, section.id)) {
+      if (item.kind === "doc") visibleIds.push(docKey(item.id));
+      else collectVisible(sections.find((child) => child.id === item.id)!);
+    }
+  }
+  roots.forEach(collectVisible);
   const allItems = [
     ...sections.map((section) => ({
       id: sectionKey(section.id),
@@ -179,22 +180,30 @@ export function DocSectionsSettings({
     if (success) revealDestination(target);
     return success;
   }
+  function parentForItem(key: string) {
+    if (isDoc(key)) {
+      const doc = uniqueDocs.find((item) => item.id === itemId(key));
+      return doc && sectionForDoc(doc, sections)?.id;
+    }
+    return sections.find((item) => item.id === itemId(key))?.parentId;
+  }
+  function navigationItem(key: string): DocNavigationItem {
+    return { kind: isDoc(key) ? "doc" : "section", id: itemId(key) };
+  }
   function reorder(key: string, offset: number) {
-    if (!isDoc(key))
+    const parentId = parentForItem(key);
+    if (!parentId)
       return changeSections(() =>
         reorderDocSection(sections, itemId(key), offset),
       );
-    const doc = uniqueDocs.find((item) => item.id === itemId(key));
-    const section = doc && sectionForDoc(doc, sections);
-    if (!section) return;
-    const siblings = orderedSectionDocs(uniqueDocs, sections, section.id);
+    const siblings = orderedSectionItems(uniqueDocs, sections, parentId);
     changeSections(() =>
-      reorderDocInSection(
+      reorderSectionItem(
         sections,
         uniqueDocs,
-        section.id,
-        doc!.id,
-        siblings.findIndex((item) => item.id === doc!.id) + offset,
+        parentId,
+        navigationItem(key),
+        siblings.findIndex((item) => navigationItemKey(item) === key) + offset,
       ),
     );
   }
@@ -206,48 +215,18 @@ export function DocSectionsSettings({
       stageMove([key], itemId(destination.id));
       return;
     }
-    if (isDoc(key) && isDoc(destination.id)) {
-      const target = uniqueDocs.find(
-        (doc) => doc.id === itemId(destination.id),
-      );
-      const parent = target && sectionForDoc(target, sections);
-      if (!parent) return;
-      const remaining = orderedSectionDocs(
-        uniqueDocs,
-        sections,
-        parent.id,
-      ).filter((doc) => doc.id !== itemId(key));
-      const index =
-        remaining.findIndex((doc) => doc.id === target!.id) +
-        (destination.side === "after" ? 1 : 0);
-      act(() => ({
-        sections: moveDocumentsInNavigation(
-          sections,
-          uniqueDocs,
-          [itemId(key)],
-          parent.id,
-          index,
-        ),
-        moves: [{ id: itemId(key), sectionId: parent.id }],
-      }));
-      revealDestination(parent.id);
-    } else if (!isDoc(key) && !isDoc(destination.id)) {
-      const target = sections.find(
-        (section) => section.id === itemId(destination.id),
-      );
-      if (!target) return;
+    const parentId = parentForItem(destination.id);
+    if (!parentId) {
+      if (isDoc(key) || isDoc(destination.id)) return;
       changeSections(() => {
         const source = sections.find((section) => section.id === itemId(key))!;
-        let next =
-          source.parentId === target.parentId
-            ? sections
-            : moveDocSection(sections, source.id, target.parentId);
-        const siblings = next.filter(
-          (section) => section.parentId === target.parentId,
-        );
+        const next = source.parentId
+          ? moveDocSection(sections, source.id)
+          : sections;
+        const siblings = next.filter((section) => !section.parentId);
         const others = siblings.filter((section) => section.id !== source.id);
         const index =
-          others.findIndex((section) => section.id === target.id) +
+          others.findIndex((section) => section.id === itemId(destination.id)) +
           (destination.side === "after" ? 1 : 0);
         return reorderDocSection(
           next,
@@ -255,8 +234,51 @@ export function DocSectionsSettings({
           index - siblings.findIndex((section) => section.id === source.id),
         );
       });
-      if (target.parentId) revealDestination(target.parentId);
+      return;
     }
+    const parent = sections.find((section) => section.id === parentId)!;
+    if (!isDoc(key) && parent.parentId) return;
+    const remaining = orderedSectionItems(
+      uniqueDocs,
+      sections,
+      parentId,
+    ).filter((item) => navigationItemKey(item) !== key);
+    const targetIndex =
+      remaining.findIndex(
+        (item) => navigationItemKey(item) === destination.id,
+      ) + (destination.side === "after" ? 1 : 0);
+    act(() => {
+      const moved = parentForItem(key) !== parentId;
+      const next = !moved
+        ? sections
+        : isDoc(key)
+          ? moveDocumentsInNavigation(
+              sections,
+              uniqueDocs,
+              [itemId(key)],
+              parentId,
+            )
+          : moveDocSection(sections, itemId(key), parentId);
+      const placedDocs =
+        moved && isDoc(key)
+          ? uniqueDocs.map((doc) =>
+              doc.id === itemId(key) ? { ...doc, sectionId: parentId } : doc,
+            )
+          : uniqueDocs;
+      return {
+        sections: reorderSectionItem(
+          next,
+          placedDocs,
+          parentId,
+          navigationItem(key),
+          targetIndex,
+        ),
+        ...(moved && isDoc(key)
+          ? { moves: [{ id: itemId(key), sectionId: parentId }] }
+          : {}),
+      };
+    });
+    revealDestination(parentId);
   }
   const drag = useRowReorder(
     allItems,
@@ -274,12 +296,30 @@ export function DocSectionsSettings({
     }
     if (isDoc(sourceKey)) {
       if (isDoc(key)) drag.over(event, key);
-      else drag.overInside(event, key);
+      else {
+        const target = sections.find((section) => section.id === itemId(key));
+        const rect = event.currentTarget.getBoundingClientRect();
+        const edge =
+          event.clientY < rect.top + rect.height * 0.25 ||
+          event.clientY > rect.bottom - rect.height * 0.25;
+        if (target?.parentId && edge) drag.over(event, key);
+        else drag.overInside(event, key);
+      }
       return;
     }
     const source = sections.find((section) => section.id === itemId(sourceKey));
     const target =
       !isDoc(key) && sections.find((section) => section.id === itemId(key));
+    if (source?.parentId && isDoc(key)) {
+      const parentId = parentForItem(key);
+      if (
+        parentId &&
+        !sections.find((section) => section.id === parentId)?.parentId
+      ) {
+        drag.over(event, key);
+        return;
+      }
+    }
     if (!source || !target) {
       event.stopPropagation();
       drag.clearDestination();
@@ -359,74 +399,62 @@ export function DocSectionsSettings({
     destination?.id === key && destination.side !== "inside"
       ? destination.side
       : undefined;
-  function documentRows(section: DocSection) {
-    const items = orderedSectionDocs(uniqueDocs, sections, section.id);
-    if (!expanded.has(section.id) || !items.length) return null;
+  function documentRow(doc: DocLink, index: number, count: number) {
     return (
-      <li className="list-none">
-        <ol
-          className="doc-order-list ms-6 border-s border-border ps-3"
-          aria-label={`Documents in ${sectionPath(section, sections)}`}
-        >
-          {items.map((doc, index) => (
-            <ReorderRow
-              key={doc.id}
-              data-sortable-preview
-              data-dragging={drag.active === docKey(doc.id)}
-              data-selected={selection.selected.includes(docKey(doc.id))}
-              data-drop={dropSide(docKey(doc.id))}
-              data-moved={drag.recentlyMoved === docKey(doc.id)}
-              onDragOver={(event) => over(event, docKey(doc.id))}
-              onDrop={drag.drop}
-              handle={handle(docKey(doc.id), `document ${doc.title}`)}
-              selection={select(docKey(doc.id), `document ${doc.title}`)}
-              icon={<FileText className="size-4" />}
-              title={<span className="block text-left">{doc.title}</span>}
-              detail={
-                <PublicationStatus published={doc.status === "published"} />
-              }
-              compactActions
-              actions={
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      disabled={blocked}
-                      aria-label={`Actions for document ${doc.title}`}
-                    >
-                      <MoreHorizontal size={18} aria-hidden="true" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      disabled={index === 0}
-                      onSelect={() => reorder(docKey(doc.id), -1)}
-                    >
-                      Move up
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={index === items.length - 1}
-                      onSelect={() => reorder(docKey(doc.id), 1)}
-                    >
-                      Move down
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => openMove(docKey(doc.id))}>
-                      Move to…
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              }
-            />
-          ))}
-        </ol>
-      </li>
+      <ReorderRow
+        key={docKey(doc.id)}
+        data-navigation-item={docKey(doc.id)}
+        data-sortable-preview
+        data-dragging={drag.active === docKey(doc.id)}
+        data-selected={selection.selected.includes(docKey(doc.id))}
+        data-drop={dropSide(docKey(doc.id))}
+        data-moved={drag.recentlyMoved === docKey(doc.id)}
+        onDragOver={(event) => over(event, docKey(doc.id))}
+        onDrop={drag.drop}
+        handle={handle(docKey(doc.id), `document ${doc.title}`)}
+        selection={select(docKey(doc.id), `document ${doc.title}`)}
+        icon={<FileText className="size-4" />}
+        title={<span className="block text-left">{doc.title}</span>}
+        detail={<PublicationStatus published={doc.status === "published"} />}
+        compactActions
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={blocked}
+                aria-label={`Actions for document ${doc.title}`}
+              >
+                <MoreHorizontal size={18} aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={index === 0}
+                onSelect={() => reorder(docKey(doc.id), -1)}
+              >
+                Move up
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={index === count - 1}
+                onSelect={() => reorder(docKey(doc.id), 1)}
+              >
+                Move down
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openMove(docKey(doc.id))}>
+                Move to…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
     );
   }
-  function sectionBranch(section: DocSection, siblings: DocSection[]) {
+  function sectionBranch(section: DocSection, siblings: DocNavigationItem[]) {
     const key = sectionKey(section.id);
-    const index = siblings.findIndex((item) => item.id === section.id);
+    const index = siblings.findIndex((item) => navigationItemKey(item) === key);
     const children = sections.filter((item) => item.parentId === section.id);
     const count = uniqueDocs.filter((doc) => {
       const parent = sectionForDoc(doc, sections);
@@ -439,13 +467,13 @@ export function DocSectionsSettings({
     const inside = destination?.id === key && destination.side === "inside";
     return (
       <li
-        key={section.id}
+        key={sectionKey(section.id)}
+        data-navigation-item={key}
         className="list-none"
         data-sortable-preview
         data-drop={dropSide(key)}
         data-moved={drag.recentlyMoved === key}
         data-branch-dragging={drag.active === key}
-        onDragOver={(event) => over(event, key)}
         onDrop={drag.drop}
       >
         <ol className="doc-order-list">
@@ -462,6 +490,7 @@ export function DocSectionsSettings({
                 <Folder className="size-4" />
               )
             }
+            data-drop={dropSide(key)}
             data-selected={selection.selected.includes(key)}
             data-drop-inside={inside}
             className="data-[drop-inside=true]:bg-selected data-[drop-inside=true]:border-primary"
@@ -606,11 +635,25 @@ export function DocSectionsSettings({
               </>
             }
           />
-          {documentRows(section)}
-          {open && children.length > 0 && (
+          {open && (children.length > 0 || count > 0) && (
             <li className="list-none">
-              <ol className="doc-order-list ms-6 border-s border-border ps-3">
-                {children.map((child) => sectionBranch(child, children))}
+              <ol
+                className="doc-order-list ms-6 border-s border-border ps-3"
+                aria-label={`Items in ${sectionPath(section, sections)}`}
+              >
+                {orderedSectionItems(uniqueDocs, sections, section.id).map(
+                  (item, index, items) =>
+                    item.kind === "doc"
+                      ? documentRow(
+                          uniqueDocs.find((doc) => doc.id === item.id)!,
+                          index,
+                          items.length,
+                        )
+                      : sectionBranch(
+                          sections.find((child) => child.id === item.id)!,
+                          items,
+                        ),
+                )}
               </ol>
             </li>
           )}
@@ -643,7 +686,9 @@ export function DocSectionsSettings({
           noun="items"
           summaryControl={
             <Tooltip
-              content={allRootsExpanded ? "Collapse sections" : "Expand sections"}
+              content={
+                allRootsExpanded ? "Collapse sections" : "Expand sections"
+              }
             >
               <Button
                 type="button"
@@ -713,7 +758,11 @@ export function DocSectionsSettings({
                     </ul>
                   );
                 } catch (error) {
-                  return <Alert variant="destructive">{(error as Error).message}</Alert>;
+                  return (
+                    <Alert variant="destructive">
+                      {(error as Error).message}
+                    </Alert>
+                  );
                 }
               },
               apply: (values, keys = []) => {
@@ -743,10 +792,12 @@ export function DocSectionsSettings({
                   .sort(
                     (a, b) =>
                       Number(
-                        !!sections.find((section) => section.id === b)?.parentId,
+                        !!sections.find((section) => section.id === b)
+                          ?.parentId,
                       ) -
                       Number(
-                        !!sections.find((section) => section.id === a)?.parentId,
+                        !!sections.find((section) => section.id === a)
+                          ?.parentId,
                       ),
                   );
                 for (const id of ids) next = deleteDocSection(next, id, docs);
@@ -758,10 +809,17 @@ export function DocSectionsSettings({
       )}
       {sections.length ? (
         <ol className="doc-order-list mt-3">
-          {roots.map((root) => sectionBranch(root, roots))}
+          {roots.map((root) =>
+            sectionBranch(
+              root,
+              roots.map((root) => ({ kind: "section", id: root.id })),
+            ),
+          )}
         </ol>
       ) : (
-        <EmptyState>No sections yet. Create a section to get started.</EmptyState>
+        <EmptyState>
+          No sections yet. Create a section to get started.
+        </EmptyState>
       )}
       <Dialog
         open={!!creating}

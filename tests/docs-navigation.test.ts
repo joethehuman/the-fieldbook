@@ -9,6 +9,9 @@ import {
   moveDocSection,
   moveDocumentsInNavigation,
   orderedDocs,
+  orderedSectionItems,
+  navigationItemKey,
+  reorderSectionItem,
   orderedSectionDocs,
   renameDocSection,
   reorderDocSection,
@@ -17,8 +20,21 @@ import {
   sectionPath,
   validateDocSections,
   type DocLink,
+  type DocSection,
 } from "../lib/docs-navigation";
 import { defaultSettings, publicSettings } from "../lib/settings";
+
+const mixedFixture = () => {
+  const sections: DocSection[] = [
+    { id: "root", name: "Start", docOrder: ["first", "second"] },
+    { id: "recipes", name: "Recipes", parentId: "root" },
+    { id: "ai", name: "AI", parentId: "root" },
+    { id: "other", name: "Other" },
+  ];
+  const docs = [doc("first", "Start", "", "root"), doc("second", "Start", "", "root"),
+    doc("recipe", "Start", "Recipes", "recipes"), doc("ai-doc", "Start", "AI", "ai")];
+  return { sections, docs };
+};
 
 const doc = (
   id: string,
@@ -334,4 +350,62 @@ test("cross-section staging removes source order and inserts at a destination wi
   assert.deepEqual(nested.find((s) => s.id === "child")?.docOrder, ["first", "second"]);
   assert.throws(() => moveDocumentsInNavigation(sections, docs, ["first"], "missing"), /existing/);
   assert.throws(() => moveDocumentsInNavigation(sections, docs, ["missing"], "b"), /unavailable/);
+});
+
+test("mixed sibling ordering keeps reader traversal and legacy document/subsection orders consistent", () => {
+  const { sections, docs } = mixedFixture();
+  const before = structuredClone(docs);
+  assert.deepEqual(orderedSectionItems(docs, sections, "root").map(navigationItemKey), ["doc:first", "doc:second", "section:recipes", "section:ai"]);
+  let next = reorderSectionItem(sections, docs, "root", { kind: "section", id: "recipes" }, 0);
+  next = reorderSectionItem(next, docs, "root", { kind: "section", id: "ai" }, 2);
+  assert.deepEqual(orderedSectionItems(docs, next, "root").map(navigationItemKey), ["section:recipes", "doc:first", "section:ai", "doc:second"]);
+  assert.deepEqual(orderedDocs(docs, [], next).map((doc) => doc.id), ["recipe", "first", "ai-doc", "second"]);
+  assert.deepEqual(next[0].docOrder, ["first", "second"]);
+  assert.deepEqual(docs, before);
+  next = reorderSectionItem(next, docs, "root", { kind: "section", id: "ai" }, 0);
+  assert.deepEqual(next.filter((section) => section.parentId === "root").map((section) => section.id), ["ai", "recipes"]);
+  assert.strictEqual(next.find((section) => section.id === "other"), sections[3]);
+});
+
+test("mixed order filters unpublished/moved/missing references and appends newly published Docs", () => {
+  const { sections, docs } = mixedFixture();
+  sections.push({ id: "draft-only", name: "Hidden", parentId: "root" });
+  sections[0].itemOrder = [
+    { kind: "section", id: "recipes" }, { kind: "doc", id: "draft" }, { kind: "doc", id: "gone" },
+    { kind: "section", id: "draft-only" }, { kind: "doc", id: "first" }, { kind: "section", id: "other" },
+    { kind: "section", id: "ai" }, { kind: "doc", id: "recipe" }, { kind: "doc", id: "second" },
+  ];
+  docs.push(doc("draft", "Start", "", "root", "draft"), doc("hidden", "Start", "Hidden", "draft-only", "draft"), doc("new", "Start", "", "root"));
+  const visible = publicSettings({ ...defaultSettings, docSections: sections }, docs);
+  assert.deepEqual(visible.docSections![0].itemOrder!.map(navigationItemKey), ["section:recipes", "doc:first", "section:ai", "doc:second"]);
+  assert.deepEqual(orderedDocs(docs, [], visible.docSections).map((doc) => doc.id), ["recipe", "first", "ai-doc", "second", "new"]);
+});
+
+test("moving and removing items preserves mixed destination order and subsection contents", () => {
+  const { sections, docs } = mixedFixture();
+  let next = reorderSectionItem(sections, docs, "root", { kind: "section", id: "recipes" }, 0);
+  next[3] = { ...next[3], itemOrder: [] };
+  next = moveDocSection(next, "recipes", "other");
+  assert.deepEqual(next[0].itemOrder!.map(navigationItemKey), ["doc:first", "doc:second", "section:ai"]);
+  assert.deepEqual(next.find((section) => section.id === "other")!.itemOrder!.map(navigationItemKey), ["section:recipes"]);
+  next = moveDocumentsInNavigation(next, docs, ["first"], "other");
+  const placed = docs.map((doc) => doc.id === "first" ? { ...doc, sectionId: "other" } : doc);
+  assert.deepEqual(orderedSectionItems(placed, next, "other").map(navigationItemKey), ["section:recipes", "doc:first"]);
+  assert.equal(placed.find((doc) => doc.id === "recipe")!.sectionId, "recipes");
+  next = moveDocSection(next, "recipes");
+  assert.deepEqual(next.find((section) => section.id === "other")!.itemOrder!.map(navigationItemKey), ["doc:first"]);
+  next = deleteDocSection(next, "ai", placed.filter((doc) => doc.id !== "ai-doc"));
+  assert.deepEqual(next[0].itemOrder!.map(navigationItemKey), ["doc:second"]);
+});
+
+test("navigation identities are typed and malformed mixed orders are rejected", () => {
+  const { sections, docs } = mixedFixture();
+  docs.push(doc("recipes", "Start", "", "root"));
+  sections[0].itemOrder = [{ kind: "section", id: "recipes" }, { kind: "doc", id: "recipes" }];
+  validateDocSections(sections);
+  assert.deepEqual(orderedSectionItems(docs, sections, "root").slice(0, 2).map(navigationItemKey), ["section:recipes", "doc:recipes"]);
+  assert.throws(() => validateDocSections([{ ...sections[0], itemOrder: [{ kind: "doc", id: "first" }, { kind: "doc", id: "first" }] }]), /unique/);
+  assert.throws(() => validateDocSections([{ ...sections[0], itemOrder: [{ kind: "doc", id: "" }] }]), /unique/);
+  assert.strictEqual(reorderSectionItem(sections, docs, "root", { kind: "doc", id: "missing" }, 0), sections);
+  assert.strictEqual(reorderSectionItem(sections, docs, "root", { kind: "doc", id: "first" }, -1), sections);
 });

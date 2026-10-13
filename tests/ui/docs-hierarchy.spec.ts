@@ -135,11 +135,11 @@ test("section expansion reveals direct Docs and subsections together while child
 }, info) => {
   const before = await openOrderingFixture(page, false, true);
   const directDocs = page.getByRole("list", {
-    name: "Documents in Start",
+    name: "Items in Start",
     exact: true,
   });
   const childDocs = page.getByRole("list", {
-    name: "Documents in Start → Install",
+    name: "Items in Start → Install",
     exact: true,
   });
   const childRow = page.getByRole("button", {
@@ -179,7 +179,7 @@ test("section expansion reveals direct Docs and subsections together while child
   await expect(directDocs).toBeVisible();
   await expect(childRow).toBeVisible();
   await expect(
-    page.getByRole("list", { name: "Documents in Direct Docs", exact: true }),
+    page.getByRole("list", { name: "Items in Direct Docs", exact: true }),
   ).toContainText("Direct guide");
   await expect(
     page.getByRole("button", {
@@ -189,7 +189,7 @@ test("section expansion reveals direct Docs and subsections together while child
   ).toBeVisible();
   await expect(childDocs).toHaveCount(0);
   const nestedDocs = page.getByRole("list", {
-    name: "Documents in Subsections only → Nested",
+    name: "Items in Subsections only → Nested",
     exact: true,
   });
   await expect(nestedDocs).toHaveCount(0);
@@ -201,7 +201,7 @@ test("section expansion reveals direct Docs and subsections together while child
   const root = rows.filter({ has: page.getByRole("button", { name: "Actions for Start", exact: true }) });
   await expect(root.locator('[data-slot="reorder-icon"] .lucide-folder-open')).toHaveCount(1);
   await expect(directDocs.locator('[data-slot="reorder-icon"] .lucide-file-text')).toHaveCount(3);
-  await expect(directDocs.locator('[data-slot="badge"]')).toHaveText(["Published", "Published", "Draft"]);
+  await expect(directDocs.locator(':scope > [data-navigation-item^="doc:"] [data-slot="badge"]')).toHaveText(["Published", "Published", "Draft"]);
   const alignment = await rows.evaluateAll((elements) => elements.map((row) => {
     const checkbox = row.querySelector('[role="checkbox"]')!.getBoundingClientRect();
     const icon = row.querySelector('[data-slot="reorder-icon"] svg')!.getBoundingClientRect();
@@ -236,7 +236,7 @@ test("section expansion reveals direct Docs and subsections together while child
   await page
     .getByRole("button", { name: "Collapse sections", exact: true })
     .click();
-  await expect(page.getByRole("list", { name: /^Documents in / })).toHaveCount(
+  await expect(page.getByRole("list", { name: /^Items in / })).toHaveCount(
     0,
   );
   await expect(childRow).toHaveCount(0);
@@ -286,7 +286,7 @@ test("document move actions stage, discard and save the reader order without cha
   await toggle.click();
   await expect(page.getByRole("button", { name: "Collapse sections", exact: true })).toHaveAttribute("aria-expanded", "true");
   const documents = page.getByRole("list", {
-    name: "Documents in Start",
+    name: "Items in Start",
     exact: true,
   });
   await expect(
@@ -403,6 +403,8 @@ async function dragAfter(
   await page.mouse.move(row!.x + row!.width / 2, row!.y + row!.height * 0.8, {
     steps: 10,
   });
+  // Native dragover can lag behind the last mouse step when crossing rows.
+  await page.mouse.move(row!.x + row!.width / 2 + 1, row!.y + row!.height * 0.8);
   await expect(target).toHaveAttribute("data-drop", "after");
   await page.screenshot({ path: screenshot });
   // The destination caption can wrap and change row geometry during the drag.
@@ -412,6 +414,75 @@ async function dragAfter(
   await page.mouse.move(settled!.x + settled!.width / 2 + 1, settled!.y + settled!.height / 2 + 1);
   await page.mouse.up();
 }
+
+test("mixed siblings reorder with menus and keyboard, discard, save and reload without changing documents", async ({ page }, info) => {
+  const before = await openOrderingFixture(page);
+  await page.getByRole("button", { name: "Expand Start", exact: true }).click();
+  const items = page.getByRole("list", { name: "Items in Start", exact: true });
+  const order = () => items.locator(":scope > [data-navigation-item]").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-navigation-item")));
+  const initial = ["doc:first", "doc:second", "doc:draft", "section:install", "section:usage", "section:troubleshooting"];
+  expect(await order()).toEqual(initial);
+  for (let index = 0; index < 3; index++) {
+    await page.getByRole("button", { name: "Actions for Start → Install", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Move up", exact: true }).click();
+  }
+  expect((await order())[0]).toBe("section:install");
+  await page.getByRole("button", { name: "Actions for Start → Install", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Move up", exact: true })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  const first = page.getByRole("button", { name: /^Reorder document First guide;/ });
+  await first.press("ArrowDown");
+  await first.press("ArrowDown");
+  await first.press("ArrowDown");
+  const mixed = ["section:install", "doc:second", "doc:draft", "section:usage", "doc:first", "section:troubleshooting"];
+  expect(await order()).toEqual(mixed);
+  await page.getByRole("button", { name: "Discard changes", exact: true }).click();
+  expect(await order()).toEqual(initial);
+  const install = page.getByRole("button", { name: /^Reorder Start → Install;/ });
+  for (let index = 0; index < 3; index++) await install.press("ArrowUp");
+  for (let index = 0; index < 3; index++) await first.press("ArrowDown");
+  await page.getByRole("button", { name: "Save settings", exact: true }).click();
+  await expect(page.getByText("Settings saved.", { exact: true })).toBeVisible();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!));
+  expect(saved.content).toEqual(before.content);
+  expect(saved.settings.docSections[0].itemOrder.map((item: { kind: string; id: string }) => `${item.kind}:${item.id}`)).toEqual(mixed);
+  await page.reload();
+  await openSettings(page);
+  await page.getByRole("button", { name: "Expand Start", exact: true }).click();
+  expect(await order()).toEqual(mixed);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: info.outputPath("docs-mixed-order.png"), fullPage: true });
+});
+
+test("native drag interleaves subsections and direct Docs while the center still moves into a subsection", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "Native mouse drag; menu and keyboard checks cover every viewport.");
+  await openOrderingFixture(page);
+  await page.getByRole("button", { name: "Expand Start", exact: true }).click();
+  const items = page.getByRole("list", { name: "Items in Start", exact: true });
+  const firstRow = items.locator(':scope > [data-navigation-item="doc:first"]');
+  await dragAfter(page, page.getByRole("button", { name: /^Reorder Start → Install;/ }), firstRow, info.outputPath("mixed-subsection-drag.png"), true);
+  expect(await items.locator(":scope > [data-navigation-item]").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-navigation-item")))).toEqual(["doc:first", "section:install", "doc:second", "doc:draft", "section:usage", "section:troubleshooting"]);
+  const installRow = items.locator('[data-navigation-item="section:install"] > ol > [data-slot="reorder-row"]');
+  const source = page.getByRole("button", { name: /^Reorder document First guide;/ });
+  // Use native drag events at the bottom edge so it inserts beside the branch.
+  const transfer = await page.evaluateHandle(() => new DataTransfer());
+  await source.dispatchEvent("dragstart", { dataTransfer: transfer });
+  // Measure and dispatch in the same frame while the pending-save bar animates.
+  await installRow.evaluate((row, dataTransfer) => {
+    const box = row.getBoundingClientRect();
+    row.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer, clientY: box.bottom - 2 }));
+  }, transfer);
+  await expect(installRow).toHaveAttribute("data-drop", "after");
+  await installRow.dispatchEvent("drop", { dataTransfer: transfer });
+  expect(await items.locator(":scope > [data-navigation-item]").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-navigation-item")))).toEqual(["section:install", "doc:first", "doc:second", "doc:draft", "section:usage", "section:troubleshooting"]);
+  await dragInto(page, source, installRow, info.outputPath("mixed-doc-inside.png"));
+  await expect(firstRow).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Items in Start → Install", exact: true })).toContainText("First guide");
+  await page.getByRole("button", { name: "Save settings", exact: true }).click();
+  await expect(page.getByText("Settings saved.", { exact: true })).toBeVisible();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!));
+  expect(saved.content.find((doc: { id: string }) => doc.id === "first").sectionId).toBe("install");
+});
 
 test("subsection and document drags show their origin and insertion destination and retain branches", async ({
   page,
@@ -434,10 +505,10 @@ test("subsection and document drags show their origin and insertion destination 
     true,
   );
   const children = child("Usage").locator("xpath=..");
-  await expect(children.locator(":scope > li").nth(0)).toContainText("Usage");
-  await expect(children.locator(":scope > li").nth(1)).toContainText("Install");
+  await expect(children.locator(':scope > li[data-navigation-item^="section:"]').nth(0)).toContainText("Usage");
+  await expect(children.locator(':scope > li[data-navigation-item^="section:"]').nth(1)).toContainText("Install");
   const documents = page.getByRole("list", {
-    name: "Documents in Start",
+    name: "Items in Start",
     exact: true,
   });
   await dragAfter(
@@ -450,7 +521,7 @@ test("subsection and document drags show their origin and insertion destination 
     documents.locator('[data-slot="reorder-row"]').first(),
   ).toContainText("Second guide");
   const childDocuments = page.getByRole("list", {
-    name: "Documents in Start → Install",
+    name: "Items in Start → Install",
     exact: true,
   });
   await page
@@ -699,7 +770,7 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
     true,
   );
   await expect(
-    page.getByRole("list", { name: "Documents in Start → Usage", exact: true }),
+    page.getByRole("list", { name: "Items in Start → Usage", exact: true }),
   ).toContainText("First guide");
   expect(
     await page.evaluate(
@@ -769,7 +840,7 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
     .click();
   await expect(bar).toBeHidden();
   await expect(
-    page.getByRole("list", { name: "Documents in Start", exact: true }),
+    page.getByRole("list", { name: "Items in Start", exact: true }),
   ).toContainText("First guide");
   await page
     .getByRole("checkbox", { name: "Select document First guide", exact: true })
@@ -800,7 +871,7 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
   ).toBeVisible();
   await expect(
     page.getByRole("list", {
-      name: "Documents in Reference with a longer section name",
+      name: "Items in Reference with a longer section name",
       exact: true,
     }),
   ).toContainText("First guide");
@@ -838,7 +909,7 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
     .click();
   await expect(
     page.getByRole("list", {
-      name: "Documents in Reference with a longer section name",
+      name: "Items in Reference with a longer section name",
       exact: true,
     }),
   ).toContainText("First guide");
@@ -982,7 +1053,7 @@ test("native drag moves documents and subsection branches into another section, 
   );
   await expect(
     page.getByRole("list", {
-      name: "Documents in Reference with a longer section name",
+      name: "Items in Reference with a longer section name",
       exact: true,
     }),
   ).toContainText("First guide");
@@ -1002,13 +1073,13 @@ test("native drag moves documents and subsection branches into another section, 
     .click();
   await expect(
     page.getByRole("list", {
-      name: "Documents in Reference with a longer section name → Install",
+      name: "Items in Reference with a longer section name → Install",
       exact: true,
     }),
   ).toContainText("Install first");
   await expect(
     page.getByRole("list", {
-      name: "Documents in Reference with a longer section name → Install",
+      name: "Items in Reference with a longer section name → Install",
       exact: true,
     }),
   ).toContainText("Install second");
