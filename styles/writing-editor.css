@@ -556,6 +556,11 @@
 :is(.writing-media-block, .writing-code-block, .writing-table-block, [data-editor-block-type="image"]):is(:hover, :focus-within) > .writing-block-actions,
 .writing-block-actions:has([data-state="open"]) { opacity: 1; }
 .writing-code-block { position: relative; }
+@media (any-pointer: coarse) {
+  .writing-code-block .cm-editor {
+    font-size: max(16px, 1rem);
+  }
+}
 .writing-editor [data-editor-block-type="image"] { position: relative; padding: var(--space-2); border-radius: var(--radius); }
 .writing-editor .writing-content .writing-table-block { position: relative; padding: calc(var(--control-height) + var(--space-1)) var(--space-4) var(--space-4) calc(var(--control-height) + var(--space-1)); border-radius: 0; }
 .writing-table-edge-fade { position: absolute; pointer-events: none; }
@@ -654,6 +659,7 @@
 .editor .writing-document-heading + .mdxeditor-root-contenteditable .writing-content { padding-block-start: var(--space-3); }
 .editor .writing-source-panel .writing-document-heading { position: relative; }
 .editor .course-quiz-content { padding: var(--space-3) var(--editor-content-padding); }
+.course-quiz-focus-space { height: 0; pointer-events: none; overflow-anchor: none; }
 .editor .course-quiz-canvas > .writing-document-heading { top: var(--editor-navigation-height, 0px); }
 .editor[data-flowing-heading] .writing-document-heading { position: relative; top: auto; }
 .editor-frame-canvas[data-navigation-scrolled="true"] .course-quiz-canvas > .writing-document-heading::after { opacity: 1; }
