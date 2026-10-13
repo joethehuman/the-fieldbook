@@ -137,9 +137,9 @@ export function ProgressRing({
       ) : (
         <div
           aria-hidden="true"
-          className="grid place-content-center text-center"
+          className="grid place-content-center gap-1 text-center"
         >
-          <strong className="text-3xl leading-tight tabular-nums">
+          <strong className="text-3xl leading-none tabular-nums">
             {value === null ? (
               "—"
             ) : (
@@ -149,7 +149,7 @@ export function ProgressRing({
               </>
             )}
           </strong>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs leading-tight text-muted-foreground">
             {value === null ? "no assignments" : caption}
           </span>
         </div>

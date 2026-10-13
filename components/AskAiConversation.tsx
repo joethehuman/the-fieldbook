@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { AiCitation } from "@/lib/ai";
 import { aiBounds } from "@/lib/ai";
 import { messageText } from "@/lib/ai-chat";
@@ -17,10 +17,12 @@ export function AskAiConversation({
   id,
   draft,
   setDraft,
+  escapeHint,
 }: {
   id: string;
   draft: string;
   setDraft: (value: string) => void;
+  escapeHint?: ReactNode;
   chat: ReturnType<typeof useAskAi>;
   onSource: (source: AiCitation) => void;
 }) {
@@ -154,7 +156,7 @@ export function AskAiConversation({
           )}
         </div>
       </div>
-      <div className="grid shrink-0 gap-3 bg-card p-4">
+      <div className="ai-composer-panel grid shrink-0 gap-3 bg-card p-4">
         <MessageComposer
           id={`${id}-follow-up`}
           label={chat.messages.length ? "Ask a follow-up" : "Your question"}
@@ -166,9 +168,12 @@ export function AskAiConversation({
           maxLength={aiBounds.questionCharacters}
           placeholder="Ask Fieldbook a question…"
         />
-        <p className="text-xs text-muted-foreground">
-          AI can make mistakes. This chat clears on reload or sign-out.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <p className={escapeHint ? "shrink-0 whitespace-nowrap text-xs text-muted-foreground" : "text-xs text-muted-foreground"}>
+            AI can make mistakes. Chat clears on reload or sign out.
+          </p>
+          {escapeHint}
+        </div>
       </div>
     </section>
   );

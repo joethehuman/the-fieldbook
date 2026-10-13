@@ -151,6 +151,41 @@ async function choose(page: Page, value: string) {
   await page.getByRole("option", { name: value, exact: true }).click();
 }
 
+test.describe("current sort dismissal", () => {
+  test.use({ hasTouch: true });
+  test("learner and admin sorts close on the current value without changing the page", async ({
+    page,
+  }, info) => {
+    const installed = info.project.name.startsWith("production");
+    await setup(page, installed);
+    for (const [route, label] of [
+      [installed ? "/courses" : "/#courses", "Sort courses"],
+      [installed ? "/admin/content" : "/#admin/content", "Sort content"],
+    ]) {
+      await page.goto(route);
+      const trigger = page.getByRole("combobox", { name: label, exact: true });
+      await expect(trigger).toBeVisible();
+      const value = await trigger.textContent();
+      const url = page.url();
+      for (const input of ["mouse", "touch", "keyboard"]) {
+        if (input === "touch") await trigger.tap();
+        else await trigger.click();
+        const selected = page.locator(
+          '[data-slot="select-item"][data-state="checked"]',
+        );
+        if (input === "mouse") await selected.click();
+        else if (input === "touch") await selected.tap();
+        else await selected.press("Enter");
+        await expect(trigger).toHaveAttribute("aria-expanded", "false");
+        await expect(trigger).toHaveText(value!);
+        await expect(trigger).toBeFocused();
+        await expect(page).toHaveURL(url);
+      }
+    }
+    await page.screenshot({ path: info.outputPath("sort-reselected.png") });
+  });
+});
+
 test("homepage shows recently updated category courses then all published curricula", async ({
   page,
 }, info) => {

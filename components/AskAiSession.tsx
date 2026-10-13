@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, type Ref, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AiCitation } from "@/lib/ai";
 import { useAskAi } from "./use-ask-ai";
@@ -20,6 +20,7 @@ export type AskAiSessionProps = {
   draft: string;
   setDraft: (value: string) => void;
   onSource: (source: AiCitation) => void;
+  escapeHint?: ReactNode;
 };
 
 /** Activated once per workspace session, independently of the visible panel/tab. */

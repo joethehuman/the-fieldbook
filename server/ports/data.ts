@@ -110,6 +110,8 @@ export type DraftIndexRecord = Partial<
 > & {
   version?: number | string;
   duration?: number | string;
+  /** Actual published rule; null or missing retains the legacy passing default. */
+  publishedRequirePassing?: boolean | null;
 } & Pick<
     DocumentRecord,
     "id" | "revision" | "published_revision" | "updated_at"

@@ -17,7 +17,6 @@ export default function PrivacySettingsPanel({
   onChange,
   onPublish,
   busy,
-  sticky,
 }: {
   settings: SiteSettings;
   actions?: ReactNode;
@@ -25,7 +24,6 @@ export default function PrivacySettingsPanel({
   onChange: (s: SiteSettings) => void;
   onPublish: (s: SiteSettings) => Promise<void>;
   busy: boolean;
-  sticky: boolean;
 }) {
   const { confirm } = useInteractionDialog();
   const privacy = settings.privacy || defaultPrivacy;
@@ -153,7 +151,6 @@ export default function PrivacySettingsPanel({
       </SettingsSection>
       <SettingsPageActions
         guidance="Save settings to keep a draft; publish separately after review."
-        sticky={sticky}
         actions={actions}
         belowActions={belowActions}
         trailingAction={

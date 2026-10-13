@@ -82,6 +82,41 @@ async function open(
   }
 }
 
+test.describe("current code language dismissal", () => {
+  test.use({ hasTouch: true });
+  test("reselecting the code language closes the menu and preserves the document", async ({
+    page,
+  }, info) => {
+    const body = `Before the code.\n\n${fence(code)}\n\nAfter the code.`;
+    await open(page, info.project.name.startsWith("production"), "doc", body);
+    const trigger = page.getByRole("combobox", {
+      name: "Code language",
+      exact: true,
+    });
+    const original = (await downloadMarkdown(page)).body;
+    for (const input of ["mouse", "touch", "keyboard"]) {
+      if (input === "touch") await trigger.tap();
+      else await trigger.click();
+      const selected = page.getByRole("option", {
+        name: "Auto-detect",
+        exact: true,
+      });
+      if (input === "mouse") await selected.click();
+      else if (input === "touch") await selected.tap();
+      else await selected.press("Enter");
+      await expect(trigger).toHaveAttribute("aria-expanded", "false");
+      await expect(trigger).toBeFocused();
+      await expect(trigger).toHaveText("Auto-detect");
+    }
+    expect((await downloadMarkdown(page)).body).toBe(original);
+    const input = page.locator(".writing-code .cm-content");
+    await input.click();
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.type("\n# Still editable");
+    await expect(input).toContainText("# Still editable");
+  });
+});
+
 for (const kind of ["doc", "brief", "course"] as const) {
   test(`${kind}: auto detection, language override, copy and exact Markdown survive authoring`, async ({
     page,

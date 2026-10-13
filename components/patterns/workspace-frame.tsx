@@ -22,6 +22,7 @@ export function WorkspaceFrame({
   alert,
   overlays,
   admin = false,
+  learner = false,
   onDismiss,
   onClickCapture,
 }: {
@@ -35,6 +36,7 @@ export function WorkspaceFrame({
   alert?: ReactNode;
   overlays?: ReactNode;
   admin?: boolean;
+  learner?: boolean;
   onDismiss: () => void;
   onClickCapture?: MouseEventHandler<HTMLDivElement>;
 }) {
@@ -54,7 +56,7 @@ export function WorkspaceFrame({
     <EditorAppDockContext.Provider value={editorDock}>
     <div
       ref={app}
-      className={`app ${collapsed ? "sidebar-collapsed" : ""}`}
+      className={`app ${collapsed ? "sidebar-collapsed" : ""}${learner ? " learner-workspace" : ""}`}
       style={brandThemeStyle(accent)}
       onClickCapture={onClickCapture}
     >
@@ -70,19 +72,21 @@ export function WorkspaceFrame({
       </SkipLink>
       <aside
         id="main-sidebar"
-        className={`sidebar ${menu ? "open" : ""} ${pending ? "navigation-pending" : ""}`}
+        className={`sidebar workspace-chrome ${menu ? "open" : ""} ${pending ? "navigation-pending" : ""}`}
+        inert={compact && !menu}
       >
         {sidebar}
       </aside>
-      {menu && (
-        <Button
-          variant="ghost"
-          className="app-navigation-backdrop fixed inset-0 z-20 h-full w-full rounded-none bg-overlay p-0 hover:bg-overlay"
-          aria-label="Dismiss navigation"
-          tabIndex={-1}
-          onClick={onDismiss}
-        />
-      )}
+      <Button
+        variant="ghost"
+        className="app-navigation-backdrop fixed inset-0 z-20 h-full w-full rounded-none bg-overlay p-0 hover:bg-overlay active:bg-overlay"
+        data-state={menu && compact ? "open" : "closed"}
+        aria-label="Dismiss navigation"
+        aria-hidden={!menu || !compact}
+        inert={!menu || !compact}
+        tabIndex={-1}
+        onClick={onDismiss}
+      />
       <div className="main-shell">
         <AppBar pending={pending}>{header}<div className="app-editor-dock-cell" ref={setEditorDock} /><div className="app-editor-header" ref={setEditorHeader} /></AppBar>
         {alert}
