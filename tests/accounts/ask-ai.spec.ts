@@ -357,7 +357,7 @@ test("uncited replies finish quietly and clearing Search preserves its responsiv
   );
   const input = page.getByRole("textbox", { name: "Search all content" });
   const panel = page.locator('[data-slot="search-panel"]');
-  const emptyPanelCount = info.project.name === "phone" ? 1 : 0;
+  const emptyPanelCount = 1;
   await input.click();
   await input.press("Enter");
   await input.press("ArrowDown");

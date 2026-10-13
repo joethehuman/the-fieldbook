@@ -158,6 +158,11 @@ export function ReaderShell({
     return () => document.removeEventListener("keydown", escape);
   }, [menu]);
   const close = () => setMenu(false);
+  async function openSearchDestination(href: string) {
+    if (!(await canLeave()) || !(await beforeNavigation())) return false;
+    startNavigation(() => router.push(href));
+    return true;
+  }
   const links = [
     { href: "/updates", title: "Updates", icon: Newspaper },
     { href: "/courses", title: "Courses", icon: GraduationCap },
@@ -230,6 +235,7 @@ export function ReaderShell({
         menu={menu}
         pending={navigationPending && showNavigationProgress}
         admin={section === "admin"}
+        learner={["updates", "courses", "curricula", "docs"].includes(section)}
         alert={
           accountError && (
             <Alert variant="destructive" role="alert" onDismiss={() => setAccountError("")}>
@@ -300,6 +306,7 @@ export function ReaderShell({
                     href={href}
                     prefetch
                     aria-label={label}
+                    aria-current={section === href.slice(1) || (href === "/courses" && section === "curricula") ? "page" : undefined}
                     title={collapsed ? label : undefined}
                   >
                     <Icon size={19} />
@@ -417,14 +424,11 @@ export function ReaderShell({
               <Menu />
             </Button>
             <ReaderSearch
+              onRequestOpen={close}
               enabled={context.branding.askAiEnabled === true}
               userId={context.user?.id || null}
-              onOpen={async (result) => {
-                if (!(await canLeave())) return false;
-                beforeNavigation();
-                startNavigation(() => router.push(result.href));
-                return true;
-              }}
+              onOpen={(result) => openSearchDestination(result.href)}
+              onBrowse={openSearchDestination}
             />
           </>
         }

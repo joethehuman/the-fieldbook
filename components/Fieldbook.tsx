@@ -16,6 +16,7 @@ import { Course } from "./Course";
 import { guestRecommendations } from "@/lib/guest-recommendations";
 import { ReportAvailability } from "./patterns/csv-export";
 import { SearchExperience } from "./SearchExperience";
+import { searchSuggestions } from "@/lib/search-suggestions";
 import { InitialsAvatar } from "./ui/initials-avatar";
 import { BrandedAccount } from "./patterns/branded-account";
 import {
@@ -477,6 +478,7 @@ export default function Fieldbook() {
       menu={menu}
       pending={false}
       admin={view === "admin" && canPublish(user)}
+      learner={["briefs", "learn", "docs"].includes(view)}
       onDismiss={() => setMenu(false)}
       sidebar={
         <>
@@ -503,6 +505,7 @@ export default function Fieldbook() {
                 className={`${sidebarPrimaryLinkClassName} ${view === n.key ? "active" : ""}`}
                 key={n.key}
                 aria-label={n.title}
+                aria-current={view === n.key ? "page" : undefined}
                 title={collapsed ? n.title : undefined}
                 onClick={() => void navigate(n.key)}
               >
@@ -609,9 +612,19 @@ export default function Fieldbook() {
             <Menu />
           </Button>
           <SearchExperience
+            onRequestOpen={() => setMenu(false)}
             key={`${user.id}:${data.settings?.askAi?.enabled ?? true}`}
             id="global-search-results"
             content={data.publishedContent || data.content}
+            suggestions={searchSuggestions({
+              content: visible,
+              user,
+              groups: learningGroups,
+              teams: demoGuest ? [] : data.teams,
+              progress,
+              docCategoryOrder: data.settings?.docCategoryOrder,
+              docSections: data.settings?.docSections,
+            })}
             aiMode={data.settings?.askAi?.enabled === false ? "off" : "demo"}
             onOpen={async (r) => {
               return navigate(
@@ -621,6 +634,9 @@ export default function Fieldbook() {
                 r.lessonId || undefined,
               );
             }}
+            onBrowse={(href) => navigate(
+              href === "/docs" ? "docs" : href === "/courses" ? "learn" : "briefs",
+            )}
           />
         </>
       }

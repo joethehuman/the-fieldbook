@@ -326,7 +326,7 @@ export default function Learning({
   const outstandingCards = assignedCards.filter((item) => !completeCard(item));
   const progressCard = (
     <Card
-      className={`flex w-full flex-col items-center justify-center gap-4 text-center ${outstandingCards.length ? "" : "max-w-xs"} ${assigned.length ? "pt-8 sm:pt-10" : "border-dotted border-muted-foreground/50"}`}
+      className={`learning-progress-card flex w-full flex-col items-center justify-center gap-4 text-center ${outstandingCards.length ? "" : "max-w-xs"} ${assigned.length ? "pt-8 sm:pt-10" : "border-dotted border-muted-foreground/50"}`}
     >
       {assigned.length > 0 ? <ProgressRing value={pct} /> : null}
       <div className="grid gap-2">

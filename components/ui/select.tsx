@@ -6,7 +6,30 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // shadcn/ui composition, styled with Fieldbook's shared CSS tokens.
-export const Select = SelectPrimitive.Root;
+const SelectDismissContext = React.createContext<(() => void) | null>(null);
+export function Select({
+  open,
+  defaultOpen = false,
+  onOpenChange,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Root>) {
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
+  const currentOpen = open ?? internalOpen;
+  function changeOpen(next: boolean) {
+    if (next === currentOpen) return;
+    if (open === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  }
+  return (
+    <SelectDismissContext.Provider value={() => changeOpen(false)}>
+      <SelectPrimitive.Root
+        {...props}
+        open={currentOpen}
+        onOpenChange={changeOpen}
+      />
+    </SelectDismissContext.Provider>
+  );
+}
 export const SelectValue = SelectPrimitive.Value;
 export const SelectGroup = SelectPrimitive.Group;
 export function SelectLabel({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Label>) {
@@ -67,16 +90,83 @@ export function SelectContent({
 export function SelectItem({
   className,
   children,
+  disabled,
+  onClick,
+  onTouchStart,
+  onTouchMove,
+  onTouchCancel,
+  onTouchEnd,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Item>) {
+  const dismiss = React.useContext(SelectDismissContext);
+  const tap = React.useRef<{ id: number; x: number; y: number } | null>(null);
+  function dismissCurrent(event: React.SyntheticEvent<HTMLDivElement>) {
+    if (
+      disabled ||
+      event.defaultPrevented ||
+      !dismiss ||
+      event.currentTarget.dataset.state !== "checked"
+    )
+      return;
+    // Reselection is a dismissal, independent of Radix's last pointer type.
+    // Prevent its second selection handler and leave the value unchanged.
+    event.preventDefault();
+    dismiss();
+  }
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
+      disabled={disabled}
       className={cn(
         "relative flex min-h-9 cursor-default select-none items-center rounded-sm py-2 pr-8 pl-3 text-label [overflow-wrap:anywhere] outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground data-[state=checked]:font-medium",
         className,
       )}
       {...props}
+      onClick={(event) => {
+        onClick?.(event);
+        dismissCurrent(event);
+      }}
+      onTouchStart={(event) => {
+        onTouchStart?.(event);
+        const touch = event.touches[0];
+        tap.current =
+          !disabled && !event.defaultPrevented && event.touches.length === 1
+            ? { id: touch.identifier, x: touch.clientX, y: touch.clientY }
+            : null;
+      }}
+      onTouchMove={(event) => {
+        onTouchMove?.(event);
+        const touch = Array.from(event.touches).find(
+          (touch) => touch.identifier === tap.current?.id,
+        );
+        if (
+          !touch ||
+          !tap.current ||
+          Math.abs(touch.clientX - tap.current.x) > 10 ||
+          Math.abs(touch.clientY - tap.current.y) > 10
+        )
+          tap.current = null;
+      }}
+      onTouchCancel={(event) => {
+        tap.current = null;
+        onTouchCancel?.(event);
+      }}
+      onTouchEnd={(event) => {
+        onTouchEnd?.(event);
+        const start = tap.current;
+        tap.current = null;
+        const touch = Array.from(event.changedTouches).find(
+          (touch) => touch.identifier === start?.id,
+        );
+        if (
+          start &&
+          touch &&
+          Math.abs(touch.clientX - start.x) <= 10 &&
+          Math.abs(touch.clientY - start.y) <= 10
+        )
+          // touchend's preventDefault also suppresses clicks on content exposed below the closed menu.
+          dismissCurrent(event);
+      }}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator className="absolute right-2 flex size-4 items-center justify-center">
