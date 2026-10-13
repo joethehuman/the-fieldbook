@@ -1,5 +1,5 @@
 # Pins follow the backend compatibility table in docs/installation.md.
-FROM supabase/storage-api:v1.74.0@sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85
+FROM supabase/storage-api:v1.81.1@sha256:e049f1f602fede44ae88472ee64390d21556e8d6b26e865a4b2f6475289d1186
 COPY .do/with-database-ca.sh /fieldbook/with-database-ca.sh
 ENTRYPOINT ["/bin/sh", "/fieldbook/with-database-ca.sh"]
 CMD ["node", "dist/start/server.js"]

@@ -266,6 +266,7 @@ test("recipe preserves verified TLS, persistent signing keys and runtime-only se
   assert.equal(envs("storage").REQUEST_ALLOW_X_FORWARDED_PATH, "false");
   assert.equal(envs("storage").STORAGE_BACKEND, "s3");
   assert.equal(envs("storage").TUS_ALLOW_S3_TAGS, "false");
+  assert.equal(envs("storage").STORAGE_VERSIONING_ENABLED, "false");
   assert.equal(envs("storage").DB_ALLOW_MIGRATION_REFRESH, "false");
   assert.equal(envs("auth").GOTRUE_OAUTH_SERVER_ENABLED, "false");
   for (const component of [...spec.services, ...spec.jobs]) {
@@ -281,9 +282,15 @@ test("recipe preserves verified TLS, persistent signing keys and runtime-only se
   assert.equal(envs("fieldbook").JWT_KEYS, undefined);
   assert.equal(envs("fieldbook").DATABASE_URL, undefined);
   assert.match(read("Dockerfile.supabase-auth"), /gotrue:v2\.196\.0@sha256:/);
-  assert.match(read("Dockerfile.supabase-rest"), /postgrest:v14\.17@sha256:/);
+  assert.match(
+    read("Dockerfile.supabase-rest"),
+    /^FROM postgrest\/postgrest:v16\.4@sha256:d155c6718ed9a9f990d159a2ab7c0a3f16944dbb6d0a0344557421042acfe0df$/m,
+  );
   assert.equal(service("storage").dockerfile_path, "Dockerfile.supabase-storage");
-  assert.match(read("Dockerfile.supabase-storage"), /storage-api:v1\.74\.0@sha256:/);
+  assert.match(
+    read("Dockerfile.supabase-storage"),
+    /^FROM supabase\/storage-api:v1\.81\.1@sha256:e049f1f602fede44ae88472ee64390d21556e8d6b26e865a4b2f6475289d1186$/m,
+  );
   assert.doesNotMatch(
     read(".do/app.yaml"),
     /NODE_TLS_REJECT_UNAUTHORIZED|rejectUnauthorized: false|backend-gateway|kong/i,

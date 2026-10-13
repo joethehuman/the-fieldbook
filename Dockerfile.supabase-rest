@@ -2,7 +2,7 @@
 # materialize the database CA before exec-ing the upstream binary.
 FROM busybox:1.37.0-musl@sha256:5cec3fc171c87218698e85a52af7087de727372aae264a787b8112901a5b0092 AS shell
 RUN mkdir /fieldbook-tmp && touch /fieldbook-tmp/.keep && chmod 1777 /fieldbook-tmp
-FROM postgrest/postgrest:v14.17@sha256:c9dc201e555f5d8e37e7f39cdd4df0229774996e213bfd7de8d10ac609030f2c
+FROM postgrest/postgrest:v16.4@sha256:d155c6718ed9a9f990d159a2ab7c0a3f16944dbb6d0a0344557421042acfe0df
 COPY --from=shell /bin/busybox /fieldbook/busybox
 COPY --from=shell --chown=1000:1000 /fieldbook-tmp /tmp
 COPY .do/with-database-ca.sh /fieldbook/with-database-ca.sh

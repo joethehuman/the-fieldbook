@@ -205,6 +205,8 @@ services:
         value: "false"
       - key: DB_ALLOW_MIGRATION_REFRESH
         value: "false"
+      - key: STORAGE_VERSIONING_ENABLED
+        value: "false"
       - key: DATABASE_SEARCH_PATH
         value: storage,public,extensions
       - key: DATABASE_MAX_CONNECTIONS
