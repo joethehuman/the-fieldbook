@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, type RefObject } from "react";
 
-/** Bound the whole mobile document; only its canvas and popup scrollports scroll. */
+/** Place the whole touch editor in the visible viewport, including native panning. */
 export function useMobileEditorViewport(
   ref: RefObject<HTMLElement | null>,
 ) {
@@ -24,32 +24,32 @@ export function useMobileEditorViewport(
       if (bodyPosition) body.style.setProperty("position", bodyPosition, bodyPositionPriority);
       else body.style.removeProperty("position");
     };
-    const restoreRoot = () => {
-      if (!touch.matches || viewport && viewport.scale !== 1) return;
-      // Overflow on html is propagated to the viewport as hidden, even when
-      // declared clip. Native focus and ancestor reveals can still scroll it.
-      // Never restore a canvas, textarea, code or popup scroll position here.
-      if (window.scrollX || window.scrollY || documentRoot.scrollTop || document.body.scrollTop
-        || viewport?.offsetTop || viewport?.offsetLeft)
-        window.scrollTo({ left: 0, top: 0, behavior: "instant" });
-    };
+    const properties = ["height", "width", "top", "left", "bottom"] as const;
     const measure = () => {
+      cancelAnimationFrame(request);
       request = 0;
       if (!touch.matches) return;
       // Pinch zoom changes the visible rectangle, not the document's layout.
       // Retain the last unzoomed height until the browser returns to scale 1.
       if (viewport && viewport.scale !== 1) return;
       const height = viewport?.height || document.documentElement.clientHeight || window.innerHeight;
-      if (!Number.isFinite(height) || height <= 0) return;
-      const value = `${height}px`;
-      if (documentRoot.style.getPropertyValue("--editor-viewport-height") !== value)
-        documentRoot.style.setProperty("--editor-viewport-height", value);
-      restoreRoot();
+      const width = viewport?.width || documentRoot.clientWidth || window.innerWidth;
+      const top = viewport?.offsetTop || 0;
+      const left = viewport?.offsetLeft || 0;
+      if (![height, width, top, left].every(Number.isFinite) || height <= 0 || width <= 0) return;
+      // Fixed positioning uses layout-viewport coordinates. Native input reveal
+      // can pan the visual viewport with zero DOM scroll and ignore scrollTo.
+      // Move the entire application boundary, never its header or caret alone.
+      const rectangle = { height, width, top, left, bottom: Math.max(0, window.innerHeight - top - height) };
+      for (const property of properties) {
+        const name = `--editor-viewport-${property}`;
+        const value = `${rectangle[property]}px`;
+        if (documentRoot.style.getPropertyValue(name) !== value) documentRoot.style.setProperty(name, value);
+      }
     };
     const schedule = () => {
       if (touch.matches && !request) request = requestAnimationFrame(measure);
     };
-    const viewportChanged = () => { restoreRoot(); schedule(); };
     const visible = () => { if (document.visibilityState === "visible") schedule(); };
     const updateTouch = () => {
       app.toggleAttribute("data-mobile-editor-boundary", touch.matches);
@@ -63,17 +63,19 @@ export function useMobileEditorViewport(
       else {
         cancelAnimationFrame(request);
         request = 0;
-        documentRoot.style.removeProperty("--editor-viewport-height");
+        for (const property of properties) documentRoot.style.removeProperty(`--editor-viewport-${property}`);
         releaseBody();
       }
     };
     updateTouch();
     touch.addEventListener("change", updateTouch);
-    viewport?.addEventListener("resize", schedule);
-    viewport?.addEventListener("scroll", viewportChanged);
-    viewport?.addEventListener("scrollend", viewportChanged);
+    // Apply the reported rectangle in this event, without another frame of
+    // origin lag. Focus/page events coalesce their later geometry read below.
+    viewport?.addEventListener("resize", measure);
+    viewport?.addEventListener("scroll", measure);
+    viewport?.addEventListener("scrollend", measure);
     window.addEventListener("resize", schedule);
-    window.addEventListener("scroll", viewportChanged, { passive: true });
+    window.addEventListener("scroll", measure, { passive: true });
     document.addEventListener("focusin", schedule);
     document.addEventListener("focusout", schedule);
     document.addEventListener("visibilitychange", visible);
@@ -81,17 +83,17 @@ export function useMobileEditorViewport(
     return () => {
       cancelAnimationFrame(request);
       touch.removeEventListener("change", updateTouch);
-      viewport?.removeEventListener("resize", schedule);
-      viewport?.removeEventListener("scroll", viewportChanged);
-      viewport?.removeEventListener("scrollend", viewportChanged);
+      viewport?.removeEventListener("resize", measure);
+      viewport?.removeEventListener("scroll", measure);
+      viewport?.removeEventListener("scrollend", measure);
       window.removeEventListener("resize", schedule);
-      window.removeEventListener("scroll", viewportChanged);
+      window.removeEventListener("scroll", measure);
       document.removeEventListener("focusin", schedule);
       document.removeEventListener("focusout", schedule);
       document.removeEventListener("visibilitychange", visible);
       window.removeEventListener("pageshow", schedule);
       app.removeAttribute("data-mobile-editor-boundary");
-      documentRoot.style.removeProperty("--editor-viewport-height");
+      for (const property of properties) documentRoot.style.removeProperty(`--editor-viewport-${property}`);
       releaseBody();
     };
   }, [ref]);

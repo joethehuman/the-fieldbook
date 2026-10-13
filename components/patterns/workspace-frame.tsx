@@ -79,7 +79,7 @@ export function WorkspaceFrame({
       {menu && (
         <Button
           variant="ghost"
-          className="app-navigation-backdrop fixed inset-0 z-20 h-[var(--editor-viewport-height,100%)] w-full rounded-none bg-overlay p-0 hover:bg-overlay"
+          className="app-navigation-backdrop absolute inset-0 z-20 h-full w-full rounded-none bg-overlay p-0 hover:bg-overlay"
           aria-label="Dismiss navigation"
           tabIndex={-1}
           onClick={onDismiss}

@@ -445,12 +445,21 @@
     inset: 0;
     width: 100%;
     --dialog-viewport-height: var(--editor-viewport-height, 100dvh);
-    --dialog-viewport-center: calc(var(--editor-viewport-height, 100dvh) / 2);
+    --dialog-viewport-top: var(--editor-viewport-top, 0px);
+    --dialog-viewport-left: var(--editor-viewport-left, 0px);
+    --dialog-viewport-width: var(--editor-viewport-width, 100vw);
+    --dialog-viewport-bottom: var(--editor-viewport-bottom, 0px);
+    --dialog-viewport-center: calc(var(--editor-viewport-top, 0px) + var(--editor-viewport-height, 100dvh) / 2);
+    --dialog-viewport-center-x: calc(var(--editor-viewport-left, 0px) + var(--editor-viewport-width, 100vw) / 2);
   }
-  .app[data-mobile-editor-boundary] { height: var(--editor-viewport-height, 100dvh); }
-  .app[data-mobile-editor-boundary] .sidebar {
+  .app[data-mobile-editor-boundary] {
+    inset: var(--editor-viewport-top, 0px) auto auto var(--editor-viewport-left, 0px);
+    width: var(--editor-viewport-width, 100vw);
     height: var(--editor-viewport-height, 100dvh);
-    bottom: auto;
+  }
+  .app[data-mobile-editor-boundary] .sidebar {
+    position: absolute;
+    height: 100%;
   }
   .app[data-mobile-editor-boundary] .editor-frame-panel {
     max-height: max(0px, calc(var(--editor-viewport-height, 100dvh) - var(--app-bar-height, var(--app-header-min-height)) - var(--space-8)));

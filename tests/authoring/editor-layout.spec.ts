@@ -85,7 +85,9 @@ async function open(
     await expect(page.locator(".writing-source")).toBeVisible();
     await expect(page.locator(".writing-source")).toHaveValue(/Paragraph 1\./);
   } else {
-    await expect(page.locator('.writing-content[contenteditable="true"]')).toContainText("Paragraph 1.");
+    const writing = page.locator('.writing-content[contenteditable="true"]');
+    if ((kind === "course" ? item.lessons[0].body : item.body).trim()) await expect(writing).toContainText("Paragraph 1.");
+    else await expect(writing).toHaveText("");
     await expect(page.locator('.writing-content[contenteditable="true"]')).toBeInViewport();
   }
   await expect(page.locator(".app")).toHaveClass(/sidebar-collapsed/);
@@ -2734,7 +2736,7 @@ test.describe("short mobile authoring with a rendered viewport", () => {
   });
 });
 
-type CommandViewport = { height: number; offsetTop: number; clientHeight: number };
+type CommandViewport = { height: number; offsetTop: number; clientHeight: number; offsetLeft?: number; width?: number; scale?: number };
 type CommandLifecycle = {
   viewport: CommandViewport;
   phase: number;
@@ -2754,6 +2756,9 @@ async function installCommandViewport(page: Page, viewport: CommandViewport) {
     const fixture: CommandLifecycle = { viewport, phase: 0, closingTimer: 0, recordRequest: 0, proseFocusCount: 0, visibleFrames: [] };
     (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle = fixture;
     for (const key of ["height", "offsetTop"] as const) Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => fixture.viewport[key] });
+    const width = window.visualViewport!.width;
+    for (const [key, fallback] of [["width", width], ["offsetLeft", 0], ["scale", 1]] as const)
+      Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => fixture.viewport[key] ?? fallback });
     Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, get: () => fixture.viewport.clientHeight });
     Object.defineProperty(window, "innerHeight", { configurable: true, get: () => fixture.viewport.clientHeight });
     window.visualViewport!.dispatchEvent(new Event("resize"));
@@ -2931,7 +2936,7 @@ async function expectFloatingSurfaceClearDock(page: Page, surface: ReturnType<Pa
   } else expect(box.y + box.height).toBeLessThanOrEqual(lane.y - 7);
 }
 
-test("mobile focus and viewport-origin reports keep one stationary header and scroll owner", async ({ page }, info) => {
+test("mobile visual panning keeps the whole editor at the visible origin with one canvas owner", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, info.project.name.startsWith("production"), "course");
   const writer = page.getByRole("textbox", { name: "Lesson content", exact: true });
@@ -2954,7 +2959,9 @@ test("mobile focus and viewport-origin reports keep one stationary header and sc
       window.dispatchEvent(new Event("scroll"));
       await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
     }, offsetTop);
-    expect((await header.boundingBox())!).toEqual(before);
+    // Synthetic viewport getters do not pan the browser compositor. In these
+    // layout coordinates the entire app must follow the modeled visible origin.
+    expect((await header.boundingBox())!).toEqual({ ...before, y: offsetTop });
     await expectHeaderDock(page);
     await expect(editor).toHaveAttribute("data-scroll-layout", "page");
     const geometry = await shell.evaluate(shell => {
@@ -3067,9 +3074,10 @@ for (const short of [true, false]) {
   });
 }
 
-test("outer viewport recovery preserves manual canvas scroll and native selection and leaves pinch zoom alone", async ({ page }, info) => {
+test("native visual pan that ignores root resets preserves canvas scroll and selection and leaves pinch zoom alone", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, info.project.name.startsWith("production"), "doc");
+  await installCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 844 });
   const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
   await writer.locator("p").nth(20).tap();
   await page.locator(".main-content").evaluate(owner => { owner.scrollTop = 400; });
@@ -3077,61 +3085,103 @@ test("outer viewport recovery preserves manual canvas scroll and native selectio
     const native = window.getSelection()!;
     return { text: native.focusNode!.textContent, offset: native.focusOffset, scroll: document.querySelector(".main-content")!.scrollTop };
   });
-  // Model separate layout/visual origins and a browser that accepts the
-  // coordinated reset. This is a boundary contract, not an iOS keyboard test.
+  // Safari's native visual pan can persist with zero DOM scroll and ignore
+  // window.scrollTo. Getters model that contract, not the UIKit compositor.
   await page.evaluate(() => {
-    const state = { x: 0, y: 0, top: 0, left: 0, scale: 1, calls: 0 };
-    (window as unknown as { outerViewport: typeof state }).outerViewport = state;
-    for (const [key, field] of [["scrollX", "x"], ["scrollY", "y"]] as const)
-      Object.defineProperty(window, key, { configurable: true, get: () => state[field] });
-    for (const [key, field] of [["offsetTop", "top"], ["offsetLeft", "left"], ["scale", "scale"]] as const)
-      Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => state[field] });
-    const nativeScroll = window.scrollTo.bind(window);
-    window.scrollTo = (() => {
-      state.calls++;
-      state.x = state.y = state.top = state.left = 0;
-      nativeScroll({ top: 0, left: 0, behavior: "instant" });
-    }) as typeof window.scrollTo;
+    window.scrollTo = (() => {}) as typeof window.scrollTo;
   });
-  for (const displacement of [{ x: 0, y: 120, top: 0, left: 0 }, { x: 0, y: 0, top: 120, left: 12 }]) {
-    await page.evaluate(displacement => {
-      Object.assign((window as unknown as { outerViewport: typeof displacement }).outerViewport, displacement);
-      window.dispatchEvent(new Event("scroll"));
+  for (const offsetTop of [84, 160, 35, 0]) {
+    await page.evaluate(offsetTop => {
+      (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport.offsetTop = offsetTop;
       window.visualViewport!.dispatchEvent(new Event("scroll"));
-    }, displacement);
-    expect(await page.evaluate(() => {
-      const state = (window as unknown as { outerViewport: { x: number; y: number; top: number; left: number } }).outerViewport;
-      return [state.x, state.y, state.top, state.left];
-    })).toEqual([0, 0, 0, 0]);
+    }, offsetTop);
+    expect((await page.locator(".topbar").boundingBox())!.y).toBe(offsetTop);
+    expect((await page.locator(".app").boundingBox())!.y + (await page.locator(".app").boundingBox())!.height).toBe(offsetTop + 490);
+    expect(await page.evaluate(() => [window.scrollY, document.documentElement.scrollTop, document.body.scrollTop])).toEqual([0, 0, 0]);
     expect(await writer.evaluate(() => {
       const native = window.getSelection()!;
       return { text: native.focusNode!.textContent, offset: native.focusOffset, scroll: document.querySelector(".main-content")!.scrollTop };
     })).toEqual(before);
   }
-  const calls = await page.evaluate(() => (window as unknown as { outerViewport: { calls: number } }).outerViewport.calls);
   await page.evaluate(() => {
-    const state = (window as unknown as { outerViewport: { scale: number; top: number } }).outerViewport;
-    state.scale = 2; state.top = 120;
+    Object.assign((window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport, { scale: 2, offsetTop: 120, height: 245 });
     window.visualViewport!.dispatchEvent(new Event("scroll"));
     window.visualViewport!.dispatchEvent(new Event("resize"));
   });
-  await page.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
-  expect(await page.evaluate(() => (window as unknown as { outerViewport: { calls: number } }).outerViewport.calls)).toBe(calls);
+  expect((await page.locator(".app").boundingBox())!.y).toBe(0);
+  expect((await page.locator(".app").boundingBox())!.height).toBe(490);
   await page.evaluate(() => {
-    (window as unknown as { outerViewport: { scale: number } }).outerViewport.scale = 1;
+    Object.assign((window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport, { scale: 1, height: 490 });
     window.dispatchEvent(new Event("pageshow"));
   });
-  await expect.poll(() => page.evaluate(() => (window as unknown as { outerViewport: { top: number } }).outerViewport.top)).toBe(0);
+  await expect.poll(async () => (await page.locator(".topbar").boundingBox())!.y).toBe(120);
 });
+
+for (const field of ["doc title", "course title", "lesson title"] as const) {
+  test(`Return from ${field} keeps the dock in the visible viewport when native selection pans it`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const course = field !== "doc title";
+    await open(page, info.project.name.startsWith("production"), course ? "course" : "doc", 1, item => {
+      item.body = "";
+      if (course) { item.lessons = item.lessons.slice(0, 1); item.lessons[0].body = ""; }
+    });
+    await installCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 844 });
+    const title = page.getByRole("textbox", { name: field === "lesson title" ? "Lesson title" : "Title", exact: true });
+    const writer = page.getByRole("textbox", { name: course ? "Lesson content" : "Doc content", exact: true });
+    const originalTitle = await title.inputValue();
+    await page.evaluate(() => {
+      window.scrollTo = (() => {}) as typeof window.scrollTo;
+      document.addEventListener("focusin", event => {
+        if (!(event.target instanceof HTMLElement) || !event.target.matches('.writing-content[contenteditable="true"]')) return;
+        const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+        fixture.viewport.offsetTop = 84;
+        window.visualViewport!.dispatchEvent(new Event("scroll"));
+      }, true);
+    });
+    await title.tap();
+    await title.press("Enter");
+    await expect(writer).toBeFocused();
+    expect((await page.locator(".topbar").boundingBox())!.y).toBe(84);
+    await expectHeaderDock(page);
+    await expect(title).toHaveValue(originalTitle);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await writer.pressSequentially("Keep writing");
+    await writer.press("Enter");
+    await writer.pressSequentially("A second line");
+    await expect(writer).toContainText("Keep writing");
+    await expect(writer).toContainText("A second line");
+    expect((await page.locator(".topbar").boundingBox())!.y).toBe(84);
+    await expectHeaderDock(page);
+  });
+}
 
 test("touch editor navigation and body-portaled dialogs share visible bounds and release them on exit", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, info.project.name.startsWith("production"), "doc");
-  await installCommandViewport(page, { height: 390, offsetTop: 0, clientHeight: 844 });
+  await installCommandViewport(page, { height: 390, offsetTop: 84, offsetLeft: 12, width: 366, clientHeight: 844 });
   await expect.poll(() => page.locator(".app").evaluate(app => app.getBoundingClientRect().height)).toBe(390);
+  await page.getByRole("textbox", { name: "Doc content", exact: true }).locator("p").first().tap();
+  await page.getByRole("button", { name: /^Commands:/ }).tap();
+  const commands = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(commands).toBeVisible();
+  const palette = (await commands.boundingBox())!;
+  const header = (await page.locator(".topbar").boundingBox())!;
+  expect(palette.y).toBe(header.y + header.height + 8);
+  expect(palette.y + palette.height).toBeLessThanOrEqual(84 + 390 - 8);
+  await commands.getByRole("menuitem", { name: "Close menu esc", exact: true }).tap();
+  await page.getByRole("button", { name: "Open search", exact: true }).tap();
+  await expect(page.getByRole("textbox", { name: "Search all content", exact: true })).toBeVisible();
+  expect((await page.locator('[data-slot="search-panel"]').boundingBox())!.y).toBeGreaterThanOrEqual(84);
+  expect((await page.locator(".topbar").boundingBox())!.y).toBe(84);
+  await page.getByRole("button", { name: "Close search", exact: true }).tap();
   await page.getByRole("button", { name: "Open navigation", exact: true }).tap();
   const sidebar = page.locator(".sidebar.open");
+  await expect.poll(async () => (await sidebar.boundingBox())!.x).toBeCloseTo(12, 0);
   expect((await sidebar.boundingBox())!.height).toBe(390);
+  expect((await sidebar.boundingBox())!.y).toBe(84);
+  expect((await sidebar.boundingBox())!.x).toBe(12);
+  const backdrop = (await page.getByRole("button", { name: "Dismiss navigation", exact: true }).boundingBox())!;
+  expect(backdrop).toEqual({ x: 12, y: 84, width: 366, height: 390 });
   await page.getByRole("button", { name: "Close navigation", exact: true }).tap();
   await page.getByRole("button", { name: "Details", exact: true }).tap();
   await page.getByRole("button", { name: "Delete Doc", exact: true }).tap();
@@ -3139,17 +3189,31 @@ test("touch editor navigation and body-portaled dialogs share visible bounds and
   await expect(dialog).toBeVisible();
   await expect(page.locator("body")).toHaveCSS("position", "fixed");
   const bounds = (await dialog.boundingBox())!;
-  expect(bounds.y).toBeGreaterThanOrEqual(15);
-  expect(bounds.y + bounds.height).toBeLessThanOrEqual(375);
-  expect((await page.locator('[data-slot="dialog-overlay"]').boundingBox())!.height).toBe(390);
+  expect(bounds.y).toBeGreaterThanOrEqual(84 + 15);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(84 + 375);
+  expect(bounds.x).toBeGreaterThanOrEqual(12 + 15);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(12 + 366 - 15);
+  expect((await page.locator('[data-slot="dialog-overlay"]').boundingBox())!).toEqual({ x: 12, y: 84, width: 366, height: 390 });
   await dialog.getByRole("button", { name: "Cancel", exact: true }).tap();
   await expect(page.getByRole("button", { name: "Delete Doc", exact: true })).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole("button", { name: "Delete Doc", exact: true })).toBeEnabled();
-  expect((await page.locator(".topbar").boundingBox())!.y).toBe(0);
-  await returnToContent(page);
+  expect((await page.locator(".topbar").boundingBox())!.y).toBe(84);
+  // Getter mocks do not reproduce the native camera or pointer routing used by
+  // Floating UI. Restore native geometry before its account menu exit gesture;
+  // the application's palettes, navigation and dialog bounds above use the pan.
+  await page.evaluate(() => {
+    Object.assign((window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport,
+      { height: 844, offsetTop: 0, offsetLeft: 0, width: 390 });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await page.getByRole("button", { name: "Open navigation", exact: true }).tap();
+  const account = page.getByRole("button", { name: "Account menu", exact: true });
+  await account.tap();
+  await expect(page.locator('[aria-label="Account menu"]')).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("menuitem", { name: /^Manage (content|organization)$/ }).tap();
   await expect(page.locator(".editor")).toHaveCount(0);
   await expect(page.locator("body")).toHaveCSS("position", "static");
-  expect(await page.locator("html").evaluate(html => (html as HTMLElement).style.getPropertyValue("--editor-viewport-height"))).toBe("");
+  expect(await page.locator("html").evaluate(html => ["height", "width", "top", "left", "bottom"].map(property => (html as HTMLElement).style.getPropertyValue(`--editor-viewport-${property}`)))).toEqual(["", "", "", "", ""]);
   await expect(page.locator(".app")).not.toHaveAttribute("data-mobile-editor-boundary", "");
   await page.getByRole("button", { name: "Actions for A clear place to write", exact: true }).tap();
   await page.getByRole("menuitem", { name: "Delete", exact: true }).tap();
