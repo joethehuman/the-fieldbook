@@ -104,13 +104,15 @@ Use this combination rather than independently choosing backend versions. The ba
 | Component | Selected version | Verification scope |
 | --- | --- | --- |
 | Fieldbook runtime | Node 22.23.3, pnpm 10.17.1; locked Next.js 16.3.8 | Local builds/regressions; App Platform publication, reading, saved progress and scheduled content cleanup |
-| Supabase Auth | `supabase/gotrue:v2.196.0` | Fresh vendor initialization; real Google sign-in/preregistration, inactive-account denial; MCP PKCE/consent/refresh/current-role enforcement |
+| Supabase Auth | `supabase/gotrue:v2.196.0` | Fresh vendor initialization; real Google sign-in/preregistration, inactive/deleted-account denial and permanent deletion; human refresh; MCP PKCE/consent/refresh/current-role enforcement and SDK client |
 | PostgREST | `postgrest/postgrest:v14.17` | Verified database TLS; hosted application permissions, publication and persistent learning records |
 | Supabase Storage | `supabase/storage-api:v1.74.0` | Fresh vendor migrations through 69; wrong CA/hostname rejected; ordinary and >6 MiB resumable Spaces transfers; unsigned private bytes denied |
 | Managed database | PostgreSQL 17.11 tested; provider-maintained minor version | Fresh preparation, vendor initialization and Fieldbook baseline; existing-data update dry run/apply preserved records, ledger and cleanup with no pending migrations |
 | Optional inference | DO custom router with `openai-gpt-oss-20b` and `openai-gpt-oss-120b` | Real forced-tool and streaming checks; primary and unmatched-task fallback selection observed. Failure-driven failover remains unverified. Provider service is public preview. |
 
 The table records checks actually performed, not a general compatibility guarantee. Complete the remaining acceptance checks below before changing this candidate's support status. Protocol-level MCP checks do not establish acceptance in every consumer client. The existing-data update check had no pending SQL; pending-migration transaction/ledger behavior is covered by a disposable local harness, not a hosted schema update. Vercel with hosted Supabase remains the supported recipe. Arbitrary backend combinations, PostgreSQL major versions, automatic router pools and horizontally scaled Fieldbook instances are outside this baseline.
+
+Application redeployment and a full service restart preserved accounts, published content, saved progress, private files and MCP refresh. A partial 7 MiB upload recovered its saved 6 MiB offset after service replacement; its expired signature required reauthorization before completion. This establishes backend upload-state durability, not automatic browser recovery after authorization expires. Restoring a backup and changing upstream backend component versions with existing data have not been exercised on this baseline.
 
 ### Prepare durable resources and keys
 
