@@ -6,13 +6,13 @@ import { writingTableControlsPlugin } from "./writing-table-controls";
 import { $createWritingVideoNode, writingVideoPlugin } from "./writing-video";
 import { WritingMediaLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
 import { useScrollFade } from "./use-scroll-fade";
-import { mobileEditorLayout } from "./mobile-editor-layout";
+import { EditorAppOverlayContext } from "./editor-app-header";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
 import { $applyWritingBlockStyle, $isMediaParagraph, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu, type SelectionMenuController } from "./writing-selection-menu";
 import { normalizeWritingSelection, writingSelectionBoundariesPlugin } from "./writing-selection-boundaries";
-import { writingMobileScrollPolicyPlugin } from "./writing-mobile-scroll-policy";
+import { writingMobileCanvasPlugin } from "./writing-mobile-canvas";
 import { EditorCompactControlsContext, EditorWritingActionsContext } from "./editor-frame";
 import { useWritingControlsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { blurWritingInput } from "./writing-cursor";
@@ -126,7 +126,7 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
   }, [lexical]);
   function enterBody() {
     const surface = lexical?.getRootElement();
-    const mobile = surface?.closest<HTMLElement>(".writing-root[data-mobile-caret-owner]");
+    const mobile = surface?.closest<HTMLElement>(".writing-root[data-mobile-canvas]");
     lexical?.update(() => {
       const root = $getRoot();
       const first = root.getFirstChild();
@@ -420,6 +420,7 @@ export default function WritingEditorEngine({
   const file = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const compactControls = useContext(EditorCompactControlsContext);
+  const overlayHost = useContext(EditorAppOverlayContext);
   const compactRef = useRef(compactControls);
   compactRef.current = compactControls;
   const wasCompact = useRef(!!compactControls);
@@ -427,11 +428,6 @@ export default function WritingEditorEngine({
   const mediaMenu = useRef<HTMLDivElement>(null);
   const ownsMenuFocus = useCallback(() => !!(slashMenu.current?.contains(document.activeElement)
     || mediaMenu.current?.contains(document.activeElement)), []);
-  const paletteSession = useRef<{
-    menu: HTMLDivElement;
-    ready: boolean;
-    cancel?: () => void;
-  } | null>(null);
   const lexicalEditor = useRef<LexicalEditor | null>(null);
   const tableEditor = useRef<LexicalEditor | null>(null);
   const writingActions = useRef<WritingActions | null>(null);
@@ -551,11 +547,18 @@ export default function WritingEditorEngine({
     if (slashOpen && !slashFromToolbar) {
       line.dataset.slashQuery = slashQuery || "Type to search";
       line.classList.add("writing-command-line");
+      const surface = lexicalEditor.current?.getRootElement();
+      const selection = window.getSelection();
+      // The query is virtual input: no native document edit reveals its caret.
+      // Reuse the bounded return transaction only while this query owns it.
+      if (canvas && compactControls && surface && document.activeElement === surface
+        && surface.contains(line) && selection?.isCollapsed && line.contains(selection.focusNode))
+        root.current?.dispatchEvent(new Event("fieldbook:writing-resume", { bubbles: true }));
     } else {
       line.classList.remove("writing-command-line");
       delete line.dataset.slashQuery;
     }
-  }, [slashOpen, slashQuery, slashFromToolbar]);
+  }, [canvas, !!compactControls, slashOpen, slashQuery, slashFromToolbar]);
   useEffect(() => {
     if (current.current !== value) {
       current.current = value;
@@ -578,88 +581,16 @@ export default function WritingEditorEngine({
     }
   }, [value]);
   useLayoutEffect(() => {
-    if (!canvas || !compactControls || !(slashOpen || mediaChooser)) return;
-    const dock = root.current?.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]');
-    const menu = mediaChooser ? mediaMenu.current : slashMenu.current;
-    if (!dock || !menu) return;
-    const layout = mobileEditorLayout(dock);
-    if (paletteSession.current?.menu !== menu) paletteSession.current = {
-      menu, ready: false,
-    };
-    const session = paletteSession.current;
-    const setStyle = (name: string, value: string) => {
-      if (menu.style.getPropertyValue(name) !== value) menu.style.setProperty(name, value);
-    };
-    const place = () => {
-      if (!menu.isConnected || paletteSession.current !== session) return;
-      const anchor = dock.getBoundingClientRect();
-      const viewport = window.visualViewport;
-      const app = root.current?.closest(".app");
-      const bounds = app?.getBoundingClientRect();
-      const visibleBottom = Math.min((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight), bounds?.bottom || window.innerHeight);
-      const visibleTop = Math.max(0, visibleBottom - (viewport?.height || window.innerHeight), app?.querySelector(".topbar")?.getBoundingClientRect().bottom || 0);
-      const usableTop = layout.band?.top ?? NaN;
-      const usableBottom = layout.band?.bottom ?? NaN;
-      // The frame owns the permitted popup band. Even a constrained chooser
-      // stays in that band, with the dock visible and its own list scrolling.
-      const top = Number.isFinite(usableTop) ? usableTop
-        : Math.max(visibleTop + 8, anchor.bottom + 8);
-      const bottom = Number.isFinite(usableBottom) ? usableBottom
-        : visibleBottom - 8;
-      const left = viewport?.offsetLeft || 0;
-      const visibleWidth = viewport?.width || window.innerWidth;
-      const width = Math.min(mediaChooser ? 324 : 288, visibleWidth - 16);
-      setStyle("width", `${width}px`);
-      const available = Math.max(0, bottom - top);
-      const wasReady = session.ready;
-      // One header anchor remains usable throughout native keyboard motion.
-      // The first measured paint can open; only available height changes.
-      session.ready = true;
-      setStyle("top", `${top}px`);
-      setStyle("left", `${Math.max(left + 8, Math.min(anchor.x + anchor.width / 2 - width / 2, left + visibleWidth - width - 8))}px`);
-      setStyle("transform", "none");
-      setStyle("max-height", `${Math.min(360, available)}px`);
-      if (mediaChooser) setStyle("overflow-y", "auto");
-      menu.dataset.paletteReady = String(session.ready);
-      if (session.ready && !wasReady) {
-        if (mediaChooser) menu.querySelector<HTMLButtonElement>(".writing-media-tabs button, .writing-media-fields button:not(:disabled)")?.focus({ preventScroll: true });
-        else if (slashFromToolbar && focusInsertItem.current) {
-          focusInsertItem.current = false;
-          menu.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
-          window.getSelection()?.removeAllRanges();
-        }
-        if (!mediaChooser) {
-          const options = menu.querySelector<HTMLElement>(".writing-slash-options");
-          const selected = options?.querySelector<HTMLElement>('[aria-current="true"]')
-            || options?.querySelector<HTMLElement>('[role="menuitem"]');
-          if (options && selected) {
-            const bounds = options.getBoundingClientRect();
-            const item = selected.getBoundingClientRect();
-            const gap = Math.min(4, Math.max(0, (bounds.height - item.height) / 2));
-            // Initial focus never scrolls the canvas. Reveal the actual row
-            // inside this list, including immediately opened typed suggestions.
-            if (item.top < bounds.top + gap) options.scrollTop -= bounds.top + gap - item.top;
-            else if (item.bottom > bounds.bottom - gap) options.scrollTop += item.bottom - bounds.bottom + gap;
-          }
-        }
-      }
-    };
-    const schedule = () => layout.schedule("overlay");
-    const unsubscribe = layout.subscribe("overlay", place);
-    const cancelOpening = () => {
-      if (paletteSession.current === session) paletteSession.current = null;
-    };
-    session.cancel = cancelOpening;
-    const observer = new ResizeObserver(schedule);
-    observer.observe(dock);
-    observer.observe(menu);
-    return () => {
-      unsubscribe();
-      observer.disconnect();
-      if (session.cancel === cancelOpening) session.cancel = undefined;
-      if (!menu.isConnected && paletteSession.current?.menu === menu) paletteSession.current = null;
-    };
-  }, [canvas, !!compactControls, slashOpen, slashFromToolbar, mediaChooser, mediaTab]);
+    if (!canvas || !compactControls || !overlayHost) return;
+    // All mobile surfaces share the canvas row's CSS bounds. Focus is an
+    // opening action, never a side effect of viewport or scroll geometry.
+    if (mediaChooser) mediaMenu.current?.querySelector<HTMLButtonElement>(".writing-media-tabs button")?.focus({ preventScroll: true });
+    else if (slashOpen && slashFromToolbar && focusInsertItem.current) {
+      focusInsertItem.current = false;
+      slashMenu.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+      window.getSelection()?.removeAllRanges();
+    }
+  }, [canvas, !!compactControls, overlayHost, slashOpen, slashFromToolbar, mediaChooser]);
 
   useEffect(() => {
     if (!canvas || !compactControls || !(slashOpen || mediaChooser || popupActive)) return;
@@ -888,7 +819,6 @@ export default function WritingEditorEngine({
     else editor.current?.focus(undefined, { preventScroll: true });
   }
   function closeMedia(returnFocus = false) {
-    paletteSession.current?.cancel?.();
     if (returnFocus) writingHighlight.clear();
     const selection = mediaSelection.current;
     activeLine.current?.classList.remove("writing-media-line");
@@ -964,7 +894,6 @@ export default function WritingEditorEngine({
     return true;
   }
   const closeInsertMenu = useCallback(() => {
-    paletteSession.current?.cancel?.();
     writingHighlight.clear();
     if (slashFromToolbar) {
       setSlashOpen(false);
@@ -986,9 +915,8 @@ export default function WritingEditorEngine({
       if (event.key !== "Escape" || event.isComposing) return;
       const target = event.target;
       const menu = mediaChooser ? mediaMenu.current : slashMenu.current;
-      const pendingCompact = canvas && compactRef.current && menu?.dataset.paletteReady === "false";
       if (!(target instanceof Node)
-        || (!pendingCompact && !root.current?.contains(target) && !menu?.contains(target))) return;
+        || (!root.current?.contains(target) && !menu?.contains(target))) return;
       // The menu is portaled; handle Escape before either editor or popup handlers.
       event.preventDefault();
       event.stopPropagation();
@@ -1084,7 +1012,6 @@ export default function WritingEditorEngine({
       const lexical = lexicalEditor.current;
       const selection = slashSelection.current;
       const dismissInvalidTarget = () => {
-        paletteSession.current?.cancel?.();
         writingHighlight.clear();
         slashSelection.current = null;
         focusInsertItem.current = false;
@@ -1126,7 +1053,7 @@ export default function WritingEditorEngine({
   }
   const plugins = useMemo(() => [
     writingViewPanelPlugin(),
-    writingMobileScrollPolicyPlugin(),
+    writingMobileCanvasPlugin(),
     writingTrailingLinePlugin(),
     writingVideoPlugin(),
     writingUploadPlugin(),
@@ -1261,13 +1188,20 @@ export default function WritingEditorEngine({
           if (command) runInsertCommand(command.run, command.group === "Media");
           return;
         }
-        if (event.key === "Backspace") { event.preventDefault(); slashNavigation.current = "keyboard"; if (slashQuery) setSlashQuery((query) => query.slice(0, -1)); else setSlashOpen(false); setSlashIndex(0); return; }
+        if (event.key === "Backspace") {
+          event.preventDefault();
+          slashNavigation.current = "keyboard";
+          if (slashQuery) setSlashQuery((query) => query.slice(0, -1));
+          else { setSlashOpen(false); resumeWriting(); }
+          setSlashIndex(0);
+          return;
+        }
         if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
           event.preventDefault();
           slashNavigation.current = "keyboard";
           const nextQuery = slashQuery + event.key;
           if (commandsFor(nextQuery).length) { setSlashQuery(nextQuery); setSlashIndex(0); }
-          else keepSlashAsText(nextQuery);
+          else { keepSlashAsText(nextQuery); resumeWriting(); }
           return;
         }
       }
@@ -1295,7 +1229,7 @@ export default function WritingEditorEngine({
           {error}
         </Alert>
       )}
-      {slashOpen && createPortal(<div ref={slashMenu} role="menu" aria-label={slashFromToolbar ? "Insert content" : "Insert content. Type to search, use arrow keys to choose, then press Enter."} className="writing-slash-menu" data-touch-motion={canvas && !!compactControls && slashFromToolbar || undefined} data-palette-ready={canvas && compactControls ? "false" : undefined} onKeyDown={(event) => {
+      {slashOpen && createPortal(<div ref={slashMenu} role="menu" aria-label={slashFromToolbar ? "Insert content" : "Insert content. Type to search, use arrow keys to choose, then press Enter."} className="writing-slash-menu" data-touch-motion={canvas && !!compactControls && slashFromToolbar || undefined} data-mobile-palette={canvas && compactControls && overlayHost ? "true" : undefined} onKeyDown={(event) => {
         if (!slashFromToolbar) return;
         if (event.key === "Tab") setSlashOpen(false);
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -1320,12 +1254,12 @@ export default function WritingEditorEngine({
           </Fragment>)}
         </div>
         <div className="writing-slash-footer"><Button type="button" size="sm" variant="ghost" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={closeInsertMenu}><span>Close menu</span><kbd>esc</kbd></Button></div>
-      </div>, document.body)}
-      {mediaChooser && createPortal(<div ref={mediaMenu} className="writing-media-chooser" data-touch-motion={canvas && !!compactControls || undefined} data-palette-ready={canvas && compactControls ? "false" : undefined} role="dialog" aria-label={`Insert ${mediaChooser}`} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeMedia(true); if (!canvas || !compactRef.current) editor.current?.focus(undefined, { preventScroll: true }); } }}>
+      </div>, canvas && compactControls && overlayHost ? overlayHost : document.body)}
+      {mediaChooser && createPortal(<div ref={mediaMenu} className="writing-media-chooser" data-touch-motion={canvas && !!compactControls || undefined} data-mobile-palette={canvas && compactControls && overlayHost ? "true" : undefined} role="dialog" aria-label={`Insert ${mediaChooser}`} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeMedia(true); if (!canvas || !compactRef.current) editor.current?.focus(undefined, { preventScroll: true }); } }}>
         <div className="writing-media-tabs"><Button type="button" variant="ghost" aria-pressed={mediaTab === "upload"} onClick={() => setMediaTab("upload")}>Upload</Button><Button type="button" variant="ghost" aria-pressed={mediaTab === "link"} onClick={() => setMediaTab("link")}>Link</Button></div>
         {mediaTab === "upload" ? <div className="writing-media-fields">{mediaChooser === "image" && <Input aria-label="Alt text (optional)" value={imageAlt} onChange={(event) => setImageAlt(event.target.value)} placeholder="Alt text (optional)" />}<Button type="button" disabled={!onUpload} onClick={() => file.current?.click()}>Choose {mediaChooser}</Button></div> : <div className="writing-media-fields"><Input aria-label={mediaChooser === "video" ? "Video URL" : "Image URL"} type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder={mediaChooser === "video" ? "YouTube, Vimeo or Loom URL" : "https://example.com/image.jpg"} /><Button type="button" onClick={mediaChooser === "video" ? insertVideo : () => { if (!/^https:\/\//i.test(videoUrl)) { setError("Use an HTTPS image URL."); return; } insertAtMediaSelection(() => $createParagraphNode().append($createImageNode({ src: videoUrl, altText: imageAlt.trim() || "Image" }))); }}>Insert {mediaChooser}</Button></div>}
         <Button type="button" variant="ghost" size="sm" onClick={() => closeMedia(true)}>Cancel</Button>
-      </div>, document.body)}
+      </div>, canvas && compactControls && overlayHost ? overlayHost : document.body)}
       <Input
         ref={file}
         type="file"

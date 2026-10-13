@@ -37,7 +37,6 @@
     "@codemirror/view": "6.43.13",
     "@lexical/link": "0.48.0",
     "@lexical/list": "0.48.0",
-    "@lexical/react": "0.48.0",
     "@lexical/rich-text": "0.48.0",
     "@lexical/selection": "0.48.0",
     "@lezer/highlight": "1.2.3",

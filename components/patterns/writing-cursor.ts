@@ -37,8 +37,10 @@ export function restoreWritingCursor(cursor: WritingCursor | null) {
   if (!cursor?.surface.isConnected) return false;
   if (cursor.kind === "field") {
     if (cursor.surface.value !== cursor.value) return false;
-    cursor.surface.focus({ preventScroll: true });
     cursor.surface.setSelectionRange(cursor.start, cursor.end, cursor.direction);
+    // The native field already knows its restored insertion point. Let the
+    // browser reveal it in the bounded canvas when input resumes.
+    cursor.surface.focus();
     return true;
   }
   if (cursor.surface.textContent !== cursor.value || !cursor.start.isConnected || !cursor.end.isConnected

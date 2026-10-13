@@ -1,45 +1,9 @@
 "use client";
 
-import { useLayoutEffect } from "react";
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import {
-  addNestedEditorChild$,
-  addTableCellEditorChild$,
-  createRootEditorSubscription$,
-  realmPlugin,
-} from "@mdxeditor/editor";
-import {
-  $addUpdateTag,
-  $getRoot,
-  COMMAND_PRIORITY_HIGH,
-  FOCUS_COMMAND,
-  RootNode,
-  SELECTION_CHANGE_COMMAND,
-  SKIP_SCROLL_INTO_VIEW_TAG,
-  type LexicalEditor,
-} from "lexical";
+import { createRootEditorSubscription$, realmPlugin } from "@mdxeditor/editor";
+import { $createRangeSelection, $getRoot, $setSelection, getNearestEditorFromDOMNode, SKIP_SCROLL_INTO_VIEW_TAG, type LexicalEditor } from "lexical";
 import { compactLayoutQuery } from "./use-compact-layout";
 import { touchWritingQuery } from "./use-editor-cards-layout";
-
-function registerMobileScrollPolicy(editor: LexicalEditor) {
-  const compact = window.matchMedia(compactLayoutQuery);
-  const touch = window.matchMedia(touchWritingQuery);
-  const tag = () => {
-    const surface = editor.getRootElement();
-    if (compact.matches && touch.matches && window.visualViewport?.scale === 1
-      && surface?.closest(".writing-root[data-mobile-caret-owner]")
-      && !surface.closest(".writing-code-block")) {
-      $addUpdateTag(SKIP_SCROLL_INTO_VIEW_TAG);
-    }
-  };
-  const onSelection = () => { tag(); return false; };
-  const cleanups = [
-    editor.registerNodeTransform(RootNode, tag),
-    editor.registerCommand(SELECTION_CHANGE_COMMAND, onSelection, COMMAND_PRIORITY_HIGH),
-    editor.registerCommand(FOCUS_COMMAND, onSelection, COMMAND_PRIORITY_HIGH),
-  ];
-  return () => cleanups.forEach(cleanup => cleanup());
-}
 
 /** Blank canvas is a tap target without enlarging the native editable bounds. */
 function registerBlankCanvasTap(editor: LexicalEditor) {
@@ -70,13 +34,13 @@ function registerBlankCanvasTap(editor: LexicalEditor) {
       const completedTap = tap;
       tap = null;
       if (!completedTap || event.defaultPrevented || !editor.isEditable()
-        || !compact.matches || !touch.matches || window.visualViewport?.scale !== 1
-        || !writing.hasAttribute("data-mobile-caret-owner")
-        || owner.querySelectorAll(".writing-root[data-mobile-caret-owner]").length !== 1
+        || !compact.matches || !touch.matches
+        || !writing.hasAttribute("data-mobile-canvas")
+        || owner.querySelectorAll(".writing-root[data-mobile-canvas]").length !== 1
         || !(event.target instanceof Element) || !wrappers.has(event.target)
         || event.clientY < surface.getBoundingClientRect().bottom) return;
       event.preventDefault();
-      editor.update(() => { $getRoot().selectEnd(); }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
+      editor.update(() => { $getRoot().selectEnd(); }, { discrete: true });
       if (surface.ownerDocument.activeElement !== surface) surface.focus({ preventScroll: true });
       writing.dispatchEvent(new Event("fieldbook:writing-resume"));
     };
@@ -95,22 +59,35 @@ function registerBlankCanvasTap(editor: LexicalEditor) {
   return () => { removeRootListener(); removeListeners(); };
 }
 
-function NestedMobileScrollPolicy() {
-  const [editor] = useLexicalComposerContext();
-  // Install before the containing cell's passive focus effect, not after the
-  // toolbar learns that this nested editor became active.
-  useLayoutEffect(() => registerMobileScrollPolicy(editor), [editor]);
-  return null;
-}
-
-export const writingMobileScrollPolicyPlugin = realmPlugin({
+export const writingMobileCanvasPlugin = realmPlugin({
   init(realm) {
-    realm.pub(createRootEditorSubscription$, (editor) => {
-      const removePolicy = registerMobileScrollPolicy(editor);
-      const removeBlankCanvasTap = registerBlankCanvasTap(editor);
-      return () => { removePolicy(); removeBlankCanvasTap(); };
+    realm.pub(createRootEditorSubscription$, editor => {
+      const removeBlankTap = registerBlankCanvasTap(editor);
+      let removeReveal = () => {};
+      const removeRoot = editor.registerRootListener(surface => {
+        removeReveal();
+        removeReveal = () => {};
+        if (!surface) return;
+        const reveal = (event: Event) => {
+          if (!(event instanceof CustomEvent) || !(event.detail instanceof Range)
+            || !surface.closest(".writing-root[data-mobile-canvas]") || !editor.isEditable()
+            || getNearestEditorFromDOMNode(event.detail.startContainer) !== editor
+            || getNearestEditorFromDOMNode(event.detail.endContainer) !== editor) return;
+          // Guided navigation already owns its bounded scroll animation.
+          // Set its caret as one tagged editor transaction, rather than let
+          // selection reconciliation start another reveal of the empty line.
+          editor.update(() => {
+            const selection = $createRangeSelection();
+            selection.applyDOMRange(event.detail);
+            $setSelection(selection);
+          }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
+          if (surface.ownerDocument.activeElement !== surface) surface.focus({ preventScroll: true });
+          event.preventDefault();
+        };
+        surface.addEventListener("fieldbook:writing-reveal", reveal);
+        removeReveal = () => surface.removeEventListener("fieldbook:writing-reveal", reveal);
+      });
+      return () => { removeBlankTap(); removeRoot(); removeReveal(); };
     });
-    realm.pub(addTableCellEditorChild$, NestedMobileScrollPolicy);
-    realm.pub(addNestedEditorChild$, NestedMobileScrollPolicy);
   },
 });

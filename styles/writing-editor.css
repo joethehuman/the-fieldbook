@@ -110,17 +110,25 @@
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
   overflow: hidden;
 }
-/* Wait for the touch chooser's opening lane before showing or focusing it. */
-:is(.writing-slash-menu, .writing-media-chooser)[data-palette-ready="false"] {
-  visibility: hidden;
-  pointer-events: none;
+:is(.writing-slash-menu, .writing-media-chooser)[data-mobile-palette="true"] {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(18rem, calc(100% - 16px));
+  max-height: min(360px, calc(100% - 16px));
+  pointer-events: auto;
 }
-:is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"][data-palette-ready="true"] {
+.writing-media-chooser[data-mobile-palette="true"] {
+  width: min(324px, calc(100% - 16px));
+  overflow-y: auto;
+}
+:is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] {
   animation: writing-touch-menu-enter 140ms ease-out;
 }
 @keyframes writing-touch-menu-enter { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  :is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"][data-palette-ready="true"] { animation: none; }
+  :is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] { animation: none; }
 }
 .writing-slash-options {
   display: grid;
@@ -236,7 +244,7 @@
   min-height: 0;
   /* One physical end reserve. Stacked canvas/paragraph padding makes native
      caret reveal scroll to the end before the visible writing space is used. */
-  padding-bottom: var(--phone-writing-clearance, var(--editor-dock-clearance, 80px));
+  padding-bottom: var(--space-2);
 }
 .editor-frame[data-dock="true"] .writing-document > .mdxeditor-root-contenteditable > .mdxeditor-contenteditable-wrapper > .writing-content[contenteditable] > :last-child {
   margin-bottom: 0;

@@ -10,9 +10,8 @@ import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
 import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
-import { EditorAppDockContext } from "./editor-app-header";
+import { EditorAppDockContext, EditorAppOverlayContext } from "./editor-app-header";
 import { useMobileEditorViewport } from "./use-mobile-editor-viewport";
-import { mobileEditorLayout } from "./mobile-editor-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
 export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
@@ -68,14 +67,11 @@ export function EditorFrame({
   const controls = useRef<HTMLDivElement>(null);
   const [writingActionsHost, setWritingActionsHost] = useState<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
-  const overlayLayer = useRef<HTMLDivElement>(null);
-  const [overlayHost, setOverlayHost] = useState<HTMLElement | null>(null);
-  useLayoutEffect(() => { setOverlayHost(frame.current?.closest<HTMLElement>(".main-shell") || null); }, []);
+  const overlayHost = useContext(EditorAppOverlayContext);
   const hasNavigation = !!navigation;
   const [panels, setPanels] = useState({ outline: false, details: false });
   const panelState = useRef(panels);
   panelState.current = panels;
-  const measureDock = useRef<(() => void) | null>(null);
   useMobileEditorViewport(frame, dock);
   const lastWritingCursor = useRef<WritingCursor | null>(null);
   const panelReturn = useRef<WritingCursor | null>(null);
@@ -122,175 +118,87 @@ export function EditorFrame({
     if (closing && dock) returnToWriting(side === "outline" ? outlineToggle.current : detailsToggle.current);
   }
   useLayoutEffect(() => {
-    const element = dock ? controls.current : canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
-    if (!element) return;
+    if (dock) {
+      frame.current?.style.setProperty("--editor-navigation-height", "0px");
+      return;
+    }
+    const element = canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
     const owner = frame.current?.closest<HTMLElement>(".main-content");
-    const app = frame.current?.closest<HTMLElement>(".app");
-    const header = app?.querySelector<HTMLElement>(".topbar");
-    const shell = frame.current?.closest<HTMLElement>(".main-shell");
-    const layout = dock && shell ? mobileEditorLayout(shell) : null;
-    let active = true;
-    let releaseRequest = 0;
-    let lastBand = "";
-    let lastCaret: { node: Node; offset: number; top: number } | null = null;
-    let caretSnapshotNeeded = false;
-    const setStyle = (target: HTMLElement | null | undefined, name: string, value: string) => {
-      if (target && target.style.getPropertyValue(name) !== value) target.style.setProperty(name, value);
-    };
+    if (!element) return;
     const measure = () => {
-      if (!active || !element.isConnected) return;
-      const viewport = window.visualViewport;
-      const rootBounds = shell?.getBoundingClientRect();
-      const bottom = dock && rootBounds ? rootBounds.bottom : (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
-      const keyboard = dock && shell?.dataset.editorKeyboard === "true";
-      if (dock) {
-        element.dataset.keyboardVisible = String(keyboard);
-      }
-      const rect = element.getBoundingClientRect();
-      const usableTop = (header?.getBoundingClientRect().bottom || rootBounds?.top || 0) + 8;
-      // The visual viewport is the visible writing area. Reserving guessed
-      // browser/keyboard heights again makes a short document scroll too soon.
-      const viewportBottom = (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
-      const usableBottom = Math.min(bottom, viewportBottom) - 8;
-      if (layout) layout.band = { top: usableTop, bottom: usableBottom, keyboard };
-      const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
-      const panelTop = dock ? usableTop : rect.bottom + 8;
-      const panelBottom = dock ? usableBottom : bottom - 16;
-      if (dock) {
-        setStyle(shell, "--editor-popup-available-height", `${Math.max(0, panelBottom - panelTop)}px`);
-        setStyle(element, "--editor-usable-top", `${usableTop}px`);
-        setStyle(element, "--editor-usable-bottom", `${usableBottom}px`);
-        setStyle(element, "--editor-writing-top", `${usableTop}px`);
-        setStyle(owner, "--editor-dock-clearance", "8px");
-      }
-      setStyle(frame.current, "--editor-navigation-height", `${dock ? 0 : rect.height}px`);
-      setStyle(overlayLayer.current, "--editor-panel-top", `${panelTop - (dock ? rootBounds?.top || 0 : 0)}px`);
-      setStyle(overlayLayer.current, "--editor-panel-left", `${bounds.left - (dock ? rootBounds?.left || 0 : 0)}px`);
-      setStyle(overlayLayer.current, "--editor-panel-right", `${dock && rootBounds ? rootBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
-      setStyle(overlayLayer.current, "--editor-panel-max-width", `${bounds.width}px`);
-      setStyle(overlayLayer.current, "--editor-panel-available-height", `${Math.max(dock ? 0 : 80, panelBottom - panelTop)}px`);
-      if (dock) {
-        const focused = document.activeElement;
-        const scroller = focused instanceof HTMLElement && overlayLayer.current?.contains(focused)
-          ? focused.closest<HTMLElement>('[data-slot="scroll-region"]') : null;
-        if (scroller && focused instanceof HTMLElement) {
-          const field = focused.getBoundingClientRect();
-          const region = scroller.getBoundingClientRect();
-          const lower = Math.min(region.bottom, panelBottom) - 8;
-          const upper = Math.max(region.top, panelTop) + 8;
-          const delta = field.bottom > lower ? Math.min(field.bottom - lower, field.top - upper)
-            : field.top < upper ? field.top - upper : 0;
-          if (lower > upper && Math.abs(delta) >= 1) scroller.scrollTop += delta;
-        }
-        const band = `${usableTop}:${usableBottom}:${rect.top}:${rect.bottom}`;
-        if (band !== lastBand) {
-          lastBand = band;
-          owner?.dispatchEvent(new Event("fieldbook:editor-dock-change"));
-        }
-        caretSnapshotNeeded = true;
-      }
+      frame.current?.style.setProperty("--editor-navigation-height", `${element.getBoundingClientRect().height}px`);
     };
-    const schedule = () => {
-      if (!active) return;
-      if (!dock) { measure(); return; }
-      layout?.schedule("dock");
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    owner?.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      owner?.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
     };
-    // Pointer-layout handoff needs the last painted row, including intentional
-    // scrolling. Updating that snapshot must not remeasure the entire dock.
+  }, [hasNavigation, dock]);
+
+  useLayoutEffect(() => {
+    const element = controls.current;
+    const writing = canvas.current;
+    const owner = frame.current?.closest<HTMLElement>(".main-content");
+    if (!dock || !element || !writing || !owner) return;
+    let releaseRequest = 0;
+    let lastCaret: { node: Node; offset: number; top: number } | null = null;
     const rememberCaret = () => {
-      if (!caretSnapshotNeeded) return;
-      caretSnapshotNeeded = false;
       const selection = window.getSelection();
-      const line = canvas.current && readWritingCaretLine(canvas.current, true);
-      lastCaret = selection?.focusNode && canvas.current?.contains(selection.focusNode) && line
+      const line = readWritingCaretLine(writing, true);
+      lastCaret = selection?.focusNode && writing.contains(selection.focusNode) && line
         ? { node: selection.focusNode, offset: selection.focusOffset, top: line.top } : null;
     };
-    const scheduleCaretSnapshot = () => { caretSnapshotNeeded = true; layout?.schedule("overlay"); };
     const remember = () => {
-      const cursor = captureWritingCursor(canvas.current);
+      const cursor = captureWritingCursor(writing);
       const focused = document.activeElement;
       if (cursor) lastWritingCursor.current = cursor;
-      else if (focused instanceof HTMLElement && (focused.isContentEditable || focused.matches("input, textarea")) && !focused.closest(".writing-media-chooser, .writing-slash-menu")) lastWritingCursor.current = null;
+      else if (focused instanceof HTMLElement && (focused.isContentEditable || focused.matches("input, textarea"))
+        && !focused.closest(".writing-media-chooser, .writing-slash-menu")) lastWritingCursor.current = null;
+      rememberCaret();
     };
     const rememberKeyboard = (event: KeyboardEvent) => { if (event.key === "Tab") remember(); };
     const released = () => {
       cancelAnimationFrame(releaseRequest);
-      releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; schedule(); });
+      releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; });
     };
-    const observer = new ResizeObserver(schedule);
-    measureDock.current = schedule;
-    const unsubscribe = layout?.subscribe("dock", measure);
-    const unsubscribeCaret = layout?.subscribe("overlay", rememberCaret);
-    if (!dock) measure();
-    observer.observe(element);
-    if (dock && owner) observer.observe(owner);
-    const editor = frame.current?.closest(".editor");
-    if (editor) observer.observe(editor);
-    if (phone && header) observer.observe(header);
-    if (!dock) owner?.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    if (!dock) {
-      window.visualViewport?.addEventListener("resize", schedule);
-      window.visualViewport?.addEventListener("scroll", schedule);
-    } else {
-      owner?.addEventListener("scroll", scheduleCaretSnapshot, { passive: true });
-      document.addEventListener("selectionchange", scheduleCaretSnapshot);
-      element.addEventListener("pointerdown", remember, true);
-      canvas.current?.addEventListener("fieldbook:writing-handoff", remember);
-      document.addEventListener("keydown", rememberKeyboard, true);
-      document.addEventListener("focusin", remember);
-      document.addEventListener("pointerup", released);
-    }
+    element.addEventListener("pointerdown", remember, true);
+    writing.addEventListener("fieldbook:writing-handoff", remember);
+    owner.addEventListener("scroll", rememberCaret, { passive: true });
+    document.addEventListener("selectionchange", rememberCaret);
+    document.addEventListener("keydown", rememberKeyboard, true);
+    document.addEventListener("focusin", remember);
+    document.addEventListener("pointerup", released);
     return () => {
-      active = false;
-      unsubscribe?.();
-      unsubscribeCaret?.();
       cancelAnimationFrame(releaseRequest);
-      if (measureDock.current === schedule) measureDock.current = null;
-      observer.disconnect();
-      if (dock) {
-        shell?.style.removeProperty("--editor-popup-available-height");
-        if (owner && frame.current && frame.current.dataset.dock !== "true") {
-          const navigationHeight = canvas.current?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().height || 0;
-          owner.scrollTop += navigationHeight;
-          // Removing the mobile viewport and restoring desktop chrome can
-          // change or clamp scrolling. Preserve the last painted writing row
-          // after those layouts settle, without changing the native selection.
-          const caret = lastCaret;
-          if (caret) requestAnimationFrame(() => {
-            const selection = window.getSelection();
-            const focused = document.activeElement;
-            if (!frame.current?.isConnected || frame.current.dataset.dock === "true"
-              || selection?.focusNode !== caret.node || selection.focusOffset !== caret.offset
-              || !(focused instanceof HTMLElement) || !focused.isContentEditable
-              || !canvas.current?.contains(focused)) return;
-            const line = readWritingCaretLine(canvas.current, true);
-            const editor = frame.current.closest<HTMLElement>(".editor");
-            const scroller = editor?.dataset.scrollLayout === "workspace"
-              ? editor.querySelector<HTMLElement>(".writing-viewport") || canvas.current : owner;
-            if (line && Math.abs(line.top - caret.top) >= 1)
-              scroller.scrollBy({ top: line.top - caret.top, behavior: "instant" });
-          });
-        }
-        owner?.style.removeProperty("--editor-dock-clearance");
-      }
-      owner?.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      if (!dock) {
-        window.visualViewport?.removeEventListener("resize", schedule);
-        window.visualViewport?.removeEventListener("scroll", schedule);
-      } else {
-        owner?.removeEventListener("scroll", scheduleCaretSnapshot);
-        document.removeEventListener("selectionchange", scheduleCaretSnapshot);
-        element.removeEventListener("pointerdown", remember, true);
-        canvas.current?.removeEventListener("fieldbook:writing-handoff", remember);
-        document.removeEventListener("keydown", rememberKeyboard, true);
-        document.removeEventListener("focusin", remember);
-        document.removeEventListener("pointerup", released);
-      }
+      element.removeEventListener("pointerdown", remember, true);
+      writing.removeEventListener("fieldbook:writing-handoff", remember);
+      owner.removeEventListener("scroll", rememberCaret);
+      document.removeEventListener("selectionchange", rememberCaret);
+      document.removeEventListener("keydown", rememberKeyboard, true);
+      document.removeEventListener("focusin", remember);
+      document.removeEventListener("pointerup", released);
+      // Changing input capabilities is explicit layout navigation. Retain the
+      // painted writing row once the desktop scroll owner has settled.
+      const caret = lastCaret;
+      if (caret && frame.current?.dataset.dock !== "true") requestAnimationFrame(() => {
+        const selection = window.getSelection();
+        const focused = document.activeElement;
+        if (!frame.current?.isConnected || frame.current.dataset.dock === "true"
+          || selection?.focusNode !== caret.node || selection.focusOffset !== caret.offset
+          || !(focused instanceof HTMLElement) || !focused.isContentEditable || !writing.contains(focused)) return;
+        const line = readWritingCaretLine(writing, true);
+        const editor = frame.current.closest<HTMLElement>(".editor");
+        const scroller = editor?.dataset.scrollLayout === "workspace"
+          ? editor.querySelector<HTMLElement>(".writing-viewport") || writing : owner;
+        if (line && Math.abs(line.top - caret.top) >= 1) scroller.scrollBy({ top: line.top - caret.top, behavior: "instant" });
+      });
     };
-  }, [hasNavigation, phone, dock, overlayHost, dockHost]);
-  useLayoutEffect(() => { measureDock.current?.(); }, [panels.outline, panels.details]);
+  }, [dock, dockHost]);
   useEffect(() => {
     if (!dock || !panels.outline && !panels.details) return;
     const cancel = (event: KeyboardEvent) => {
@@ -455,7 +363,7 @@ export function EditorFrame({
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
             onPointerDown={() => { if (dock) preparePanel("outline"); }}
-            onPointerCancel={() => { preparedPanel.current = null; measureDock.current?.(); }}
+            onPointerCancel={() => { preparedPanel.current = null; }}
             onMouseDown={(event) => { if (dock) event.preventDefault(); }}
             onClick={() => togglePanel("outline")}>
             {panels.outline ? <X aria-hidden="true" /> : <ListTree aria-hidden="true" />}
@@ -467,7 +375,7 @@ export function EditorFrame({
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
           onPointerDown={() => { if (dock) preparePanel("details"); }}
-          onPointerCancel={() => { preparedPanel.current = null; measureDock.current?.(); }}
+          onPointerCancel={() => { preparedPanel.current = null; }}
           onMouseDown={(event) => { if (dock) event.preventDefault(); }}
           onClick={() => togglePanel("details")}>
           {panels.details ? <X aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}
@@ -514,7 +422,7 @@ export function EditorFrame({
         {!phone && panelSurfaces}
         <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!dock && (navigation || phone) && <div className="editor-canvas-navigation">{!phone && navigation}{phone && panelControls}</div>}{children}</div>
       </div>
-      {phone && overlayHost && createPortal(<div ref={overlayLayer} className="editor-mobile-panels" data-dock={dock || undefined}>{panelSurfaces}</div>, overlayHost)}
+      {phone && overlayHost && createPortal(<div className="editor-mobile-panels" data-dock={dock || undefined}>{panelSurfaces}</div>, overlayHost)}
     </section>
     </EditorWritingActionsContext.Provider>
     </EditorCompactControlsContext.Provider>
