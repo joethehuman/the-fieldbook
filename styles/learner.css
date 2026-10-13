@@ -9,12 +9,19 @@
     position: absolute;
     inset-inline-end: 0.75rem;
     pointer-events: none;
+  }
+
+  .search-shortcut, .search-keycap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--border);
     border-radius: 0.25rem;
-    padding: 0.1rem 0.3rem;
+    padding: 0.125rem 0.3125rem;
     color: var(--muted-foreground);
     font-family: inherit;
     font-size: 0.6875rem;
+    line-height: 1;
   }
 
   .workspace-chrome .ai-composer-panel {
@@ -38,6 +45,29 @@
 }
 
 @layer utilities {
+  [data-slot="dialog-overlay"]:has(.search-mobile-surface) {
+    background: var(--background);
+  }
+
+  .search-mobile-surface[data-mobile="true"] {
+    --control-height: 2.75rem;
+    --control-height-sm: 2.75rem;
+    top: var(--search-viewport-top, 0px);
+    left: var(--search-viewport-left, 0px);
+    display: flex;
+    width: var(--search-viewport-width, 100vw);
+    height: var(--search-viewport-height, 100dvh);
+    max-width: none;
+    max-height: none;
+    transform: none;
+    gap: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    box-shadow: none;
+  }
+
   .workspace-chrome .sidebar-primary-link > span:not(.sidebar-nav-text):not(.nav-count) {
     width: 100%;
     justify-content: start;

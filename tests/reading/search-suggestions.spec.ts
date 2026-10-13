@@ -306,12 +306,16 @@ test("suggestion and Browse navigation preserve dirty installed editors until ap
     });
   });
   await page.goto(`/admin/content/${id(5)}/edit`);
-  const title = page.getByRole("textbox", { name: "Title", exact: true });
+  const title = page.getByRole("textbox", { name: "Title", exact: true, includeHidden: true });
   await title.fill("Keep this unpublished title");
   await expect.poll(() => failedSaves).toBeGreaterThan(0);
   const panel = page.locator('[data-slot="search-panel"]');
   const dialog = page.getByRole("alertdialog");
+  const touch = await page.evaluate(() => matchMedia("(pointer: coarse) and (not (any-pointer: fine))").matches);
+  const dock = page.locator('.editor-frame-controls[data-dock="true"]');
+  if (touch) await expect(dock).toHaveCount(1);
   await openSearch(page);
+  if (touch) await expect(dock).toHaveCSS("visibility", "hidden");
   await panel
     .getByRole("navigation", { name: "Browse content" })
     .getByRole("link", { name: "Docs", exact: true })
@@ -319,6 +323,10 @@ test("suggestion and Browse navigation preserve dirty installed editors until ap
   await expect(dialog).toHaveCount(1);
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(title).toHaveValue("Keep this unpublished title");
+  if (touch) {
+    await panel.getByRole("button", { name: "Close search", exact: true }).click();
+    await expect(dock).toHaveCSS("visibility", "visible");
+  }
   await openSearch(page);
   await panel
     .getByRole("list", { name: "Suggested content" })

@@ -10,10 +10,10 @@ import { IntentLink } from "./patterns/intent-link";
 import { Button } from "./ui/button";
 
 const icons = { doc: BookOpen, course: GraduationCap, brief: Newspaper };
-const browse: { href: SearchBrowsePath; label: string }[] = [
-  { href: "/docs", label: "Docs" },
-  { href: "/courses", label: "Courses" },
-  { href: "/updates", label: "Updates" },
+const browse = [
+  { href: "/docs" as const, label: "Docs", icon: BookOpen },
+  { href: "/courses" as const, label: "Courses", icon: GraduationCap },
+  { href: "/updates" as const, label: "Updates", icon: Newspaper },
 ];
 function ordinaryClick(event: MouseEvent<HTMLAnchorElement>) {
   return (
@@ -144,6 +144,10 @@ export function SearchSuggestions({
                     : undefined
                 }
               >
+                <item.icon
+                  aria-hidden="true"
+                  className="text-muted-foreground"
+                />
                 {item.label}
               </Link>
             </Button>

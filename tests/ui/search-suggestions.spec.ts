@@ -107,9 +107,51 @@ for (const guest of [false, true]) {
     await expect(first).toContainText(
       guest ? "unstarted" : "A practical guide",
     );
-    await expect(panel).toHaveAttribute("data-fit-content", "true");
     const bounds = (await panel.boundingBox())!;
-    expect(bounds.height).toBeLessThan(560);
+    if (info.project.name === "phone") {
+      await expect(panel).toHaveAttribute("data-mobile", "true");
+      await expect(panel).toHaveAttribute("role", "dialog");
+      expect(bounds.y).toBeCloseTo(0, 0);
+      expect(bounds.height).toBeCloseTo(page.viewportSize()!.height, 0);
+      await expect(panel.getByText("to close", { exact: true })).toHaveCount(0);
+      expect(
+        await page
+          .locator("main")
+          .evaluate((element) => !!element.closest('[aria-hidden="true"]')),
+      ).toBe(true);
+    } else {
+      await expect(panel).toHaveAttribute("data-fit-content", "true");
+      expect(bounds.height).toBeLessThan(560);
+      await expect(panel.getByText("to close", { exact: true })).toBeVisible();
+      await expect(panel.locator("kbd")).toHaveText("Esc");
+      const keycap = page.locator(".search-shortcut");
+      const keycapBox = (await keycap.boundingBox())!;
+      const inputBox = (await input.boundingBox())!;
+      expect(keycapBox.height).toBeLessThan(inputBox.height * 0.6);
+      expect(
+        Math.abs(
+          keycapBox.y + keycapBox.height / 2 - inputBox.y - inputBox.height / 2,
+        ),
+      ).toBeLessThanOrEqual(1);
+      const padding = await keycap.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          left: style.paddingLeft,
+          right: style.paddingRight,
+          pointer: style.pointerEvents,
+          tag: element.tagName,
+        };
+      });
+      expect(padding.left).toBe(padding.right);
+      expect(padding.pointer).toBe("none");
+      expect(padding.tag).toBe("KBD");
+    }
+    const browse = panel.getByRole("navigation", { name: "Browse content" });
+    for (const label of ["Docs", "Courses", "Updates"]) {
+      await expect(
+        browse.getByRole("link", { name: label, exact: true }).locator("svg"),
+      ).toHaveCount(1);
+    }
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(
       page.viewportSize()!.width,
     );
@@ -122,6 +164,10 @@ for (const guest of [false, true]) {
     await expect(first).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
+    if (info.project.name === "phone")
+      await expect(
+        page.getByRole("button", { name: "Open search", exact: true }),
+      ).toBeFocused();
     await openSearch(page);
     await input.fill("Reference");
     await expect(
@@ -167,7 +213,10 @@ test("suggestions stay reachable above a small phone viewport at enlarged text",
   await openSearch(page);
   const panel = page.locator('[data-slot="search-panel"]');
   const bounds = (await panel.boundingBox())!;
-  expect(bounds.y + bounds.height).toBeLessThanOrEqual(424);
+  expect(bounds.y).toBeCloseTo(0, 0);
+  expect(bounds.height).toBeCloseTo(440, 0);
+  const header = panel.locator('[data-slot="search-compact-header"]');
+  const headerY = (await header.boundingBox())!.y;
   const scroll = panel.locator('[data-slot="search-suggestions-scroll"]');
   expect(
     await scroll.evaluate(
@@ -179,6 +228,10 @@ test("suggestions stay reachable above a small phone viewport at enlarged text",
   });
   await expect(
     panel.getByRole("link", { name: "Updates", exact: true }),
+  ).toBeInViewport();
+  expect((await header.boundingBox())!.y).toBe(headerY);
+  await expect(
+    panel.getByRole("button", { name: "Close search", exact: true }),
   ).toBeInViewport();
   expect(
     await page.evaluate(

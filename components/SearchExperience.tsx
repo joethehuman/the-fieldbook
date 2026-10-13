@@ -84,11 +84,12 @@ export function SearchExperience({
   const compactLayout = useCompactLayout();
   const searchCollision = useContext(AppBarSearchCompactContext);
   const compact = compactLayout || searchCollision;
-  const [panel, setPanel] = useState({ compact, open: false });
-  // A hidden empty panel must not revive when the field switches back to an icon.
-  if (panel.compact !== compact) setPanel({ compact, open: false });
-  const open = panel.compact === compact && panel.open;
-  function setOpen(open: boolean) { setPanel({ compact, open }); }
+  const [panel, setPanel] = useState({ compact, fullScreen: compactLayout, open: false });
+  // Changing presentation closes the surface without clearing the query or chat.
+  if (panel.compact !== compact || panel.fullScreen !== compactLayout)
+    setPanel({ compact, fullScreen: compactLayout, open: false });
+  const open = panel.compact === compact && panel.fullScreen === compactLayout && panel.open;
+  function setOpen(open: boolean) { setPanel({ compact, fullScreen: compactLayout, open }); }
   const [view, setView] = useState("search");
   const [draft, setDraft] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -102,6 +103,7 @@ export function SearchExperience({
   const enabled = aiMode !== "off";
   const visible = open;
   const fitContent = view === "search" && !query.trim();
+  const fitPanel = fitContent && !compactLayout;
   const showSuggestions = visible && fitContent;
   const [suggested, setSuggested] = useState<{
     items: SearchSuggestion[];
@@ -127,24 +129,25 @@ export function SearchExperience({
     setShortcut(/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl K");
     const focusSearch = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "k" || event.isComposing || event.repeat) return;
-      if (document.activeElement?.closest('[role="dialog"], [role="alertdialog"]')) return;
+      const dialog = document.activeElement?.closest('[role="dialog"], [role="alertdialog"]');
+      if (dialog && dialog.id !== id) return;
       event.preventDefault();
       onRequestOpen?.();
-      setPanel({ compact, open: true });
-      if (!compact) {
+      setPanel({ compact, fullScreen: compactLayout, open: true });
+      if (input.current) {
         input.current?.focus({ preventScroll: true });
         input.current?.select();
       }
     };
     window.addEventListener("keydown", focusSearch);
     return () => window.removeEventListener("keydown", focusSearch);
-  }, [compact, onRequestOpen]);
+  }, [compact, compactLayout, id, onRequestOpen]);
   useLayoutEffect(() => {
     if (compact && visible) input.current?.focus({ preventScroll: true });
   }, [compact, visible]);
   function dismiss() {
     setOpen(false);
-    if (compact) searchTrigger.current?.focus({ preventScroll: true });
+    if (compact && !compactLayout) searchTrigger.current?.focus({ preventScroll: true });
   }
   useLayoutEffect(() => {
     // Search starts with its first result, independently of chat autoscrolling.
@@ -264,7 +267,8 @@ export function SearchExperience({
       id={id}
       open={visible}
       compact={compact}
-      fitContent={fitContent}
+      fullScreen={compactLayout}
+      fitContent={fitPanel}
       onDismiss={() => setOpen(false)}
       returnFocus={compact ? searchTrigger : undefined}
       persistentContent={
@@ -305,11 +309,11 @@ export function SearchExperience({
       }
     >
       <div
-        data-slot={fitContent ? "search-suggestions-scroll" : undefined}
-        className={`flex min-h-0 flex-1 flex-col ${fitContent ? "overflow-y-auto overscroll-contain" : ""}`}
+        data-slot={fitPanel ? "search-suggestions-scroll" : undefined}
+        className={`flex min-h-0 flex-1 flex-col ${fitPanel ? "overflow-y-auto overscroll-contain" : ""}`}
       >
         {compact && (
-          <div className="flex shrink-0 items-center gap-2 p-4">
+          <div data-slot="search-compact-header" className={`flex shrink-0 items-center gap-2 px-4 ${compactLayout ? "py-3" : "py-4"}`}>
             <div className="min-w-0 flex-1">{searchField}</div>
             <Button
               type="button"
@@ -322,7 +326,7 @@ export function SearchExperience({
             </Button>
           </div>
         )}
-        <div className={`flex min-h-0 flex-col ${fitContent ? "flex-none" : "flex-1"}`}>
+        <div className={`flex min-h-0 flex-col ${fitPanel ? "flex-none" : "flex-1"}`}>
           {enabled ? (
             <Tabs
               value={view}
@@ -357,7 +361,7 @@ export function SearchExperience({
               </div>
               <TabsContent value="search" className="mt-0 flex min-h-0 flex-1 flex-col">
                 <div
-                  data-slot="search-results-scroll"
+                  data-slot={compactLayout && fitContent ? "search-suggestions-scroll" : "search-results-scroll"}
                   className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
                 >
                   {results || emptySearch}
@@ -379,7 +383,7 @@ export function SearchExperience({
             </Tabs>
           ) : (
             <div
-              data-slot="search-results-scroll"
+              data-slot={compactLayout && fitContent ? "search-suggestions-scroll" : "search-results-scroll"}
               className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
             >
               {results || emptySearch}

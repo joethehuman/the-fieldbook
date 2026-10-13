@@ -69,7 +69,9 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
   await input.blur();
   await searchInput(page);
   await expect(result).toBeVisible();
-  await page.mouse.click(4, 4);
+  if (info.project.name === "phone")
+    await panel.getByRole("button", { name: "Close search", exact: true }).click();
+  else await page.mouse.click(4, 4);
   await expect(panel).toHaveCount(0);
   await searchInput(page);
   await expect(result).toBeVisible();
@@ -150,7 +152,7 @@ test("search preserves an unsaved editor and guards result navigation", async ({
   }, data);
   await page.goto("/#admin");
   await page.locator('table[data-layout="contentSelection"] tbody tr').first().getByRole("link").click();
-  const title = page.getByRole("textbox", { name: "Title", exact: true });
+  const title = page.getByRole("textbox", { name: "Title", exact: true, includeHidden: true });
   // Successful autosave allows navigation. Hold a real failed save to exercise
   // the unsaved-work guard while search remains available over the editor.
   await page.evaluate(() => {

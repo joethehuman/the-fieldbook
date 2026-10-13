@@ -1,12 +1,20 @@
 "use client";
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Card } from "../ui/card";
+import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 
-/** Stable nonmodal surface; children own scrolling within the available height. */
+/** Responsive surfaces share one owner for the search query and chat session. */
 export function SearchPanel({
   id,
   open,
   compact = false,
+  fullScreen = false,
   fitContent = false,
   onDismiss,
   trigger,
@@ -17,6 +25,7 @@ export function SearchPanel({
   id: string;
   open: boolean;
   compact?: boolean;
+  fullScreen?: boolean;
   fitContent?: boolean;
   onDismiss: () => void;
   trigger: ReactNode;
@@ -27,20 +36,38 @@ export function SearchPanel({
 }) {
   const root = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLElement>(null);
+  const measure = useCallback(() => {
+    const panel = surface.current;
+    if (!panel) return;
+    const viewport = window.visualViewport;
+    const height = viewport?.height ?? window.innerHeight;
+    const top = viewport?.offsetTop ?? 0;
+    panel.style.setProperty(
+      "--search-viewport-height",
+      `${fullScreen ? height : Math.max(0, top + height - panel.getBoundingClientRect().top - 16)}px`,
+    );
+    if (fullScreen) {
+      panel.style.setProperty("--search-viewport-top", `${top}px`);
+      panel.style.setProperty(
+        "--search-viewport-left",
+        `${viewport?.offsetLeft ?? 0}px`,
+      );
+      panel.style.setProperty(
+        "--search-viewport-width",
+        `${viewport?.width ?? window.innerWidth}px`,
+      );
+    }
+  }, [fullScreen]);
+  const setSurface = useCallback(
+    (element: HTMLElement | null) => {
+      surface.current = element;
+      if (element) measure();
+    },
+    [measure],
+  );
   useEffect(() => {
     if (!open) return;
     const viewport = window.visualViewport;
-    const measure = () => {
-      const panel = surface.current;
-      if (!panel) return;
-      const bottom = viewport
-        ? viewport.offsetTop + viewport.height
-        : window.innerHeight;
-      panel.style.setProperty(
-        "--search-viewport-height",
-        `${Math.max(0, bottom - panel.getBoundingClientRect().top - 16)}px`,
-      );
-    };
     measure();
     viewport?.addEventListener("resize", measure);
     viewport?.addEventListener("scroll", measure);
@@ -50,22 +77,30 @@ export function SearchPanel({
       viewport?.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
     };
-  }, [open, compact]);
+  }, [open, compact, measure]);
   useEffect(() => {
-    if (!open) return;
+    if (!open || fullScreen) return;
     const dismiss = (event: PointerEvent) => {
       if (!root.current?.contains(event.target as Node)) onDismiss();
     };
     document.addEventListener("pointerdown", dismiss);
     return () => document.removeEventListener("pointerdown", dismiss);
-  }, [open, onDismiss]);
+  }, [open, fullScreen, onDismiss]);
+  const escapeHint = (
+    <p className="flex shrink-0 items-center justify-end gap-2 px-4 pb-3 text-xs text-muted-foreground">
+      <kbd className="search-keycap">Esc</kbd>
+      <span>to close</span>
+    </p>
+  );
   return (
     <div
       ref={root}
       data-slot="search-root"
       data-compact={compact || undefined}
+      data-search-open={open || undefined}
       className="group/search-panel relative min-w-0 data-[compact=true]:static"
       onBlur={(event) => {
+        if (fullScreen) return;
         if (
           event.relatedTarget &&
           !event.currentTarget.contains(event.relatedTarget)
@@ -73,6 +108,7 @@ export function SearchPanel({
           onDismiss();
       }}
       onKeyDown={(event) => {
+        if (fullScreen) return;
         if (event.key === "Escape" && open) {
           event.preventDefault();
           event.stopPropagation();
@@ -85,16 +121,42 @@ export function SearchPanel({
     >
       {trigger}
       {persistentContent}
-      {open && (
-        <Card
-          ref={surface}
-          id={id}
-          data-slot="search-panel"
-          data-fit-content={fitContent || undefined}
-          className={`absolute right-0 top-full z-40 mt-2 flex flex-col max-h-[min(40rem,75dvh,var(--search-viewport-height,100dvh),var(--editor-popup-available-height,calc(100dvh-var(--app-bar-height,4rem)-1rem)))] ${fitContent ? "h-auto" : "h-[min(40rem,75dvh,var(--editor-popup-available-height,calc(100dvh-var(--app-bar-height,4rem)-1rem)))]"} w-[var(--search-panel-width,min(48rem,calc(100vw-2rem)))] overflow-hidden p-0 sm:p-0 shadow-xl group-data-[compact=true]/search-panel:inset-x-4 group-data-[compact=true]/search-panel:w-auto`}
+      {fullScreen ? (
+        <Dialog
+          open={open}
+          onOpenChange={(next) => {
+            if (!next) onDismiss();
+          }}
         >
-          {children}
-        </Card>
+          <DialogContent
+            ref={setSurface}
+            id={id}
+            data-slot="search-panel"
+            data-mobile="true"
+            aria-describedby={undefined}
+            className="workspace-chrome search-mobile-surface translate-x-0 translate-y-0"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              returnFocus?.current?.focus({ preventScroll: true });
+            }}
+          >
+            <DialogTitle className="sr-only">Search Fieldbook</DialogTitle>
+            {children}
+          </DialogContent>
+        </Dialog>
+      ) : (
+        open && (
+          <Card
+            ref={setSurface}
+            id={id}
+            data-slot="search-panel"
+            data-fit-content={fitContent || undefined}
+            className={`absolute right-0 top-full z-40 mt-2 flex flex-col max-h-[min(40rem,75dvh,var(--search-viewport-height,100dvh),var(--editor-popup-available-height,calc(100dvh-var(--app-bar-height,4rem)-1rem)))] ${fitContent ? "h-auto" : "h-[min(40rem,75dvh,var(--editor-popup-available-height,calc(100dvh-var(--app-bar-height,4rem)-1rem)))]"} w-[var(--search-panel-width,min(48rem,calc(100vw-2rem)))] overflow-hidden p-0 sm:p-0 shadow-xl group-data-[compact=true]/search-panel:inset-x-4 group-data-[compact=true]/search-panel:w-auto`}
+          >
+            {children}
+            {escapeHint}
+          </Card>
+        )
       )}
     </div>
   );
