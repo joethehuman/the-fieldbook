@@ -93,6 +93,8 @@
     gap: var(--space-4);
     padding: var(--space-6);
   }
+  /* Search covers the editor's floating controls, beneath the navigation drawer. */
+  .topbar:has([data-slot="search-panel"]) { z-index: 26; }
   .topbar::after {
     content: "";
     position: absolute;

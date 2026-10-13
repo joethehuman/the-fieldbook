@@ -373,7 +373,7 @@ test.describe("touch mobile outline actions", () => {
   });
 });
 
-test("small-screen search opens a full field and restores its trigger on Escape", async ({ page }, info) => {
+test("small-screen search clears floating editor controls and restores focus on dismissal", async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, info.project.name.startsWith("production"), "doc");
   const trigger = page.getByRole("button", { name: "Open search", exact: true });
@@ -384,6 +384,16 @@ test("small-screen search opens a full field and restores its trigger on Escape"
   await input.fill("context");
   await expect(page.locator('[data-slot="search-panel"]')).toBeVisible();
   await input.press("Escape");
+  await expect(trigger).toBeFocused();
+  await expect(page.locator('[data-slot="search-panel"]')).toHaveCount(0);
+  await trigger.click();
+  const close = page.getByRole("button", { name: "Close search", exact: true });
+  await expect.poll(() => close.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2));
+  })).toBe(true);
+  await page.screenshot({ path: info.outputPath("editor-search-controls.png") });
+  await close.click();
   await expect(trigger).toBeFocused();
   await expect(page.locator('[data-slot="search-panel"]')).toHaveCount(0);
 });
@@ -1769,6 +1779,11 @@ test("centered search yields to publication controls without changing navigation
   const panelBox = (await panel.boundingBox())!;
   expect(panelBox.x).toBeGreaterThanOrEqual(header.x);
   expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(header.x + header.width);
+  const close = page.getByRole("button", { name: "Close search", exact: true });
+  await expect.poll(() => close.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2));
+  })).toBe(true);
   await page.keyboard.press("Escape");
   await expect(icon).toBeFocused();
   await page.setViewportSize({ width: 1800, height: 1000 });

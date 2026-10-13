@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { MessageCircle } from "lucide-react";
 import type { AiCitation } from "@/lib/ai";
 import { aiBounds } from "@/lib/ai";
 import { messageText } from "@/lib/ai-chat";
@@ -70,13 +69,6 @@ export function AskAiConversation({
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable_both-edges]"
       >
         <div className="grid min-w-0 gap-4">
-          {!chat.messages.length && !chat.busy && !chat.error && (
-            <div className="search-welcome ai-welcome">
-              <span className="search-welcome-icon"><MessageCircle size={24} aria-hidden="true" /></span>
-              <h2>What would you like to know?</h2>
-              <p>Ask a question about your workspace. Follow the sources to explore further.</p>
-            </div>
-          )}
           <div
             role="log"
             aria-label="Conversation messages"

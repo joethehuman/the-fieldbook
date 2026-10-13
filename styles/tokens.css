@@ -130,7 +130,6 @@
   --accent: #e9ede4;
   --accent-foreground: #252b27;
   --selected: color-mix(in srgb, var(--brand) 10%, var(--background));
-  --workspace-display-font: Georgia, "Times New Roman", serif;
   --learner-progress-surface: #263e33;
   --learner-progress-foreground: #fcfff8;
   --learner-progress-muted: #c8d4c9;

@@ -98,57 +98,11 @@
     box-shadow: 0 8px 24px rgb(24 42 30 / 8%), 0 24px 64px rgb(24 42 30 / 12%);
   }
 
-  .workspace-chrome .search-panel-heading {
-    padding-block: var(--space-3);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .workspace-chrome .search-panel-heading [role="tablist"] { gap: var(--space-2); }
-  .workspace-chrome .search-panel-heading [role="tab"] { gap: var(--space-2); }
-
-  .search-welcome {
-    display: grid;
-    align-content: center;
-    justify-items: center;
-    gap: var(--space-3);
-    min-height: min(22rem, 100%);
-    padding: var(--space-8) var(--space-6);
-    text-align: center;
-    color: var(--muted-foreground);
-  }
-
-  .search-welcome h2 {
-    color: var(--foreground);
-    font-family: var(--workspace-display-font);
-    font-size: clamp(1.5rem, 3vw, 2rem);
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: -0.03em;
-  }
-
-  .search-welcome p { max-width: 24rem; line-height: 1.6; }
-  .search-welcome > [data-slot="button"] { margin-top: var(--space-3); }
-
-  .search-welcome-icon {
-    display: grid;
-    place-items: center;
-    width: 3rem;
-    height: 3rem;
-    margin-bottom: var(--space-2);
-    color: var(--foreground);
-    border: 1px solid var(--border);
-    border-radius: 0.875rem;
-    background: var(--surface);
-  }
-
   .workspace-chrome .search-result-card {
     border-radius: 0.75rem;
     gap: var(--space-2);
   }
 
-  .workspace-chrome .search-result-card h2 { font-size: 1rem; }
-  .workspace-chrome .search-result-card p { line-height: 1.6; }
-  .workspace-chrome .ai-welcome { min-height: 12rem; }
   .workspace-chrome .ai-composer-panel { border-top: 1px solid var(--border); }
   .workspace-chrome [data-slot="message-composer-field"] { border-radius: 0.875rem; }
 
@@ -160,17 +114,8 @@
     background: var(--background);
   }
 
-  .learner-workspace [data-slot="page-header"] {
-    --type-page: clamp(2.25rem, 3.6vw, 3.5rem);
-    --type-page-leading: 1.12;
-    position: relative;
-  }
-
   .learner-workspace [data-slot="page-header"] h1,
   .learner-workspace .article-header h1 {
-    font-family: var(--workspace-display-font);
-    font-weight: 400;
-    letter-spacing: -0.045em;
     text-wrap: balance;
   }
 
@@ -237,10 +182,6 @@
     min-height: 10rem;
   }
 
-  .learner-workspace .learning-card-copy h3 {
-    letter-spacing: -0.025em;
-  }
-
   .learner-workspace .brief-list {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
     gap: var(--space-6);
@@ -252,9 +193,6 @@
   }
 
   .learner-workspace .brief-copy h3 {
-    font-size: 1.25rem;
-    line-height: 1.35;
-    letter-spacing: -0.025em;
     text-wrap: balance;
   }
 
@@ -267,24 +205,9 @@
     padding-block-start: var(--space-4);
   }
 
-  .learner-workspace .article-header h1 {
-    font-size: clamp(2.25rem, 3.7vw, 3.25rem);
-    line-height: 1.12;
-  }
-
-  .learner-workspace .article-lede {
-    font-size: 1.125rem;
-    line-height: 1.7;
-  }
-
   .learner-workspace .article-meta {
     padding-block: var(--space-3) var(--space-6);
     border-bottom: 1px solid var(--border);
-  }
-
-  .learner-workspace .article .markdown {
-    font-size: 1.0625rem;
-    line-height: 1.8;
   }
 
   .learner-workspace .article .markdown > p + p {
@@ -346,25 +269,8 @@
     color: var(--link);
   }
 
-  .learner-workspace .course-player .markdown { line-height: 1.8; }
-
   .learner-workspace .course-continue.reading-pagination {
     margin-top: var(--space-8);
-  }
-
-  .learner-workspace .course-detail-heading h1 {
-    font-size: 1.5rem;
-    line-height: 1.3;
-    letter-spacing: -0.03em;
-  }
-
-  .learner-workspace .course-player .course-lesson > h2,
-  .learner-workspace .course-quiz > h2 {
-    font-family: var(--workspace-display-font);
-    font-size: clamp(1.875rem, 2.8vw, 2.75rem);
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: -0.035em;
   }
 
   .learner-workspace .course-continue,
@@ -418,12 +324,6 @@
       align-content: center;
       padding: clamp(1.5rem, 3vw, 3rem);
     }
-    .learner-workspace .brief-card.featured h3 {
-      font-family: var(--workspace-display-font);
-      font-size: clamp(1.75rem, 2.5vw, 2.5rem);
-      font-weight: 400;
-      line-height: 1.15;
-    }
     .learner-workspace .brief-list > .brief-card:nth-child(2):last-child {
       display: grid;
       grid-column: 1 / -1;
@@ -441,8 +341,6 @@
       gap: var(--space-8);
     }
     .learner-workspace .article-header { padding-block-start: 0; }
-    .learner-workspace .article-lede { font-size: 1rem; }
-    .learner-workspace .article .markdown { font-size: 1rem; }
     .learner-workspace .course-continue { gap: var(--space-2); }
     .learner-workspace .reading-pagination-link { min-height: 2.75rem; }
     .workspace-chrome .search-new-conversation-label { display: none; }

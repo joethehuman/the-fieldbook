@@ -8,7 +8,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { BookOpen, MessageCircle, Plus, Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import type { Content } from "@/lib/types";
 import type { SearchProvider, SearchResult } from "@/lib/search";
 import type { AiCitation } from "@/lib/ai";
@@ -85,7 +85,6 @@ export function SearchExperience({
   const [aiReady, setAiReady] = useState(false);
   const [aiTarget, setAiTarget] = useState<HTMLDivElement | null>(null);
   const [initialQuestion, setInitialQuestion] = useState<string | null>(null);
-  const focusComposer = useRef(false);
   const [shortcut, setShortcut] = useState("Ctrl K");
   const enabled = aiMode !== "off";
   const visible = open;
@@ -105,14 +104,6 @@ export function SearchExperience({
     window.addEventListener("keydown", focusSearch);
     return () => window.removeEventListener("keydown", focusSearch);
   }, [compact, onRequestOpen]);
-  useEffect(() => {
-    if (!focusComposer.current || !visible || view !== "ai" || !aiReady || !aiTarget) return;
-    const field = aiTarget.querySelector<HTMLTextAreaElement>("textarea");
-    if (field) {
-      focusComposer.current = false;
-      field.focus({ preventScroll: true });
-    }
-  }, [visible, view, aiReady, aiTarget]);
   useLayoutEffect(() => {
     if (compact && visible) input.current?.focus({ preventScroll: true });
   }, [compact, visible]);
@@ -225,16 +216,9 @@ export function SearchExperience({
     </SearchField>
   );
   const emptySearch = (
-    <div className="search-welcome">
-      <span className="search-welcome-icon"><BookOpen size={24} aria-hidden="true" /></span>
-      <h2>Find what you need.</h2>
-      <p>Search courses, updates, and docs.</p>
-      {enabled && (
-        <Button variant="outline" onClick={() => { focusComposer.current = true; setAiActivated(true); setView("ai"); }}>
-          <MessageCircle aria-hidden="true" /> Ask AI a question
-        </Button>
-      )}
-    </div>
+    <p className="px-4 py-3 text-copy text-muted-foreground">
+      Search courses, updates, and docs.
+    </p>
   );
   return (
     <SearchPanel
@@ -307,8 +291,8 @@ export function SearchExperience({
             >
               <div className="search-panel-heading flex shrink-0 flex-wrap items-center justify-between gap-2 bg-card px-4 pt-2">
                 <TabsList aria-label="Search and Ask AI">
-                  <TabsTrigger value="search"><Search size={15} aria-hidden="true" /> Search</TabsTrigger>
-                  <TabsTrigger value="ai"><MessageCircle size={15} aria-hidden="true" /> Ask AI</TabsTrigger>
+                  <TabsTrigger value="search">Search</TabsTrigger>
+                  <TabsTrigger value="ai">Ask AI</TabsTrigger>
                 </TabsList>
                 {view === "ai" && (
                   <Button

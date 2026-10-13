@@ -84,11 +84,16 @@ for (const profile of ["demo-admin", "demo-contributor", "demo-manager"]) {
     }, { workspace: data, profile });
     await page.goto("/#courses");
     await expect(page.locator(".app")).toHaveClass(/learner-workspace/);
+    const heading = page.getByRole("heading", { name: "Courses", exact: true });
+    const headingFont = await heading.evaluate((element) => getComputedStyle(element).fontFamily);
+    await expect(heading).toHaveCSS("font-size", "32px");
+    await expect(heading).toHaveCSS("font-weight", "500");
     const learnerSurface = await page.locator(".app").evaluate((element) => getComputedStyle(element).getPropertyValue("--surface"));
     const sidebarSurface = await page.locator(".sidebar").evaluate((element) => getComputedStyle(element).backgroundColor);
     await page.goto(profile === "demo-manager" ? "/#team" : "/#admin");
     await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
     await expect(page.locator(".sidebar")).toHaveCSS("background-color", sidebarSurface);
+    await expect(page.locator("main h1").first()).toHaveCSS("font-family", headingFont);
     await expect.poll(() => page.locator(".app").evaluate((element) => getComputedStyle(element).getPropertyValue("--surface"))).not.toBe(learnerSurface);
     if (profile === "demo-admin") {
       await page.getByRole("searchbox", { name: "Search content", exact: true }).fill("Know the platform");
@@ -98,6 +103,7 @@ for (const profile of ["demo-admin", "demo-contributor", "demo-manager"]) {
     }
     await page.goto("/#updates");
     await expect(page.locator(".app")).toHaveClass(/learner-workspace/);
+    await expect(page.getByRole("heading", { name: "Updates", exact: true })).toHaveCSS("font-family", headingFont);
   });
 }
 
@@ -138,9 +144,10 @@ test("learner search opens from the keyboard and preserves an AI draft across di
   const search = page.getByRole("textbox", { name: "Search all content", exact: true });
   const panel = page.locator('[data-slot="search-panel"]');
   await expect(search).toBeFocused();
-  await expect(panel.getByRole("heading", { name: "Find what you need." })).toBeVisible();
-  await panel.getByRole("button", { name: "Ask AI a question", exact: true }).click();
+  await expect(panel.getByText("Search courses, updates, and docs.", { exact: true })).toBeVisible();
+  await panel.getByRole("tab", { name: "Ask AI", exact: true }).click();
   const question = page.getByRole("textbox", { name: "Your question", exact: true });
+  await question.click();
   await expect(question).toBeFocused();
   await question.fill("How should I prepare for a customer conversation?");
   await question.press("Escape");

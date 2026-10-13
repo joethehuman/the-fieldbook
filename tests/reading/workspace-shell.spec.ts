@@ -117,16 +117,18 @@ test("learner and management routes share chrome while keeping separate content 
     return { background: style.backgroundColor, color: style.color, font: style.fontFamily };
   }));
   const appearance = await chrome();
+  const headingFont = await page.locator("main h1").first().evaluate((element) => getComputedStyle(element).fontFamily);
   for (const route of ["/admin", "/team", "/updates", contentPath("doc", docId, doc.title)]) {
     await page.goto(route);
     await expect(page.locator("main h1").first()).toBeVisible();
     await expect.poll(chrome).toEqual(appearance);
+    await expect(page.locator("main h1").first()).toHaveCSS("font-family", headingFont);
     await expect(page.locator(".main-content")).toHaveCSS("background-color", "rgb(255, 255, 255)");
     if (route === "/admin" || route === "/team") await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
     else await expect(page.locator(".app")).toHaveClass(/learner-workspace/);
     await page.keyboard.press("Control+k");
     await expect(page.getByRole("textbox", { name: "Search all content", exact: true })).toBeFocused();
-    await expect(page.getByRole("heading", { name: "Find what you need." })).toBeVisible();
+    await expect(page.getByText("Search courses, updates, and docs.", { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
   }
 });
