@@ -76,16 +76,26 @@ test("key generation is private, silent about secrets and never overwrites exist
   try {
     const file = join(directory, "keys.env");
     writeSelfHostedKeys(file);
-    const descriptor = openSync(file, "r");
-    let original: string;
-    try {
-      assert.equal(fstatSync(descriptor).mode & 0o777, 0o600);
-      original = readFileSync(descriptor, "utf8");
-    } finally {
-      closeSync(descriptor);
-    }
+    const snapshot = () => {
+      const descriptor = openSync(file, "r");
+      try {
+        return {
+          mode: fstatSync(descriptor).mode & 0o777,
+          contents: readFileSync(descriptor, "utf8"),
+        };
+      } finally {
+        closeSync(descriptor);
+      }
+    };
+    const original = snapshot();
+    assert.equal(original.mode, 0o600);
     assert.throws(() => writeSelfHostedKeys(file), /EEXIST/);
-    assert.equal(readFileSync(file, "utf8"), original);
+    const preserved = snapshot();
+    assert.equal(preserved.mode, 0o600);
+    assert.ok(
+      preserved.contents === original.contents,
+      "Exclusive creation preserves the saved key bytes.",
+    );
     const processResult = spawnSync(
       process.execPath,
       [
