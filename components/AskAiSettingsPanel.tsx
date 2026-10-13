@@ -49,7 +49,6 @@ export function AskAiSettingsPanel({
   busy,
   actions,
   belowActions,
-  sticky = false,
 }: {
   value: AskAiSettings;
   onChange: (next: AskAiSettings) => void;
@@ -57,7 +56,6 @@ export function AskAiSettingsPanel({
   busy: boolean;
   actions: ReactNode;
   belowActions?: ReactNode;
-  sticky?: boolean;
 }) {
   const [setup, setSetup] = useState<AiSetup | null>(
     production ? null : demoSetup,
@@ -379,7 +377,6 @@ export function AskAiSettingsPanel({
         }
         actions={actions}
         belowActions={belowActions}
-        sticky={sticky}
       />
     </>
   );
