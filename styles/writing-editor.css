@@ -659,6 +659,7 @@
 .editor .writing-document-heading + .mdxeditor-root-contenteditable .writing-content { padding-block-start: var(--space-3); }
 .editor .writing-source-panel .writing-document-heading { position: relative; }
 .editor .course-quiz-content { padding: var(--space-3) var(--editor-content-padding); }
+.course-quiz-focus-space { height: 0; pointer-events: none; overflow-anchor: none; }
 .editor .course-quiz-canvas > .writing-document-heading { top: var(--editor-navigation-height, 0px); }
 .editor[data-flowing-heading] .writing-document-heading { position: relative; top: auto; }
 .editor-frame-canvas[data-navigation-scrolled="true"] .course-quiz-canvas > .writing-document-heading::after { opacity: 1; }
