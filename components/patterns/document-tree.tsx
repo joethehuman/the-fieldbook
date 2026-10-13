@@ -12,6 +12,7 @@ import {
   docSections,
   type DocLink,
   type DocBranch,
+  orderedBranchItems,
   type DocSection,
 } from "@/lib/docs-navigation";
 import { useScrollFade } from "./use-scroll-fade";
@@ -137,7 +138,7 @@ export function DocumentTree({
       asChild
       variant="ghost"
       size="sm"
-      key={doc.id}
+      key={`doc:${doc.id}`}
       className="document-link w-full justify-start rounded-control px-2 py-1 text-left text-sm font-normal leading-snug whitespace-normal break-words [overflow-wrap:anywhere] text-foreground/80 aria-[current=page]:text-link hover:bg-muted-hover hover:text-foreground focus-visible:ring-inset focus-visible:ring-offset-0"
     >
       {onOpen ? (
@@ -177,7 +178,7 @@ export function DocumentTree({
     return (
       <Collapsible
         open={expanded.includes(key)}
-        key={value.id}
+        key={`section:${value.id}`}
         data-branch={key}
         onOpenChange={(open) => {
           const next = open
@@ -193,8 +194,11 @@ export function DocumentTree({
           <ChevronRight aria-hidden="true" size={14} />
         </CollapsibleTrigger>
         <CollapsibleContent forceMount className="document-subsection-children">
-          {value.docs.map(documentLink)}
-          {value.folders.map((child) => folder(child, [...path, value.id]))}
+          {orderedBranchItems(value).map((item) =>
+            item.kind === "doc"
+              ? documentLink(item.doc)
+              : folder(item.section, [...path, value.id]),
+          )}
         </CollapsibleContent>
       </Collapsible>
     );
@@ -218,8 +222,11 @@ export function DocumentTree({
         <section className="document-section" key={section.id}>
           <h2 className="document-section-heading">{section.name}</h2>
           <div className="document-section-children">
-            {section.docs.map(documentLink)}
-            {section.folders.map((child) => folder(child, [section.id]))}
+            {orderedBranchItems(section).map((item) =>
+              item.kind === "doc"
+                ? documentLink(item.doc)
+                : folder(item.section, [section.id]),
+            )}
           </div>
         </section>
       ))}
