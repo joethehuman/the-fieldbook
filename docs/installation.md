@@ -146,6 +146,8 @@ The app spec runs:
 - **Storage:** the pinned upstream image plus the same CA wrapper, private Spaces credentials and persistent PostgreSQL/S3 state. No file bytes depend on the container's local disk.
 - **Cleanup:** the hourly App Platform job. Omit this job from the initial deployment until its credential exists, then add it after database setup below.
 
+Bootstrap the same app with only **Fieldbook** and its `/` ingress rule first, retaining the database attachment, VPC, canonical hostname and final public Supabase variables. Omit Auth, REST, Storage, cleanup and their ingress rules for this deployment. The static `/fieldbook-build.json` health check works without the backend; the ordinary interface is not usable yet. After that deployment succeeds, read the app's `vpc.egress_ips` in Networking or the app API and add those exact private addresses to database trusted sources. Then add Auth, REST and Storage and their ingress rules from the populated spec, keeping signup, the token hook and OAuth disabled as described below. Re-read the egress addresses after the component update and reconcile trusted sources if they changed. This avoids starting database-dependent services before DO assigns the app's private egress address; no second app or unrestricted database access is needed.
+
 Map generated keys as follows:
 
 | Generated value | Component environment |

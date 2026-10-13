@@ -1,6 +1,9 @@
 # Candidate DO recipe. Read docs/installation.md before supplying private values.
 # Keep populated specs outside Git. Choose sizes for your workload before creating.
 # One Fieldbook instance: distributed Next.js cache coordination is not configured.
+# Bootstrap this same app with only Fieldbook and its / ingress first. Once its
+# VPC egress IPs are trusted by PostgreSQL, add the backend services and routes.
+# Add cleanup only after Fieldbook setup has created its durable credential.
 name: fieldbook
 region: sfo
 domains:
