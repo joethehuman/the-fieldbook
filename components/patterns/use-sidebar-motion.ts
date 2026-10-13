@@ -29,7 +29,7 @@ export function useSidebarMotion(ref: RefObject<HTMLDivElement | null>, collapse
         const animation = element.animate({
           [property]: [interrupted.current.get(element)?.[property] || from, to],
           ...(visible ? { visibility: ["visible", "visible"] } : {}),
-        }, { duration: property === "opacity" ? 160 : 180, easing: "ease" });
+        }, { duration: property === "opacity" ? (collapsed ? 160 : 240) : (collapsed ? 220 : 320), easing: "ease" });
         motions.push({ element, property, animation });
       };
       const from = `${collapsed ? full : rail}px`, to = `${collapsed ? rail : full}px`;

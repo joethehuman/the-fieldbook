@@ -1140,7 +1140,7 @@
       transform: translateX(-100%);
       transition: none;
     }
-    .app .sidebar.open { visibility: visible; transform: translateX(0); transition: transform 150ms ease; }
+    .app .sidebar.open { visibility: visible; transform: translateX(0); }
     .app :is(.sidebar-heading, .primary-navigation, .document-tree, .sidebar-bottom) { width: 100%; }
     .app :is(.sidebar-heading .logo, .sidebar-nav-text, .nav-count, .document-tree, .sidebar-account-avatar, .sidebar-account-identity, .sidebar-account-secondary) { opacity: 1; visibility: inherit; pointer-events: auto; transition: none; }
     .app .sidebar-account-trigger { transform: none; }
@@ -1157,7 +1157,6 @@
       animation: loading-enter 200ms ease-out both, loading-sweep 1.2s ease-in-out 200ms infinite alternate;
     }
     @media (prefers-reduced-motion: reduce) {
-      .app .sidebar.open { transition: none; }
       .app .sidebar.open.navigation-pending::after { animation: none; width: 100%; }
     }
   }
@@ -1269,11 +1268,25 @@
 @layer utilities {
   .app .sidebar, .app .sidebar * { transition: none; }
   .app :is(.app-navigation-toggle, .sidebar-mobile-close, .app-navigation-backdrop) { display: none; }
+  .app .app-navigation-backdrop { opacity: 0; visibility: hidden; pointer-events: none; }
   @media (width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait) {
     .app :is(.app-navigation-toggle, .sidebar-mobile-close, .app-navigation-backdrop) { display: flex; }
     .app .sidebar-toggle { display: none; }
-    .app .sidebar.open { transition: transform 150ms ease; }
-    @media (prefers-reduced-motion: reduce) { .app .sidebar.open { transition: none; } }
+    .app .sidebar { transition: transform 220ms ease, visibility 0s linear 220ms; }
+    .app .sidebar.open { transition: transform 320ms ease, visibility 0s; }
+    .app .app-navigation-backdrop { transition: opacity 220ms ease-in-out, visibility 0s linear 220ms; }
+    .app .app-navigation-backdrop[data-state="open"] {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition: opacity 320ms ease-in-out, visibility 0s;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .app .sidebar,
+      .app .sidebar.open,
+      .app .app-navigation-backdrop,
+      .app .app-navigation-backdrop[data-state="open"] { transition: none; }
+    }
   }
 }
 
