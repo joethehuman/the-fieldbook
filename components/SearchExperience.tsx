@@ -272,7 +272,7 @@ export function SearchExperience({
       compact={compact}
       fullScreen={compactLayout}
       fitContent={fitPanel}
-      showEscapeHint={view === "search" ? !fitContent : !aiReady}
+      showEscapeHint={view === "search" && !fitContent}
       onDismiss={() => setOpen(false)}
       returnFocus={compact ? searchTrigger : undefined}
       persistentContent={
