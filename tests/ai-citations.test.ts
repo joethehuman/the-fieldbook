@@ -163,11 +163,13 @@ test("pending prose hides internal and partial source IDs until verified metadat
     "[S12]【S3",
   ]) {
     const tree: any = pending.runSync(pending.parse("Read the steps " + tail));
-    assert.doesNotMatch(
-      JSON.stringify(tree.children),
-      /\[S|【S|value.*(?:\[|【)$/,
+    assert.doesNotMatch(JSON.stringify(tree.children), /\[S|【S/);
+    assert.equal(
+      tree.children[0].children
+        .map((node: { value?: string }) => node.value ?? "")
+        .join(""),
+      "Read the steps ",
     );
-    assert.equal(tree.children[0].children[0].value, "Read the steps ");
   }
   const code: any = pending.runSync(pending.parse("`[S12]` and prose [S12]."));
   assert.equal(code.children[0].children[0].value, "[S12]");

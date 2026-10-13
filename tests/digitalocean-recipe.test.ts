@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPublicKey, verify } from "node:crypto";
-import { readFileSync, mkdtempSync, statSync, rmSync } from "node:fs";
+import {
+  readFileSync,
+  mkdtempSync,
+  openSync,
+  fstatSync,
+  closeSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -69,8 +76,14 @@ test("key generation is private, silent about secrets and never overwrites exist
   try {
     const file = join(directory, "keys.env");
     writeSelfHostedKeys(file);
-    const original = readFileSync(file, "utf8");
-    assert.equal(statSync(file).mode & 0o777, 0o600);
+    const descriptor = openSync(file, "r");
+    let original: string;
+    try {
+      assert.equal(fstatSync(descriptor).mode & 0o777, 0o600);
+      original = readFileSync(descriptor, "utf8");
+    } finally {
+      closeSync(descriptor);
+    }
     assert.throws(() => writeSelfHostedKeys(file), /EEXIST/);
     assert.equal(readFileSync(file, "utf8"), original);
     const processResult = spawnSync(
