@@ -61,7 +61,7 @@
     max-height: none;
     transform: none;
     gap: 0;
-    overflow: hidden;
+    overflow: clip;
     border: 0;
     border-radius: 0;
     padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);

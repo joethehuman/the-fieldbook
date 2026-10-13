@@ -135,6 +135,19 @@ export function SearchPanel({
             data-mobile="true"
             aria-describedby={undefined}
             className="workspace-chrome search-mobile-surface translate-x-0 translate-y-0"
+            onPointerUpCapture={(event) => {
+              const field = event.target;
+              if (
+                event.pointerType !== "touch" ||
+                !event.isPrimary ||
+                !(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) ||
+                field === document.activeElement
+              ) return;
+              // Focus at the end of a tap without Safari's additional pan.
+              // Viewport resizing already brings the composer above the keyboard.
+              // Scrolling cancels the pointer; native caret gestures stay intact.
+              field.focus({ preventScroll: true });
+            }}
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               returnFocus?.current?.focus({ preventScroll: true });
