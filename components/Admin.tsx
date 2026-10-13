@@ -287,6 +287,7 @@ const adminSections = [
   },
 ];
 type Props = {
+  aiRouter?: import("@/lib/ai").AiRouter | null;
   initialDestination?: AdminDestination;
   onWriteDestination?: (
     destination: AdminDestination,
@@ -385,6 +386,7 @@ function initialPerson(
     : null;
 }
 export default function Admin({
+  aiRouter,
   initialDestination = { tab: "content" },
   onWriteDestination,
   onLoadDestination,
@@ -1403,6 +1405,7 @@ export default function Admin({
               <CategorySettingsPanel data={data} onSave={onSaveCategories} registerNavigationGuard={registerAdminGuard} />
             ) : tab.startsWith("settings-") ? (
               <SiteSettingsPanel
+                aiRouter={aiRouter}
                 key={tab}
                 contributor={!admin}
                 section={

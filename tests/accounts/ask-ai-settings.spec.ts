@@ -570,10 +570,150 @@ test("Missing router warns inline; late metadata cannot reveal controls after sw
   expect(await setupCalls(request)).toBe(0);
 });
 
-test("DigitalOcean selects an external router and explains its capability and fallback boundaries", async ({
+test("DigitalOcean shows a stable router summary before discovery, preserves settings and explains model pools", async ({
   page,
   request,
 }, info) => {
+  test.skip(
+    process.env.FIELDBOOK_AI_ROUTER !== "digitalocean",
+    "Run with the DigitalOcean presentation selected.",
+  );
+  await signedIn(page, request);
+  await request.post("http://127.0.0.1:3130/fixture", {
+    data: {
+      settings: {
+        access: "public",
+        askAi: {
+          ...defaultAskAiSettings,
+          enabled: true,
+          router: "digitalocean",
+          model: "router:fieldbook",
+          fallbackModel: "",
+        },
+      },
+      role: "admin",
+    },
+  });
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/admin/ask-ai", async (route) => {
+    await waiting;
+    await route.fulfill({
+      json: {
+        setup: {
+          router: {
+            id: "digitalocean",
+            name: "DigitalOcean Inference Router",
+            supportsFallback: false,
+            routerSelection: {
+              target: "router:fieldbook",
+              description:
+                "Model pools, priorities and fallbacks are managed through the DigitalOcean API. Inference Router is in public preview.",
+              details:
+                "Fieldbook sends both search planning and answer generation to this router. Pricing and data handling depend on the model that answers; router-wide pricing, retention and training assurances are unavailable.",
+            },
+          },
+          selectionRouter: "digitalocean",
+          checkedAt: "",
+          models: [
+            {
+              id: "router:fieldbook",
+              name: "router:fieldbook",
+              inputPerMillion: null,
+              outputPerMillion: null,
+              zeroRetention: "unknown",
+              noTraining: "unknown",
+              validation: {
+                ready: true,
+                message:
+                  "Synthetic metadata checked; routing and failover still need an inference check.",
+              },
+              routing: {
+                pools: [
+                  { label: "Published questions", models: ["test/primary"] },
+                ],
+                fallbacks: ["test/backup", "test/primary"],
+              },
+            },
+          ],
+          catalog: { ready: true, message: "" },
+          connection: { configured: true, message: "" },
+          retrieval: { ready: true, message: "" },
+        },
+      },
+    });
+  });
+  await page.goto("/admin/settings/ask-ai");
+  const content = page.locator("#settings-ai-content");
+  await expect(
+    page.getByRole("heading", { name: "Routing", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Checking router metadata…", { exact: true }),
+  ).toBeVisible();
+  for (const name of ["Primary model", "Fallback model", "Inference router"])
+    await expect(page.getByRole("combobox", { name, exact: true })).toHaveCount(
+      0,
+    );
+  await expect(
+    page.getByText("router:fieldbook", { exact: true }),
+  ).toBeVisible();
+  const before = await content.boundingBox();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
+  release();
+  await expect(
+    page.getByText("Model metadata checked.", { exact: true }),
+  ).toBeVisible();
+  const after = await content.boundingBox();
+  expect(before).not.toBeNull();
+  expect(after).not.toBeNull();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThanOrEqual(1);
+  await expect(
+    page.getByRole("button", { name: "Use configured router", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", {
+      name: "Model pools and fallback order",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText("Published questions", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("#settings-ai-models ul li")).toHaveText([
+    "test/primary",
+  ]);
+  await expect(page.locator("#settings-ai-models ol li")).toHaveText([
+    "test/backup",
+    "test/primary",
+  ]);
+  await expect(
+    page.getByText("routing and failover still need an inference check.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  expect(await setupCalls(request)).toBe(0);
+  await picture(page, {
+    path: info.outputPath("ask-ai-digitalocean-router.png"),
+    fullPage: true,
+  });
+});
+
+test("DigitalOcean explicitly adopts the configured target and clears a saved legacy fallback", async ({
+  page,
+  request,
+}) => {
+  test.skip(
+    process.env.FIELDBOOK_AI_ROUTER !== "digitalocean",
+    "Run with the DigitalOcean presentation selected.",
+  );
   await signedIn(page, request);
   await request.post("http://127.0.0.1:3130/fixture", {
     data: {
@@ -598,82 +738,62 @@ test("DigitalOcean selects an external router and explains its capability and fa
             name: "DigitalOcean Inference Router",
             supportsFallback: false,
             routerSelection: {
+              target: "router:fieldbook",
               description:
-                "Choose the custom router configured for this installation. Manage its model pools, priorities and fallbacks through the DigitalOcean API. Inference Router is in public preview.",
-              details:
-                "Fallbacks are managed in DigitalOcean. Pricing and data handling depend on the model that answers; router-wide pricing, retention and training assurances are unavailable.",
+                "Model pools, priorities and fallbacks are managed through the DigitalOcean API. Inference Router is in public preview.",
+              details: "Managed routing.",
             },
           },
           selectionRouter: "vercel",
           checkedAt: "",
+          catalog: { ready: true },
+          connection: { configured: true },
+          retrieval: { ready: true },
           models: [
             {
               id: "router:fieldbook",
               name: "router:fieldbook",
-              inputPerMillion: null,
-              outputPerMillion: null,
-              zeroRetention: "unknown",
-              noTraining: "unknown",
-              validation: {
-                ready: true,
-                message:
-                  "All pool and fallback models advertise text, tool calling and streaming. Routing and failover still need an inference check.",
-              },
+              validation: { ready: true, message: "Synthetic check" },
             },
           ],
-          catalog: { ready: true, message: "" },
-          connection: { configured: true, message: "" },
-          retrieval: { ready: true, message: "" },
         },
       },
     }),
   );
-  await page.goto("/admin");
-  await section(page, "Ask AI");
-  await page.getByRole("switch", { name: "Enable Ask AI" }).check();
-  await expect(
-    page.getByRole("heading", { name: "Routing", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Inference Router is in public preview.", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("combobox", { name: "Fallback model", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByText("This router does not support a fallback."),
-  ).toHaveCount(0);
-  await expect(
-    page.getByText("Fallbacks are managed in DigitalOcean.", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByText(
-      "router-wide pricing, retention and training assurances are unavailable.",
-      { exact: false },
-    ),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Routing and failover still need an inference check.", {
-      exact: false,
-    }),
-  ).toBeVisible();
-  await page
-    .getByRole("combobox", { name: "Inference router", exact: true })
-    .click();
-  await page
-    .getByRole("option", { name: "router:fieldbook", exact: true })
-    .click();
-  await expect(
-    page.getByRole("combobox", { name: "Inference router", exact: true }),
-  ).toContainText("router:fieldbook");
-  await expect(
-    page.getByText("A previous fallback is still saved.", { exact: false }),
-  ).toHaveCount(0);
-  await page
-    .getByRole("heading", { name: "Routing", exact: true })
-    .scrollIntoViewIfNeeded();
-  await picture(page, {
-    path: info.outputPath("ask-ai-digitalocean-router.png"),
-    fullPage: true,
+  await page.goto("/admin/settings/ask-ai");
+  const use = page.getByRole("button", {
+    name: "Use configured router",
+    exact: true,
   });
+  await expect(use).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
+  let saves = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname === "/api/settings" &&
+      request.method() === "POST"
+    )
+      saves++;
+  });
+  await use.click();
+  await expect(use).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText("The model router changed.", { exact: false }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", {
+      name: "Model pools and fallback order",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeEnabled();
+  expect(saves).toBe(0);
+  expect(await setupCalls(request)).toBe(0);
 });

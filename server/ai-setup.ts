@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { aiModelChoices } from "@/lib/ai-models";
-import type { AiSetup } from "@/lib/ai";
+import type { AiRouter, AiSetup } from "@/lib/ai";
 import type { User } from "@/lib/types";
 import type { AiProvider } from "./ports/ai";
 import type { DataStore } from "./ports/data";
@@ -20,6 +20,17 @@ type Dependencies = {
   store: Pick<DataStore, "searchAiPassages" | "areAiSourcesCurrent">;
   currentUser: () => Promise<User | null>;
 };
+
+/** Synchronous public presentation. No credentials, remote reads or inference. */
+export function aiRouterPresentation(provider: AiProvider): AiRouter {
+  const selection = provider.routerSelection;
+  return {
+    id: provider.id,
+    name: provider.name,
+    supportsFallback: provider.supportsFallback,
+    ...(selection ? { routerSelection: selection } : {}),
+  };
+}
 
 /** Read-only metadata. Never generates text or writes settings. */
 export async function aiSetup(
@@ -58,14 +69,7 @@ export async function aiSetup(
     // claimed connection. Never expose raw configuration or credential errors.
   }
   if (provider) {
-    status.router = {
-      id: provider.id,
-      name: provider.name,
-      supportsFallback: provider.supportsFallback,
-      ...(provider.routerSelection
-        ? { routerSelection: provider.routerSelection }
-        : {}),
-    };
+    status.router = aiRouterPresentation(provider);
     status.connection = provider.connection();
     const [catalog, retrieval] = await Promise.allSettled([
       provider.models(signal),

@@ -12,14 +12,14 @@ export function requireAiRouter(settings: AskAiSettings, provider: AiProvider) {
     throw new HttpError(
       409,
       provider.routerSelection
-        ? "The model router changed. Choose the configured inference router in Ask AI settings before saving."
+        ? "The model router changed. Use the configured inference router in Ask AI settings before saving."
         : "The model router changed. Choose a primary model and review the fallback in Ask AI settings before saving.",
     );
   if (settings.fallbackModel && !provider.supportsFallback)
     throw new HttpError(
       400,
       provider.routerSelection
-        ? "Fallbacks are configured in the inference router. Clear the saved Fieldbook fallback before saving."
+        ? "Fallbacks are configured in the inference router. Use configured router in Ask AI settings to clear the saved Fieldbook fallback before saving."
         : "This model router does not support a fallback. Choose None before saving.",
     );
 }

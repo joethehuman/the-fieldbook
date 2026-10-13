@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   defaultAskAiSettings,
+  type AiRouter,
   type AiSetup,
   type AskAiSettings,
 } from "@/lib/ai";
@@ -18,6 +19,12 @@ import { Checkbox } from "./ui/checkbox";
 import { Field, FieldDescription, FieldGroup } from "./ui/field";
 import { Alert } from "./ui/alert";
 import { Badge } from "./ui/badge";
+import { ChevronDown } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "./ui/collapsible";
 
 const sourceChoices = [
   { value: "doc", label: "Docs" },
@@ -43,6 +50,7 @@ const demoSetup: AiSetup = {
 };
 
 export function AskAiSettingsPanel({
+  initialRouter,
   value,
   onChange,
   production,
@@ -51,6 +59,7 @@ export function AskAiSettingsPanel({
   belowActions,
   sticky = false,
 }: {
+  initialRouter?: AiRouter | null;
   value: AskAiSettings;
   onChange: (next: AskAiSettings) => void;
   production: boolean;
@@ -106,18 +115,26 @@ export function AskAiSettingsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [production, value.enabled]);
 
-  const router = setup?.router;
+  const router = setup
+    ? setup.router
+    : (initialRouter ?? (production ? null : demoSetup.router));
   const routerSelection = router?.routerSelection;
-  const primaryRequired = routerSelection
-    ? "Choose an inference router to enable AI."
-    : "Choose a primary model to enable AI.";
-  const boundRouter = value.router ?? setup?.selectionRouter;
+  const primaryRequired = "Choose a primary model to enable AI.";
+  const boundRouter = value.router ?? setup?.selectionRouter ?? "vercel";
   const routerChanged = Boolean(
     value.model && router && boundRouter !== router.id,
   );
   const model = setup?.models.find((entry) => entry.id === value.model);
   const fallback = setup?.models.find(
     (entry) => entry.id === value.fallbackModel,
+  );
+  const target = routerSelection?.target ?? "";
+  const configuredTarget = setup?.models.find((entry) => entry.id === target);
+  const needsRouterSelection = Boolean(
+    routerSelection &&
+    (boundRouter !== router?.id ||
+      value.model !== target ||
+      value.fallbackModel),
   );
   const problem =
     notice ||
@@ -142,13 +159,7 @@ export function AskAiSettingsPanel({
     const supportsFallback = router?.supportsFallback;
     return (
       <FormField
-        label={
-          backup
-            ? "Fallback model"
-            : routerSelection
-              ? "Inference router"
-              : "Primary model"
-        }
+        label={backup ? "Fallback model" : "Primary model"}
         errorPlaceholder={production && !backup ? primaryRequired : undefined}
         error={!backup && !selected ? primaryRequired : undefined}
         description={
@@ -156,9 +167,7 @@ export function AskAiSettingsPanel({
             ? supportsFallback === false
               ? "This router does not support a fallback."
               : "Optional backup if the primary cannot respond."
-            : routerSelection
-              ? "The installation configuration controls which router is available."
-              : "Required. Your choice stays saved while AI is off."
+            : "Required. Your choice stays saved while AI is off."
         }
       >
         <SelectField
@@ -190,15 +199,12 @@ export function AskAiSettingsPanel({
             )
           }
         >
-          <option value="">
-            {backup
-              ? "None"
-              : routerSelection
-                ? "Choose an inference router"
-                : "Choose a primary model"}
-          </option>
+          <option value="">{backup ? "None" : "Choose a primary model"}</option>
           {selected && !entry && (
-            <option value={selected}>{selected} — unavailable</option>
+            <option value={selected}>
+              {selected}
+              {setup?.catalog.ready ? " — unavailable" : ""}
+            </option>
           )}
           {setup?.models
             .filter(
@@ -257,21 +263,23 @@ export function AskAiSettingsPanel({
                       : "Checking configuration…")}
                 </p>
               </div>
-              {(setup || notice) && (
-                <Badge
-                  variant={
-                    production && !setup?.connection.configured
-                      ? "warning"
-                      : "default"
-                  }
-                >
-                  {!production
-                    ? "Demo only"
+              <Badge
+                variant={
+                  production &&
+                  (setup || notice) &&
+                  !setup?.connection.configured
+                    ? "warning"
+                    : "default"
+                }
+              >
+                {!production
+                  ? "Demo only"
+                  : !setup && !notice
+                    ? "Checking"
                     : setup?.connection.configured
                       ? "Configured"
                       : "Needs setup"}
-                </Badge>
-              )}
+              </Badge>
             </div>
             {problem && (
               <Alert role="status" dismissible>
@@ -281,7 +289,7 @@ export function AskAiSettingsPanel({
             {routerChanged && (
               <Alert dismissible>
                 {routerSelection
-                  ? "The model router changed. Choose the configured inference router before saving."
+                  ? "The model router changed. Use the configured inference router before saving."
                   : "The model router changed. Review the primary and fallback models before saving."}
               </Alert>
             )}
@@ -300,35 +308,135 @@ export function AskAiSettingsPanel({
             disabled={busy}
           >
             <FieldGroup>
-              <div
-                data-slot="ai-model-fields"
-                className={
-                  routerSelection
-                    ? "grid items-start gap-4"
-                    : "grid items-start gap-4 md:grid-cols-2"
-                }
-              >
-                {picker(false)}
-                {!routerSelection && picker(true)}
-              </div>
-              {routerSelection && (
+              {routerSelection ? (
                 <>
+                  <div className="grid gap-2 text-copy">
+                    <p className="font-medium">Configured inference router</p>
+                    <p className="break-words">
+                      {target || "No router configured"}
+                    </p>
+                  </div>
                   <FieldDescription>{routerSelection.details}</FieldDescription>
-                  {setup?.models.map(
-                    (entry) =>
-                      entry.validation && (
-                        <FieldDescription key={entry.id} role="status">
-                          {entry.validation.message}
-                        </FieldDescription>
-                      ),
+                  <FieldDescription role="status" className="min-h-10">
+                    {!setup && !notice
+                      ? "Checking router metadata…"
+                      : configuredTarget?.validation?.ready
+                        ? "Model metadata checked."
+                        : "Router metadata is unavailable or needs attention. View the details below."}
+                  </FieldDescription>
+                  {needsRouterSelection && (
+                    <FieldGroup className="gap-2">
+                      <FieldDescription>
+                        Use this installation’s configured router before saving.
+                        This replaces any previously saved model or fallback
+                        choice.
+                      </FieldDescription>
+                      <ActionGroup>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={
+                            busy ||
+                            !target ||
+                            !setup?.catalog.ready ||
+                            !configuredTarget?.validation?.ready
+                          }
+                          onClick={() =>
+                            onChange({
+                              ...value,
+                              router: router!.id,
+                              model: target,
+                              fallbackModel: "",
+                            })
+                          }
+                        >
+                          Use configured router
+                        </Button>
+                      </ActionGroup>
+                    </FieldGroup>
                   )}
-                  {value.fallbackModel && (
-                    <Alert dismissible>
-                      A previous fallback is still saved. Choose the inference
-                      router again to clear it before saving.
-                    </Alert>
-                  )}
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="group justify-start"
+                      >
+                        <ChevronDown
+                          aria-hidden="true"
+                          className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none"
+                        />
+                        Model pools and fallback order
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid gap-4 pt-3 text-copy">
+                        {configuredTarget?.routing ? (
+                          <>
+                            <div className="grid gap-2">
+                              <p className="font-medium">Model pools</p>
+                              {configuredTarget.routing.pools.length ? (
+                                configuredTarget.routing.pools.map(
+                                  (pool, index) => (
+                                    <div key={index} className="grid gap-1">
+                                      <p>{pool.label}</p>
+                                      <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                                        {pool.models.map((id, modelIndex) => (
+                                          <li
+                                            key={modelIndex}
+                                            className="break-words"
+                                          >
+                                            {id}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ),
+                                )
+                              ) : (
+                                <p className="text-muted-foreground">
+                                  No task-specific pools. Requests use the
+                                  fallback order.
+                                </p>
+                              )}
+                            </div>
+                            <div className="grid gap-2">
+                              <p className="font-medium">Fallback order</p>
+                              <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+                                {configuredTarget.routing.fallbacks.map(
+                                  (id, index) => (
+                                    <li key={index} className="break-words">
+                                      {id}
+                                    </li>
+                                  ),
+                                )}
+                              </ol>
+                            </div>
+                          </>
+                        ) : (
+                          <FieldDescription>
+                            {!setup && !notice
+                              ? "Checking router metadata…"
+                              : "Model pools and fallback order could not be loaded."}
+                          </FieldDescription>
+                        )}
+                        {configuredTarget?.validation && (
+                          <FieldDescription>
+                            {configuredTarget.validation.message}
+                          </FieldDescription>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </>
+              ) : (
+                <div
+                  data-slot="ai-model-fields"
+                  className="grid items-start gap-4 md:grid-cols-2"
+                >
+                  {picker(false)}
+                  {picker(true)}
+                </div>
               )}
               {!routerChanged &&
                 setup?.catalog.ready &&
@@ -336,7 +444,7 @@ export function AskAiSettingsPanel({
                 !model && (
                   <Alert dismissible>
                     {routerSelection ? (
-                      "The saved inference router is unavailable. Choose the configured router to enable Ask AI."
+                      "The saved inference router is unavailable. Use the configured router to enable Ask AI."
                     ) : (
                       <>
                         The primary model is unavailable. Choose a replacement

@@ -14,6 +14,8 @@ import { actor, requirePublisher, HttpError } from "@server/auth";
 import { readerWorkspaceContext } from "@server/reader";
 import { adminSnapshot } from "@server/admin-snapshot";
 import { getContent } from "@server/content";
+import { aiPresentation } from "@server/ai";
+import { canAdminister } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Administration | Fieldbook" };
@@ -77,6 +79,7 @@ export default async function Page({
         user,
         shell: await readerWorkspaceContext(path),
         destination,
+        aiRouter: canAdminister(user) ? aiPresentation() : null,
       }}
     />
   );

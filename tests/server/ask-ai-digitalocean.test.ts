@@ -190,6 +190,11 @@ test("DO custom router uses scoped discovery, bounded tool planning, and cited a
     assert.equal(models[0].inputPerMillion, null);
     assert.equal(models[0].zeroRetention, "unknown");
     assert.equal(models[0].validation?.ready, true);
+    assert.deepEqual(models[0].routing, {
+      pools: [{ label: "Published questions", models: ["test-chat"] }],
+      fallbacks: ["test-backup"],
+    });
+    assert.equal(digitaloceanAi.routerSelection!.target, "router:fieldbook");
     assert.match(models[0].validation!.message, /2 pool and fallback/);
     assert.match(models[0].validation!.message, /operator-attested/);
     assert.match(models[0].validation!.message, /does not establish/);
@@ -396,6 +401,31 @@ test("Router eligibility rejects implicit pools and every incompatible fallback 
       });
     }
     entries = catalog;
+    config = {
+      ...routerConfig,
+      config: {
+        fallback_models: ["test-backup", "test-chat"],
+        policies: [
+          { custom_task: null, models: ["test-backup", "test-chat"] },
+          {
+            custom_task: {
+              name: "Published questions",
+              description: "Not projected",
+            },
+            models: ["test-chat"],
+          },
+        ],
+      },
+    };
+    const [ordered] = await digitaloceanAi.models(signal);
+    assert.deepEqual(ordered.routing, {
+      pools: [
+        { label: "Model pool 1", models: ["test-backup", "test-chat"] },
+        { label: "Published questions", models: ["test-chat"] },
+      ],
+      fallbacks: ["test-backup", "test-chat"],
+    });
+    assert.equal(ordered.validation?.ready, true);
     config = {
       ...routerConfig,
       config: {

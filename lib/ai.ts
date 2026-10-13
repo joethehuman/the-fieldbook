@@ -23,6 +23,11 @@ export type AiModel = {
   noTraining: "all" | "some" | "none" | "unknown";
   /** Provider metadata check; never proof that paid inference succeeded. */
   validation?: { ready: boolean; message: string };
+  /** Read-only routing policy, supplied by the provider's metadata API. */
+  routing?: {
+    pools: { label: string; models: string[] }[];
+    fallbacks: string[];
+  };
 };
 export type AiConnection = {
   configured: boolean;
@@ -34,7 +39,11 @@ export type AiRouter = {
   /** Whether Fieldbook may select a separate fallback alongside the target. */
   supportsFallback: boolean;
   /** A selected target owns its pools and fallback policy outside Fieldbook. */
-  routerSelection?: { description: string; details: string };
+  routerSelection?: {
+    target: string;
+    description: string;
+    details: string;
+  };
 };
 export type AiSetup = {
   router: AiRouter | null;

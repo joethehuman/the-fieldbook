@@ -34,7 +34,12 @@ const routerSchema = routerSummarySchema.extend({
   config: z.object({
     fallback_models: z.array(z.string()).min(1).max(64),
     policies: z
-      .array(z.object({ models: z.array(z.string()).min(1).max(64) }))
+      .array(
+        z.object({
+          models: z.array(z.string()).min(1).max(64),
+          custom_task: z.object({ name: z.string().optional() }).nullish(),
+        }),
+      )
       .max(64),
   }),
 });
@@ -215,6 +220,17 @@ async function routerModel(signal: AbortSignal): Promise<AiModel> {
     zeroRetention: "unknown",
     noTraining: "unknown",
     validation,
+    ...(parsed.success
+      ? {
+          routing: {
+            pools: parsed.data.config.policies.map((policy, index) => ({
+              label: policy.custom_task?.name || `Model pool ${index + 1}`,
+              models: policy.models,
+            })),
+            fallbacks: parsed.data.config.fallback_models,
+          },
+        }
+      : {}),
   };
 }
 function model(id: string, fallback: string | undefined) {
@@ -249,11 +265,15 @@ export const digitaloceanAi: AiProvider = {
   id: "digitalocean",
   name: "DigitalOcean Inference Router",
   supportsFallback: false,
-  routerSelection: {
-    description:
-      "Choose the custom router configured for this installation. Manage its model pools, priorities and fallbacks through the DigitalOcean API. Inference Router is in public preview.",
-    details:
-      "Fallbacks are managed in DigitalOcean. Fieldbook sends both search planning and answer generation to this router. Pricing and data handling depend on the model that answers; router-wide pricing, retention and training assurances are unavailable.",
+  get routerSelection() {
+    const configured = target();
+    return {
+      target: configured.success ? configured.data : "",
+      description:
+        "Model pools, priorities and fallbacks are managed through the DigitalOcean API. Inference Router is in public preview.",
+      details:
+        "Fieldbook sends both search planning and answer generation to this router. Pricing and data handling depend on the model that answers; router-wide pricing, retention and training assurances are unavailable.",
+    };
   },
   connection,
   async models(signal) {
