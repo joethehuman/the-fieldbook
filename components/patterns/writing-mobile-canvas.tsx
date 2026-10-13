@@ -40,8 +40,10 @@ function registerBlankCanvasTap(editor: LexicalEditor) {
         || !(event.target instanceof Element) || !wrappers.has(event.target)
         || event.clientY < surface.getBoundingClientRect().bottom) return;
       event.preventDefault();
-      editor.update(() => { $getRoot().selectEnd(); }, { discrete: true });
       if (surface.ownerDocument.activeElement !== surface) surface.focus({ preventScroll: true });
+      // This explicit return already has a bounded canvas reveal. Native
+      // selection must not initiate focus or a second Lexical scroll walk.
+      editor.update(() => { $getRoot().selectEnd(); }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
       writing.dispatchEvent(new Event("fieldbook:writing-resume"));
     };
     owner.addEventListener("pointerdown", start, { passive: true });
@@ -76,12 +78,12 @@ export const writingMobileCanvasPlugin = realmPlugin({
           // Guided navigation already owns its bounded scroll animation.
           // Set its caret as one tagged editor transaction, rather than let
           // selection reconciliation start another reveal of the empty line.
+          if (surface.ownerDocument.activeElement !== surface) surface.focus({ preventScroll: true });
           editor.update(() => {
             const selection = $createRangeSelection();
             selection.applyDOMRange(event.detail);
             $setSelection(selection);
           }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
-          if (surface.ownerDocument.activeElement !== surface) surface.focus({ preventScroll: true });
           event.preventDefault();
         };
         surface.addEventListener("fieldbook:writing-reveal", reveal);

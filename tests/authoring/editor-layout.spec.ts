@@ -2481,6 +2481,154 @@ test("editor delete failure retains the draft and uses the latest saved revision
 test.describe("touch-only writing dock", () => {
   test.use({ hasTouch: true });
 
+async function recordWritingFocus(page: Page) {
+  await page.evaluate(() => {
+    type Entry = { kind: "focus"; preventScroll: boolean } | { kind: "selection"; focused: boolean };
+    const trace: Entry[] = [];
+    (window as unknown as { writingFocusTrace: Entry[] }).writingFocusTrace = trace;
+    const focus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (options) {
+      if (this.matches('.writing-content[contenteditable="true"]'))
+        trace.push({ kind: "focus", preventScroll: options?.preventScroll === true });
+      return focus.call(this, options);
+    };
+    const setBaseAndExtent = Selection.prototype.setBaseAndExtent;
+    Selection.prototype.setBaseAndExtent = function (anchor, anchorOffset, focusNode, focusOffset) {
+      const surface = (anchor instanceof Element ? anchor : anchor.parentElement)
+        ?.closest<HTMLElement>('.writing-content[contenteditable="true"]');
+      if (surface) trace.push({ kind: "selection", focused: document.activeElement === surface });
+      return setBaseAndExtent.call(this, anchor, anchorOffset, focusNode, focusOffset);
+    };
+  });
+}
+
+async function expectProtectedWritingFocus(page: Page) {
+  const trace = await page.evaluate(() => (window as unknown as {
+    writingFocusTrace: ({ kind: "focus"; preventScroll: boolean } | { kind: "selection"; focused: boolean })[];
+  }).writingFocusTrace);
+  // Observe native reconciliation, without replacing its focus or scroll behavior.
+  // Bounds alone cannot tell whether selection implicitly focused the editor.
+  expect(trace[0], JSON.stringify(trace)).toEqual({ kind: "focus", preventScroll: true });
+  const selections = trace.filter(entry => entry.kind === "selection");
+  expect(selections.length).toBeGreaterThan(0);
+  expect(selections.every(entry => entry.focused), JSON.stringify(trace)).toBe(true);
+  // These checks use a real rendered viewport, not overridden viewport getters.
+  // Verify the header is visible and its buttons still receive pointer routing.
+  await expect(page.locator(".topbar")).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("group", { name: "Editor controls", exact: true })).toBeInViewport({ ratio: 1 });
+  expect(await page.getByRole("button", { name: "Details", exact: true }).evaluate(button => {
+    const box = button.getBoundingClientRect();
+    return button.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+  })).toBe(true);
+}
+
+for (const field of ["doc title", "course title", "lesson title"] as const) {
+  for (const populated of [false, true]) {
+    test(`protected handoff: ${field} Return focuses before native selection with ${populated ? "existing" : "empty"} writing`, async ({ page }, info) => {
+      await page.setViewportSize({ width: 390, height: 490 });
+      const course = field !== "doc title";
+      await open(page, info.project.name.startsWith("production"), course ? "course" : "doc", 1, item => {
+        item.body = populated ? "Paragraph 1. Saved writing." : "";
+        if (course) item.lessons = [{ ...item.lessons[0], body: item.body }];
+      });
+      const title = page.getByRole("textbox", { name: field === "lesson title" ? "Lesson title" : "Title", exact: true });
+      const writer = page.getByRole("textbox", { name: course ? "Lesson content" : "Doc content", exact: true });
+      const titleValue = await title.inputValue();
+      await title.tap();
+      await recordWritingFocus(page);
+      await title.press("Enter");
+      await expectProtectedWritingFocus(page);
+      // Type immediately: waiting for a second selection would hide a handoff race.
+      await page.keyboard.insertText("First input.");
+      await expect(writer.locator("p").first()).toHaveText("First input.");
+      if (populated) await expect(writer.locator("p").nth(1)).toHaveText("Paragraph 1. Saved writing.");
+      await expect(title).toHaveValue(titleValue);
+      await expect(writer).toBeFocused();
+      await expectHeaderDock(page);
+      await expect(writer.locator("p").first()).toBeInViewport({ ratio: 1 });
+    });
+  }
+}
+
+test("protected handoff: blank canvas focuses before native selection and accepts immediate input", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 490 });
+  await open(page, info.project.name.startsWith("production"), "doc", 1, item => { item.body = "Paragraph 1."; });
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await page.locator("#editor-title").tap();
+  await recordWritingFocus(page);
+  const box = (await writer.boundingBox())!;
+  await page.touchscreen.tap(box.x + 12, box.y + box.height + 60);
+  await expectProtectedWritingFocus(page);
+  await page.keyboard.insertText(" Blank tap input.");
+  await expect(writer).toHaveText("Paragraph 1. Blank tap input.");
+  await expectHeaderDock(page);
+});
+
+test("protected handoff: publishing navigation focuses before native selection", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 490 });
+  await open(page, info.project.name.startsWith("production"), "doc", 1, item => { item.body = ""; });
+  await page.getByRole("button", { name: "Details", exact: true }).tap();
+  await recordWritingFocus(page);
+  await page.getByRole("button", { name: "Add content", exact: true }).tap();
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  // Guided navigation commits from its layout effect, after the panel closes.
+  await expect(writer).toBeFocused();
+  await expectProtectedWritingFocus(page);
+  await page.keyboard.insertText("Guided first input.");
+  await expect(writer).toHaveText("Guided first input.");
+  await expectHeaderDock(page);
+});
+
+test("protected handoff: a media link returns from its field before native selection", async ({ page }, info) => {
+  await page.route("https://example.test/focus-order.svg", route => route.fulfill({
+    contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="80"><rect width="160" height="80" fill="#d8e5ed"/></svg>',
+  }));
+  await page.setViewportSize({ width: 390, height: 490 });
+  await open(page, info.project.name.startsWith("production"), "doc", 1, item => { item.body = "Paragraph 1."; });
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await writer.locator("p").tap();
+  await writer.press("End");
+  await writer.press("Enter");
+  await page.getByRole("button", { name: /^Commands:/ }).tap();
+  await page.getByRole("menuitem", { name: "Image", exact: true }).tap();
+  const chooser = page.getByRole("dialog", { name: "Insert image", exact: true });
+  await chooser.getByRole("button", { name: "Link", exact: true }).tap();
+  await chooser.getByRole("textbox", { name: "Image URL", exact: true }).fill("https://example.test/focus-order.svg");
+  await recordWritingFocus(page);
+  await chooser.getByRole("button", { name: "Insert image", exact: true }).tap();
+  await expectProtectedWritingFocus(page);
+  await page.keyboard.insertText("After media.");
+  await expect(writer.locator("p").last()).toHaveText("After media.");
+  await expect(writer.locator('img[src="https://example.test/focus-order.svg"]')).toHaveCount(1);
+  await expect(writer.locator("p").first()).toHaveText("Paragraph 1.");
+  await expectHeaderDock(page);
+});
+
+test("Markdown Return after a long title retains native field reveal and exact source", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 490 });
+  const source = 'Paragraph 1.\n\n<UnsupportedWidget custom="preserved">Keep exact source.</UnsupportedWidget>';
+  await open(page, info.project.name.startsWith("production"), "doc", 1, item => { item.body = source; }, undefined, true);
+  const title = page.locator("#editor-title");
+  const longTitle = "W".repeat(160);
+  await title.fill(longTitle);
+  await title.evaluate(field => {
+    (field as HTMLTextAreaElement).setSelectionRange(0, 0);
+    field.closest<HTMLElement>(".main-content")!.scrollTop = 0;
+  });
+  expect((await page.locator(".writing-source").boundingBox())!.y).toBeGreaterThanOrEqual(490);
+  await title.press("Enter");
+  const markdown = page.locator(".writing-source");
+  await expect(markdown).toBeFocused();
+  await expect(markdown).toHaveValue(source);
+  await expect(title).toHaveValue(longTitle);
+  const box = (await markdown.boundingBox())!;
+  const header = (await page.locator(".topbar").boundingBox())!;
+  expect(box.y).toBeLessThan(490);
+  expect(box.y + box.height).toBeGreaterThan(header.y + header.height);
+  expect(await markdown.evaluate(field => (field as HTMLTextAreaElement).selectionStart)).toBe(0);
+  await expectHeaderDock(page);
+});
+
 test.describe("short mobile authoring with a rendered viewport", () => {
   test.use({ isMobile: true, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" });
 
@@ -2748,7 +2896,7 @@ type CommandLifecycle = {
 type ContinuousCommandMotion = {
   finished: boolean;
   recording: boolean;
-  frames: { top: number; bottom: number; height: number; viewportHeight: number; dockPosition?: string }[];
+  frames: { top: number; bottom: number; height: number; headerBottom: number; canvasBottom: number; dockPosition?: string }[];
 };
 
 async function installCommandViewport(page: Page, viewport: CommandViewport) {
@@ -2841,7 +2989,8 @@ async function animateContinuousCommandKeyboardClosing(page: Page, duration: num
         if (style.visibility === "visible" && parseFloat(style.opacity) > 0.05 && rect.height > 0) {
           motion.frames.push({ top: rect.top,
             bottom: rect.bottom, height: rect.height,
-            viewportHeight: fixture.viewport.height,
+            headerBottom: document.querySelector(".topbar")!.getBoundingClientRect().bottom,
+            canvasBottom: document.querySelector(".app-editor-overlays")!.getBoundingClientRect().bottom,
             dockPosition: document.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]')?.dataset.dockPosition });
         }
       }
@@ -3690,12 +3839,12 @@ test.describe("continuous mobile keyboard transitions", () => {
       });
       expect(frames.length).toBeGreaterThan(2);
       expect(frames.at(-1)!.height).toBeCloseTo(360, 0);
-      // The menu opens at the header immediately. Native keyboard motion
-      // may grow its height, but never flips or relocates its top anchor.
+      // The fixture pans the whole application as well as resizing it. Compare
+      // the menu and its owning row in the same frame, retaining exact clearance.
       for (const frame of frames) {
         expect(frame.dockPosition).toBe("top");
-        expect(frame.bottom).toBeLessThanOrEqual(frame.viewportHeight - 7);
-        expect(frame.top).toBeCloseTo(frames.at(-1)!.top, 0);
+        expect(frame.bottom).toBeLessThanOrEqual(frame.canvasBottom - 7);
+        expect(frame.top - frame.headerBottom).toBeCloseTo(8, 0);
         expect(frame.height).toBeLessThanOrEqual(360);
       }
       await expectFloatingSurfaceClearDock(page, menu);

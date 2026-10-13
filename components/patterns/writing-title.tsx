@@ -94,16 +94,19 @@ export function WritingTitle({
           ?.querySelector<HTMLElement>(
             '[contenteditable="true"], textarea.writing-source',
           );
-        body?.focus();
         if (body?.isContentEditable) {
+          body.focus({ preventScroll: true });
           const range = document.createRange();
           range.selectNodeContents(body);
           range.collapse(true);
           const selection = window.getSelection();
           selection?.removeAllRanges();
           selection?.addRange(range);
-        } else if (body instanceof HTMLTextAreaElement)
+        } else if (body instanceof HTMLTextAreaElement) {
+          // Markdown has its own native scrollport and no prose return session.
+          body.focus();
           body.setSelectionRange(0, 0);
+        }
       }}
     />
     </span>

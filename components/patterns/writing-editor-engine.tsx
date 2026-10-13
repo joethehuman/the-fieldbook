@@ -127,6 +127,9 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
   function enterBody() {
     const surface = lexical?.getRootElement();
     const mobile = surface?.closest<HTMLElement>(".writing-root[data-mobile-canvas]");
+    // DOM selection can implicitly focus WebKit's contenteditable. Protect the
+    // handoff before reconciliation, while it is still the title's user gesture.
+    if (surface && document.activeElement !== surface) surface.focus({ preventScroll: true });
     lexical?.update(() => {
       const root = $getRoot();
       const first = root.getFirstChild();
@@ -138,8 +141,6 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
       }
       paragraph.selectStart();
     }, { discrete: true, tag: mobile ? SKIP_SCROLL_INTO_VIEW_TAG : undefined });
-    // Keep the title-to-body handoff inside the same keyboard gesture.
-    if (surface && document.activeElement !== surface) surface.focus({ preventScroll: true });
     mobile?.dispatchEvent(new Event("fieldbook:writing-resume"));
   }
   const fade = useScrollFade<HTMLDivElement>();
@@ -727,6 +728,10 @@ export default function WritingEditorEngine({
     slashSelection.current = null;
     setSlashOpen(false);
     if (!lexical || !$isRangeSelection(saved)) return;
+    if (restoreCaret && canvas && compactRef.current) {
+      if (!hasAttachedInsertTarget(saved)) return;
+      lexical.getRootElement()?.focus({ preventScroll: true });
+    }
     lexical.update(() => {
       if (!$getNodeByKey(saved.anchor.key)?.isAttached()
         || !$getNodeByKey(saved.focus.key)?.isAttached()) return;
@@ -740,7 +745,7 @@ export default function WritingEditorEngine({
       tag: !restoreCaret && !lexical.getRootElement()?.contains(document.activeElement)
         ? [SKIP_SCROLL_INTO_VIEW_TAG, SKIP_DOM_SELECTION_TAG] : SKIP_SCROLL_INTO_VIEW_TAG,
     });
-  }, [slashQuery]);
+  }, [slashQuery, canvas]);
   useEffect(() => {
     if (!slashOpen) return;
     function close(event: PointerEvent) {
@@ -804,7 +809,11 @@ export default function WritingEditorEngine({
     const selection = mediaSelection.current;
     const lexical = lexicalEditor.current;
     if (!lexical) return;
-    if (canvas && compactRef.current) writingHighlight.clear();
+    if (canvas && compactRef.current) {
+      if (!hasAttachedInsertTarget(selection)) return;
+      writingHighlight.clear();
+      lexical.getRootElement()?.focus({ preventScroll: true });
+    }
     lexical.update(() => {
       if (selection) $setSelection(selection.clone());
       // A block decorator splits the current line without inheriting or
