@@ -7,6 +7,7 @@ import { Badge } from "./ui/badge";
 import { Alert } from "./ui/alert";
 import { Note } from "./ui/note";
 import { Card } from "./ui/card";
+import { Progress as ProgressBar } from "./ui/progress";
 import { QuizResults } from "./patterns/quiz-results";
 import { Radio, Checkbox } from "./ui/choice";
 import { Field, FieldGroup } from "./ui/field";
@@ -17,6 +18,7 @@ import { CourseVideo } from "./patterns/course-video";
 import Markdown from "./Markdown";
 import { correctOptionIds, optionIds, quizUnlocked, requiresPassing, type QuizAnswers } from "@/lib/course-quiz";
 import { isComplete, type Content, type Progress } from "@/lib/types";
+import { courseProgress } from "@/lib/course-progress";
 
 export function Course({ course, progress, onBack, backLabel, onProgress, onDemoProgress,
   guest = false, feedback, initialLessonId, curriculumTitle, backHref, lessonBaseHref }: {
@@ -58,6 +60,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const lessonContent = useMemo(() => lesson ? <Markdown linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown> : null, [lesson]);
   const allDone = course.lessons.every((item) => p?.lessons.includes(item.id));
   const complete = isComplete(course, progress);
+  const completion = courseProgress(course, progress);
   const latestAttempt = p?.attempts?.at(-1);
   const question = course.questions[questionIndex];
   const score = latestAttempt?.answers?.filter((answer) => answer.correct).length;
@@ -162,16 +165,20 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
               <p className="course-desktop-summary">{course.summary}</p>
               <div className="course-detail-meta course-desktop-summary"><span className="course-duration"><Clock size={16} aria-hidden="true" />{course.duration} min</span><span aria-hidden="true">·</span><span>{course.lessons.length} lessons</span><Badge variant="success" className={complete ? undefined : "invisible"} aria-hidden={!complete}>Completed</Badge></div>
             </div>
+            <div className="course-player-progress">
+              <div><span>Your progress</span><span>{completion.percent}%</span></div>
+              <ProgressBar value={completion.percent} />
+            </div>
           </div>
           <nav className="lesson-nav" aria-label="In this course">
             <h2>In this course</h2>
-            {course.lessons.map((item, index) => <NavigationButton variant="ghost" asChild={!!lessonBaseHref} className={step === index ? "selected" : ""} onClick={lessonBaseHref ? undefined : () => selectLesson(index)} key={item.id}>
+            {course.lessons.map((item, index) => <NavigationButton variant="ghost" asChild={!!lessonBaseHref} aria-current={step === index ? "step" : undefined} className={step === index ? "selected" : ""} onClick={lessonBaseHref ? undefined : () => selectLesson(index)} key={item.id}>
               {lessonBaseHref ? <Link prefetch={false} href={`${lessonBaseHref}${lessonBaseHref.includes("?") ? "&" : "?"}lesson=${encodeURIComponent(item.id)}`} onClick={(event) => { event.preventDefault(); selectLesson(index, event.currentTarget.href); }}>
               <span className={"step-number " + (p?.lessons.includes(item.id) ? "done" : "")}>{p?.lessons.includes(item.id) ? <Check size={13} /> : index + 1}</span>
               <span>{item.title}</span>
               </Link> : <><span className={"step-number " + (p?.lessons.includes(item.id) ? "done" : "")}>{p?.lessons.includes(item.id) ? <Check size={13} /> : index + 1}</span><span>{item.title}</span></>}
             </NavigationButton>)}
-            <NavigationButton variant="ghost" className={step === course.lessons.length ? "selected quiz-step" : "quiz-step"} onClick={() => setStep(course.lessons.length)}>
+            <NavigationButton variant="ghost" aria-current={step === course.lessons.length ? "step" : undefined} className={step === course.lessons.length ? "selected quiz-step" : "quiz-step"} onClick={() => setStep(course.lessons.length)}>
               <span className="step-number quiz-number"><CheckCircle2 size={16} /></span><span>{course.questions.length ? "Quiz" : "Finish course"}</span>
             </NavigationButton>
           </nav>

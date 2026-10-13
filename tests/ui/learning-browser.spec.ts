@@ -351,15 +351,15 @@ test("no assignments show personal activity without labeling other courses", asy
   });
 });
 
-test("course rows scroll directly and the completion card splits on iPad", async ({
+test("course rows scroll directly and the completion card adapts to tablets and phones", async ({
   page,
 }, info) => {
   await seed(page, false, true);
   const home = page.locator(".for-you");
   const row = home.getByRole("region", { name: "For you", exact: true });
   await expect(
-    page.getByRole("button", { name: /^(Previous|Next) .* courses$/ }),
-  ).toHaveCount(0);
+    home.getByRole("button", { name: "Scroll For you right", exact: true }),
+  ).toBeVisible();
   await expect(row).toHaveAttribute("tabindex", "0");
   expect(
     await row.evaluate((element) => element.scrollWidth > element.clientWidth),
@@ -436,10 +436,24 @@ test("course rows scroll directly and the completion card splits on iPad", async
           .first()
           .getByRole("button", { name: "Start course" })
           .boundingBox();
+        if (width >= 820) {
+          return Math.abs(
+            settledAction!.x +
+              settledAction!.width / 2 -
+              (settledSummary!.x + settledSummary!.width / 2),
+          );
+        }
+        const secondaryAction = await home
+          .locator('[data-slot="card"]')
+          .first()
+          .getByRole("button", { name: "View all for you" })
+          .boundingBox();
+        expect(settledAction!.x).toBeGreaterThan(settledSummary!.x);
+        expect(secondaryAction!.x).toBeGreaterThan(settledAction!.x + settledAction!.width);
+        expect(secondaryAction!.x + secondaryAction!.width).toBeLessThan(settledSummary!.x + settledSummary!.width);
         return Math.abs(
-          settledAction!.x +
-            settledAction!.width / 2 -
-            (settledSummary!.x + settledSummary!.width / 2),
+          settledAction!.y + settledAction!.height / 2 -
+          (secondaryAction!.y + secondaryAction!.height / 2),
         );
       })
       .toBeLessThan(2);

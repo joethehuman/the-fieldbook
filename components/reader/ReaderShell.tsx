@@ -230,6 +230,7 @@ export function ReaderShell({
         menu={menu}
         pending={navigationPending && showNavigationProgress}
         admin={section === "admin"}
+        learner={["updates", "courses", "curricula", "docs"].includes(section)}
         alert={
           accountError && (
             <Alert variant="destructive" role="alert" onDismiss={() => setAccountError("")}>
@@ -300,6 +301,7 @@ export function ReaderShell({
                     href={href}
                     prefetch
                     aria-label={label}
+                    aria-current={section === href.slice(1) || (href === "/courses" && section === "curricula") ? "page" : undefined}
                     title={collapsed ? label : undefined}
                   >
                     <Icon size={19} />
@@ -417,6 +419,7 @@ export function ReaderShell({
               <Menu />
             </Button>
             <ReaderSearch
+              onRequestOpen={close}
               enabled={context.branding.askAiEnabled === true}
               userId={context.user?.id || null}
               onOpen={async (result) => {

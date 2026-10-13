@@ -18,10 +18,12 @@ const searchReader: SearchProvider = async (query, filter, signal) => {
 export function ReaderSearch({
   enabled,
   userId,
+  onRequestOpen,
   onOpen,
 }: {
   enabled: boolean;
   userId: string | null;
+  onRequestOpen?: () => void;
   onOpen: (result: SearchResult) => Promise<boolean>;
 }) {
   return (
@@ -31,6 +33,7 @@ export function ReaderSearch({
       content={noWorkspaceContent}
       searchProvider={searchReader}
       clientNavigation
+      onRequestOpen={onRequestOpen}
       aiMode={enabled ? "installed" : "off"}
       onOpen={onOpen}
     />

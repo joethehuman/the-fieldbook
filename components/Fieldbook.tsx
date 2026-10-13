@@ -477,6 +477,7 @@ export default function Fieldbook() {
       menu={menu}
       pending={false}
       admin={view === "admin" && canPublish(user)}
+      learner={["briefs", "learn", "docs"].includes(view)}
       onDismiss={() => setMenu(false)}
       sidebar={
         <>
@@ -503,6 +504,7 @@ export default function Fieldbook() {
                 className={`${sidebarPrimaryLinkClassName} ${view === n.key ? "active" : ""}`}
                 key={n.key}
                 aria-label={n.title}
+                aria-current={view === n.key ? "page" : undefined}
                 title={collapsed ? n.title : undefined}
                 onClick={() => void navigate(n.key)}
               >
@@ -609,6 +611,7 @@ export default function Fieldbook() {
             <Menu />
           </Button>
           <SearchExperience
+            onRequestOpen={() => setMenu(false)}
             key={`${user.id}:${data.settings?.askAi?.enabled ?? true}`}
             id="global-search-results"
             content={data.publishedContent || data.content}
@@ -961,8 +964,9 @@ function initials(name: string) {
 }
 function PageHeading({ title }: { title: string }) {
   return (
-    <PageHeader>
+    <PageHeader className="learner-page-header">
       <h1>{title}</h1>
+      {title === "Updates" && <p>The latest news, ideas, and changes worth knowing.</p>}
     </PageHeader>
   );
 }

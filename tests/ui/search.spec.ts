@@ -387,13 +387,8 @@ test("Search returns to the first results and chat uses an embedded multiline co
   expect(aiRequests).toEqual([]);
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(input).toHaveValue("");
-  if (await openSearch.isVisible()) {
-    await expect(
-      panel.getByRole("tab", { name: "Search", exact: true }),
-    ).toHaveAttribute("aria-selected", "true");
-  } else {
-    await expect(panel).toHaveCount(0);
-  }
+  await expect(panel.getByRole("tab", { name: "Search", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(panel.getByRole("heading", { name: "Find what you need." })).toBeVisible();
   await expect(chat).toHaveCount(0);
   expect(
     await page.evaluate(

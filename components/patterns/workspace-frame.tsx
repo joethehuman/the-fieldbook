@@ -22,6 +22,7 @@ export function WorkspaceFrame({
   alert,
   overlays,
   admin = false,
+  learner = false,
   onDismiss,
   onClickCapture,
 }: {
@@ -35,6 +36,7 @@ export function WorkspaceFrame({
   alert?: ReactNode;
   overlays?: ReactNode;
   admin?: boolean;
+  learner?: boolean;
   onDismiss: () => void;
   onClickCapture?: MouseEventHandler<HTMLDivElement>;
 }) {
@@ -54,7 +56,7 @@ export function WorkspaceFrame({
     <EditorAppDockContext.Provider value={editorDock}>
     <div
       ref={app}
-      className={`app ${collapsed ? "sidebar-collapsed" : ""}`}
+      className={`app ${collapsed ? "sidebar-collapsed" : ""}${learner ? " learner-workspace" : ""}`}
       style={brandThemeStyle(accent)}
       onClickCapture={onClickCapture}
     >
@@ -70,7 +72,7 @@ export function WorkspaceFrame({
       </SkipLink>
       <aside
         id="main-sidebar"
-        className={`sidebar ${menu ? "open" : ""} ${pending ? "navigation-pending" : ""}`}
+        className={`sidebar workspace-chrome ${menu ? "open" : ""} ${pending ? "navigation-pending" : ""}`}
       >
         {sidebar}
       </aside>

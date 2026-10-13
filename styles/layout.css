@@ -154,6 +154,7 @@
     max-width: 100%;
   }
   .main-content {
+    background: var(--background);
     --workspace-inset-block: var(--space-2);
     --workspace-inset-inline: var(--space-6);
     container: workspace / inline-size;

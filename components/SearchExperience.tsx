@@ -8,7 +8,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { Plus, Search, X } from "lucide-react";
+import { BookOpen, MessageCircle, Plus, Search, X } from "lucide-react";
 import type { Content } from "@/lib/types";
 import type { SearchProvider, SearchResult } from "@/lib/search";
 import type { AiCitation } from "@/lib/ai";
@@ -56,6 +56,7 @@ export function SearchExperience({
   searchProvider,
   clientNavigation = false,
   aiMode,
+  onRequestOpen,
   onOpen,
 }: {
   id: string;
@@ -63,6 +64,7 @@ export function SearchExperience({
   searchProvider?: SearchProvider;
   clientNavigation?: boolean;
   aiMode: "installed" | "demo" | "off";
+  onRequestOpen?: () => void;
   onOpen: (result: SearchResult) => void | Promise<boolean | void>;
 }) {
   const [query, setQuery] = useState("");
@@ -83,8 +85,34 @@ export function SearchExperience({
   const [aiReady, setAiReady] = useState(false);
   const [aiTarget, setAiTarget] = useState<HTMLDivElement | null>(null);
   const [initialQuestion, setInitialQuestion] = useState<string | null>(null);
+  const focusComposer = useRef(false);
+  const [shortcut, setShortcut] = useState("Ctrl K");
   const enabled = aiMode !== "off";
-  const visible = open && (compact || !!query.trim());
+  const visible = open;
+  useEffect(() => {
+    setShortcut(/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl K");
+    const focusSearch = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "k" || event.isComposing || event.repeat) return;
+      if (document.activeElement?.closest('[role="dialog"], [role="alertdialog"]')) return;
+      event.preventDefault();
+      onRequestOpen?.();
+      setPanel({ compact, open: true });
+      if (!compact) {
+        input.current?.focus({ preventScroll: true });
+        input.current?.select();
+      }
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, [compact, onRequestOpen]);
+  useEffect(() => {
+    if (!focusComposer.current || !visible || view !== "ai" || !aiReady || !aiTarget) return;
+    const field = aiTarget.querySelector<HTMLTextAreaElement>("textarea");
+    if (field) {
+      focusComposer.current = false;
+      field.focus({ preventScroll: true });
+    }
+  }, [visible, view, aiReady, aiTarget]);
   useLayoutEffect(() => {
     if (compact && visible) input.current?.focus({ preventScroll: true });
   }, [compact, visible]);
@@ -130,23 +158,24 @@ export function SearchExperience({
     />
   ) : null;
   const searchField = (
-    <SearchField className="[&>[data-slot=input]]:pr-10">
+    <SearchField className={!query && !compact ? "[&>[data-slot=input]]:pr-16" : "[&>[data-slot=input]]:pr-10"}>
       <Input
         ref={input}
         aria-label="Search all content"
         aria-expanded={visible}
         aria-controls={visible ? id : undefined}
+        aria-keyshortcuts="Meta+K Control+K"
         maxLength={enabled ? 2000 : 160}
         placeholder={
           enabled ? "Search or Ask AI" : "Search Fieldbook"
         }
         value={query}
-        onFocus={() => setOpen(compact || !!query.trim())}
-        onClick={() => setOpen(compact || !!query.trim())}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
         onChange={(event) => {
           setQuery(event.target.value);
           setView("search");
-          setOpen(compact || !!event.target.value.trim());
+          setOpen(true);
         }}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -186,13 +215,26 @@ export function SearchExperience({
             setQuery("");
             setView("search");
             input.current?.focus();
-            setOpen(compact);
+            setOpen(true);
           }}
         >
           <X size={14} />
         </Button>
       )}
+      {!query && !compact && <kbd className="search-shortcut" aria-hidden="true">{shortcut}</kbd>}
     </SearchField>
+  );
+  const emptySearch = (
+    <div className="search-welcome">
+      <span className="search-welcome-icon"><BookOpen size={24} aria-hidden="true" /></span>
+      <h2>Find what you need.</h2>
+      <p>Search courses, updates, and docs.</p>
+      {enabled && (
+        <Button variant="outline" onClick={() => { focusComposer.current = true; setAiActivated(true); setView("ai"); }}>
+          <MessageCircle aria-hidden="true" /> Ask AI a question
+        </Button>
+      )}
+    </div>
   );
   return (
     <SearchPanel
@@ -227,6 +269,7 @@ export function SearchExperience({
               aria-label="Open search"
               aria-expanded={visible}
               aria-controls={visible ? id : undefined}
+              aria-keyshortcuts="Meta+K Control+K"
               onClick={() => setOpen(true)}
             >
               <Search aria-hidden="true" />
@@ -262,16 +305,18 @@ export function SearchExperience({
               }}
               className="flex h-full min-h-0 flex-col"
             >
-              <div className="flex shrink-0 items-center justify-between gap-2 bg-card px-4 pt-2">
+              <div className="search-panel-heading flex shrink-0 flex-wrap items-center justify-between gap-2 bg-card px-4 pt-2">
                 <TabsList aria-label="Search and Ask AI">
-                  <TabsTrigger value="search">Search</TabsTrigger>
-                  <TabsTrigger value="ai">Ask AI</TabsTrigger>
+                  <TabsTrigger value="search"><Search size={15} aria-hidden="true" /> Search</TabsTrigger>
+                  <TabsTrigger value="ai"><MessageCircle size={15} aria-hidden="true" /> Ask AI</TabsTrigger>
                 </TabsList>
                 {view === "ai" && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="default"
+                    aria-label="New conversation"
+                    className="search-new-conversation"
                     onClick={async () => {
                       setInitialQuestion(null);
                       await session.current?.reset();
@@ -279,7 +324,7 @@ export function SearchExperience({
                     }}
                   >
                     <Plus aria-hidden="true" />
-                    New conversation
+                    <span className="search-new-conversation-label">New conversation</span>
                   </Button>
                 )}
               </div>
@@ -288,12 +333,7 @@ export function SearchExperience({
                   data-slot="search-results-scroll"
                   className="h-full overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
                 >
-                  {results ||
-                    (compact && !query.trim() && (
-                      <p className="px-4 py-3 text-copy text-muted-foreground">
-                        Search courses, updates, and docs.
-                      </p>
-                    ))}
+                  {results || emptySearch}
                 </div>
               </TabsContent>
               <TabsContent value="ai" className="mt-0 min-h-0 flex-1">
@@ -315,12 +355,7 @@ export function SearchExperience({
               data-slot="search-results-scroll"
               className="h-full overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
             >
-              {results ||
-                (compact && !query.trim() && (
-                  <p className="px-4 py-3 text-copy text-muted-foreground">
-                    Search courses, updates, and docs.
-                  </p>
-                ))}
+              {results || emptySearch}
             </div>
           )}
         </div>

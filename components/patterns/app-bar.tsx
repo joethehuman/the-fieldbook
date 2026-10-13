@@ -67,7 +67,7 @@ export function AppBar({
   }, []);
   return (
     <AppBarSearchCompactContext.Provider value={searchCollision}>
-    <header ref={ref} className="topbar">
+    <header ref={ref} className="topbar workspace-chrome">
       <div ref={searchMeasure} className="app-search-measure" aria-hidden="true" />
       {children}
       {pending && (
