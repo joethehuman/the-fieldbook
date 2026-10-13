@@ -356,7 +356,6 @@ export default function SiteSettingsPanel({
             guidance="Changes to installation details and appearance save together."
             actions={saveAction}
             belowActions={discardAction}
-            sticky={dirty || busy}
           />
         </>
       )}
@@ -669,7 +668,6 @@ export default function SiteSettingsPanel({
           <PrivacySettingsPanel
             actions={saveAction}
             belowActions={discardAction}
-            sticky={dirty || busy}
             settings={settings}
             onChange={setSettings}
             busy={busy}
@@ -691,7 +689,7 @@ export default function SiteSettingsPanel({
       )}
       {section === "mcp" && <McpSettings production={production} contributor={contributor} />}
       {section === "ai" && !contributor && <AskAiSettingsPanel
-        production={production} busy={busy} actions={saveAction} belowActions={discardAction} sticky={dirty || busy}
+        production={production} busy={busy} actions={saveAction} belowActions={discardAction}
         value={settings.askAi ?? defaultAskAiSettings}
         onChange={(askAi) => setSettings({ ...settings, askAi })}
       />}
