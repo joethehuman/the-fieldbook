@@ -1,6 +1,6 @@
 # Install The Fieldbook
 
-The Vercel recipe uses hosted Supabase for database, authentication and private media, and Google sign-in. The [DigitalOcean recipe](#digitalocean-app-platform) uses App Platform, managed PostgreSQL, self-hosted Supabase and optional DO inference. Each operator supplies their own accounts. Use Node.js 22 and pnpm 10.17.1 for setup. A custom domain is optional.
+The Vercel recipe uses hosted Supabase for database, authentication and private media, and Google sign-in. The [DigitalOcean recipe](#digitalocean-app-platform) uses App Platform, managed PostgreSQL, self-hosted Supabase and optional DO inference. Each operator supplies their own accounts. Use Node.js 22 and pnpm 10.17.1 for setup. A custom domain is optional on Vercel; this DigitalOcean recipe uses a primary custom HTTPS hostname.
 
 ## 1. Get the source and create a Supabase project
 
@@ -116,7 +116,7 @@ Application redeployment and a full service restart preserved accounts, publishe
 
 ### Prepare durable resources and keys
 
-1. Create a dedicated Managed PostgreSQL **17** cluster/database and a private Spaces bucket in suitable regions. Use the database's certificate-matching DNS hostname and download its CA certificate. After connecting the app to its VPC, add its **VPC egress private IP addresses** to the database's trusted sources, along with the temporary operator connection used for setup. The app API returns these under `vpc.egress_ips`; selecting the app itself as a trusted source does not authorize this private path. Recheck the addresses after network changes. Follow [DO's VPC connection guidance](https://docs.digitalocean.com/products/app-platform/how-to/enable-vpc/), keep the app and database in the intended VPC, and use direct database connections rather than a transaction pooler.
+1. Create a dedicated Managed PostgreSQL **17** cluster/database and a private Spaces bucket in suitable regions. The app spec defaults to App Platform region `sfo` and database `defaultdb`. If you choose another region or database, update the spec's region, database binding and all three service connection URLs to match the database prepared below. Use the database's certificate-matching DNS hostname and download its CA certificate. After connecting the app to its VPC, add its **VPC egress private IP addresses** to the database's trusted sources, along with the temporary operator connection used for setup. The app API returns these under `vpc.egress_ips`; selecting the app itself as a trusted source does not authorize this private path. Recheck the addresses after network changes. Follow [DO's VPC connection guidance](https://docs.digitalocean.com/products/app-platform/how-to/enable-vpc/), keep the app and database in the intended VPC, and use direct database connections rather than a transaction pooler.
 2. Create Spaces credentials scoped to that bucket with read, write and delete access. Keep the bucket private; do not enable public ACLs or a public CDN. Fieldbook issues short-lived access through the Storage service.
 3. From the source checkout, run `pnpm install --frozen-lockfile`. Generate durable keys into an existing private directory outside the repository:
 
