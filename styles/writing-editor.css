@@ -122,6 +122,7 @@
 .writing-media-chooser[data-mobile-palette="true"] {
   width: min(324px, calc(100% - 16px));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 :is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] {
   animation: writing-touch-menu-enter 140ms ease-out;

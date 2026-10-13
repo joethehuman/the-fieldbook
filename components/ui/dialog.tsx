@@ -37,9 +37,9 @@ export function DialogDescription({
   );
 }
 export const dialogOverlayClass =
-  "[&:has(~_[data-slot=dialog-overlay][data-state=open])]:hidden fixed inset-0 z-40 bg-overlay";
+  "[&:has(~_[data-slot=dialog-overlay][data-state=open])]:hidden fixed inset-0 z-40 h-[var(--dialog-viewport-height,auto)] bg-overlay";
 export const dialogContentClass =
-  "fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border border-border bg-background p-5 text-foreground shadow-floating outline-none";
+  "fixed top-[var(--dialog-viewport-center,50%)] left-1/2 z-40 grid max-h-[calc(var(--dialog-viewport-height,100dvh)-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border border-border bg-background p-5 text-foreground shadow-floating outline-none";
 export function DialogContent({
   className,
   size = "default",
@@ -66,19 +66,19 @@ export function DialogContent({
       className={cn(
         dialogContentClass,
         size === "sheet" &&
-          "top-auto bottom-[var(--phone-panel-bottom,0px)] left-0 flex max-h-[calc(var(--phone-panel-height,100dvh)-1rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none pb-[calc(var(--space-8)+env(safe-area-inset-bottom))]",
+          "top-auto bottom-[var(--phone-panel-bottom,0px)] left-0 flex max-h-[calc(var(--phone-panel-height,var(--dialog-viewport-height,100dvh))-1rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none pb-[calc(var(--space-8)+env(safe-area-inset-bottom))]",
         size === "media" &&
-          "h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
+          "h-[calc(var(--dialog-viewport-height,100dvh)-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
         size === "selection" &&
-          "flex h-[min(48rem,calc(100dvh-3rem))] max-w-3xl flex-col overflow-hidden",
+          "flex h-[min(48rem,calc(var(--dialog-viewport-height,100dvh)-3rem))] max-w-3xl flex-col overflow-hidden",
         size === "picker" &&
           "flex flex-col overscroll-y-contain [&>:not([data-slot=dialog-body])]:shrink-0 [&>[data-slot=dialog-body]]:min-h-[var(--dialog-picker-body-min-height)]",
         (size === "workflow" || size === "workflow-list") &&
-          "flex h-[calc(100dvh-2rem)] sm:h-[min(var(--dialog-workflow-height),calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] max-w-[var(--dialog-workflow-width)] flex-col overflow-hidden",
+          "flex h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] sm:h-[min(var(--dialog-workflow-height),calc(var(--dialog-viewport-height,100dvh)-2rem))] max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] max-w-[var(--dialog-workflow-width)] flex-col overflow-hidden",
         size === "workflow-list" &&
           "[--dialog-workflow-height:var(--dialog-workflow-list-height)]",
         size === "assignment" &&
-          "flex h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] max-w-6xl flex-col gap-3 overflow-hidden max-md:top-0 max-md:left-0 max-md:h-dvh max-md:max-h-dvh max-md:w-full max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:pt-[max(1.25rem,env(safe-area-inset-top))] max-md:[&>[data-slot=dialog-footer]]:pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+          "flex h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] max-w-6xl flex-col gap-3 overflow-hidden max-md:top-0 max-md:left-0 max-md:h-[var(--dialog-viewport-height,100dvh)] max-md:max-h-[var(--dialog-viewport-height,100dvh)] max-md:w-full max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:pt-[max(1.25rem,env(safe-area-inset-top))] max-md:[&>[data-slot=dialog-footer]]:pb-[max(0.75rem,env(safe-area-inset-bottom))]",
         className,
       )}
       {...props}

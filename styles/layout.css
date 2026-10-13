@@ -432,6 +432,29 @@
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
   .editor-controls-surface { display: contents; }
   .app-editor-dock-cell { display: none; }
+  /* Seal the document as well as the inner canvas. A full-height outer app
+     leaves iOS a second page to pan while its visible canvas is shorter. */
+  html:has(.app[data-mobile-editor-boundary]),
+  body:has(.app[data-mobile-editor-boundary]) {
+    height: var(--editor-viewport-height, 100dvh);
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body:has(.app[data-mobile-editor-boundary]) {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    --dialog-viewport-height: var(--editor-viewport-height, 100dvh);
+    --dialog-viewport-center: calc(var(--editor-viewport-height, 100dvh) / 2);
+  }
+  .app[data-mobile-editor-boundary] { height: var(--editor-viewport-height, 100dvh); }
+  .app[data-mobile-editor-boundary] .sidebar {
+    height: var(--editor-viewport-height, 100dvh);
+    bottom: auto;
+  }
+  .app[data-mobile-editor-boundary] .editor-frame-panel {
+    max-height: max(0px, calc(var(--editor-viewport-height, 100dvh) - var(--app-bar-height, var(--app-header-min-height)) - var(--space-8)));
+  }
   .app:has(.editor-frame[data-dock="true"]) .main-shell {
     --editor-dock-height: max(46px, calc(2.75rem + 2px));
     position: relative;

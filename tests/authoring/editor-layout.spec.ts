@@ -3026,6 +3026,139 @@ test("mobile overlays share the canvas row through resizing without moving the h
   await page.screenshot({ path: info.outputPath("stationary-mobile-editor.png") });
 });
 
+for (const short of [true, false]) {
+  test(`the entire touch editor stays bounded through focus, edge scrolling and rotation with a ${short ? "short" : "long"} document`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, info.project.name.startsWith("production"), "course", 1, item => {
+      item.lessons = item.lessons.slice(0, 1);
+      if (short) item.lessons[0].body = "Paragraph 1.";
+    });
+    const writer = page.getByRole("textbox", { name: "Lesson content", exact: true });
+    const verify = async (height: number) => {
+      await expect.poll(() => page.evaluate(() => {
+        const app = document.querySelector(".app")!;
+        const body = document.body.getBoundingClientRect();
+        const shell = app.querySelector(".main-shell")!.getBoundingClientRect();
+        return [document.documentElement.getBoundingClientRect().height, body.height, app.getBoundingClientRect().height, shell.height];
+      })).toEqual([height, height, height, height]);
+      const header = (await page.locator(".topbar").boundingBox())!;
+      expect(header.y).toBe(0);
+      expect(header.y + header.height).toBeLessThan(height);
+      await expect(page.locator("body")).toHaveCSS("position", "fixed");
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    };
+    for (const size of [{ width: 390, height: 844 }, { width: 390, height: 490 }, { width: 844, height: 390 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(size);
+      await verify(size.height);
+      for (const field of [page.locator("#editor-title"), page.getByRole("textbox", { name: "Lesson title", exact: true }), writer.locator("p").first()]) {
+        await field.tap();
+        await verify(size.height);
+      }
+      const canvas = page.locator(".main-content");
+      const box = (await canvas.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      for (const distance of [6000, 6000, -6000, -6000]) {
+        await page.mouse.wheel(0, distance);
+        await verify(size.height);
+      }
+    }
+    await expect(writer).toContainText("Paragraph 1.");
+    await page.screenshot({ path: info.outputPath(`bounded-${short ? "short" : "long"}-mobile-editor.png`) });
+  });
+}
+
+test("outer viewport recovery preserves manual canvas scroll and native selection and leaves pinch zoom alone", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await writer.locator("p").nth(20).tap();
+  await page.locator(".main-content").evaluate(owner => { owner.scrollTop = 400; });
+  const before = await writer.evaluate(() => {
+    const native = window.getSelection()!;
+    return { text: native.focusNode!.textContent, offset: native.focusOffset, scroll: document.querySelector(".main-content")!.scrollTop };
+  });
+  // Model separate layout/visual origins and a browser that accepts the
+  // coordinated reset. This is a boundary contract, not an iOS keyboard test.
+  await page.evaluate(() => {
+    const state = { x: 0, y: 0, top: 0, left: 0, scale: 1, calls: 0 };
+    (window as unknown as { outerViewport: typeof state }).outerViewport = state;
+    for (const [key, field] of [["scrollX", "x"], ["scrollY", "y"]] as const)
+      Object.defineProperty(window, key, { configurable: true, get: () => state[field] });
+    for (const [key, field] of [["offsetTop", "top"], ["offsetLeft", "left"], ["scale", "scale"]] as const)
+      Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => state[field] });
+    const nativeScroll = window.scrollTo.bind(window);
+    window.scrollTo = (() => {
+      state.calls++;
+      state.x = state.y = state.top = state.left = 0;
+      nativeScroll({ top: 0, left: 0, behavior: "instant" });
+    }) as typeof window.scrollTo;
+  });
+  for (const displacement of [{ x: 0, y: 120, top: 0, left: 0 }, { x: 0, y: 0, top: 120, left: 12 }]) {
+    await page.evaluate(displacement => {
+      Object.assign((window as unknown as { outerViewport: typeof displacement }).outerViewport, displacement);
+      window.dispatchEvent(new Event("scroll"));
+      window.visualViewport!.dispatchEvent(new Event("scroll"));
+    }, displacement);
+    expect(await page.evaluate(() => {
+      const state = (window as unknown as { outerViewport: { x: number; y: number; top: number; left: number } }).outerViewport;
+      return [state.x, state.y, state.top, state.left];
+    })).toEqual([0, 0, 0, 0]);
+    expect(await writer.evaluate(() => {
+      const native = window.getSelection()!;
+      return { text: native.focusNode!.textContent, offset: native.focusOffset, scroll: document.querySelector(".main-content")!.scrollTop };
+    })).toEqual(before);
+  }
+  const calls = await page.evaluate(() => (window as unknown as { outerViewport: { calls: number } }).outerViewport.calls);
+  await page.evaluate(() => {
+    const state = (window as unknown as { outerViewport: { scale: number; top: number } }).outerViewport;
+    state.scale = 2; state.top = 120;
+    window.visualViewport!.dispatchEvent(new Event("scroll"));
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await page.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
+  expect(await page.evaluate(() => (window as unknown as { outerViewport: { calls: number } }).outerViewport.calls)).toBe(calls);
+  await page.evaluate(() => {
+    (window as unknown as { outerViewport: { scale: number } }).outerViewport.scale = 1;
+    window.dispatchEvent(new Event("pageshow"));
+  });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { outerViewport: { top: number } }).outerViewport.top)).toBe(0);
+});
+
+test("touch editor navigation and body-portaled dialogs share visible bounds and release them on exit", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  await installCommandViewport(page, { height: 390, offsetTop: 0, clientHeight: 844 });
+  await expect.poll(() => page.locator(".app").evaluate(app => app.getBoundingClientRect().height)).toBe(390);
+  await page.getByRole("button", { name: "Open navigation", exact: true }).tap();
+  const sidebar = page.locator(".sidebar.open");
+  expect((await sidebar.boundingBox())!.height).toBe(390);
+  await page.getByRole("button", { name: "Close navigation", exact: true }).tap();
+  await page.getByRole("button", { name: "Details", exact: true }).tap();
+  await page.getByRole("button", { name: "Delete Doc", exact: true }).tap();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("body")).toHaveCSS("position", "fixed");
+  const bounds = (await dialog.boundingBox())!;
+  expect(bounds.y).toBeGreaterThanOrEqual(15);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(375);
+  expect((await page.locator('[data-slot="dialog-overlay"]').boundingBox())!.height).toBe(390);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).tap();
+  await expect(page.getByRole("button", { name: "Delete Doc", exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "Delete Doc", exact: true })).toBeEnabled();
+  expect((await page.locator(".topbar").boundingBox())!.y).toBe(0);
+  await returnToContent(page);
+  await expect(page.locator(".editor")).toHaveCount(0);
+  await expect(page.locator("body")).toHaveCSS("position", "static");
+  expect(await page.locator("html").evaluate(html => (html as HTMLElement).style.getPropertyValue("--editor-viewport-height"))).toBe("");
+  await expect(page.locator(".app")).not.toHaveAttribute("data-mobile-editor-boundary", "");
+  await page.getByRole("button", { name: "Actions for A clear place to write", exact: true }).tap();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).tap();
+  await expect(dialog).toBeVisible();
+  const ordinary = (await dialog.boundingBox())!;
+  expect(ordinary.y + ordinary.height / 2).toBeCloseTo(844 / 2, 0);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).tap();
+});
+
 for (const mode of ["title", "source", "code"] as const) {
   test(`mobile Details returns to the same ${mode} target without changing its content`, async ({ page }, info) => {
     await page.setViewportSize({ width: 390, height: 844 });

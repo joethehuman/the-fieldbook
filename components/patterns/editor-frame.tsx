@@ -72,7 +72,7 @@ export function EditorFrame({
   const [panels, setPanels] = useState({ outline: false, details: false });
   const panelState = useRef(panels);
   panelState.current = panels;
-  useMobileEditorViewport(frame, dock);
+  useMobileEditorViewport(frame);
   const lastWritingCursor = useRef<WritingCursor | null>(null);
   const panelReturn = useRef<WritingCursor | null>(null);
   const preparedPanel = useRef<"outline" | "details" | null>(null);
