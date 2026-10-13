@@ -964,9 +964,8 @@ function initials(name: string) {
 }
 function PageHeading({ title }: { title: string }) {
   return (
-    <PageHeader className="learner-page-header">
+    <PageHeader>
       <h1>{title}</h1>
-      {title === "Updates" && <p>The latest news, ideas, and changes worth knowing.</p>}
     </PageHeader>
   );
 }

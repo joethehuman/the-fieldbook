@@ -45,7 +45,7 @@ export function LearningCard({
   const content = (
     <>
       {artwork}
-      <div className="learning-card-copy flex min-h-64 flex-1 flex-col p-5">
+      <div className="flex min-h-64 flex-1 flex-col p-5">
         <h3 className="text-lg font-semibold leading-6 tracking-tight [overflow-wrap:anywhere]">
           {title}
         </h3>

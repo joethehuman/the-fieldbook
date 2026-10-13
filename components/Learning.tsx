@@ -328,9 +328,8 @@ export default function Learning({
     <Card
       className={`learning-progress-card flex w-full flex-col items-center justify-center gap-4 text-center ${outstandingCards.length ? "" : "max-w-xs"} ${assigned.length ? "pt-8 sm:pt-10" : "border-dotted border-muted-foreground/50"}`}
     >
-      <span className="eyebrow">Your learning</span>
       {assigned.length > 0 ? <ProgressRing value={pct} /> : null}
-      <div className="learning-progress-copy grid gap-2">
+      <div className="grid gap-2">
         <h3>
           {!assigned.length
             ? useDueDates
@@ -377,53 +376,46 @@ export default function Learning({
             </p>
           )}
       </div>
-      <div className="learning-progress-actions mt-auto grid justify-items-center gap-4">
-        {nextCourse && (
-          <Button
-            variant="default"
-            onClick={() => onOpen(nextCourse.id)}
-          >
-            {courseProgress(nextCourse, progress).started
-              ? "Continue course"
-              : "Start course"}
-          </Button>
-        )}
-        {!assigned.length && personalCourseCount > 0 && (
-          <Button
-            variant="link"
-            className="text-sm text-foreground underline hover:text-foreground"
-            onClick={() => changeView("yours")}
-          >
-            View your courses
-          </Button>
-        )}
-        {assigned.length ? (
-          <Button variant="link" onClick={() => changeView("assigned")}>
-            View all for you <ArrowRight size={16} />
-          </Button>
-        ) : (
-          <Button variant="link" onClick={browseLibrary}>
-            All courses <ArrowRight size={16} />
-          </Button>
-        )}
-      </div>
+      {nextCourse && (
+        <Button
+          variant="default"
+          className="mt-auto"
+          onClick={() => onOpen(nextCourse.id)}
+        >
+          {courseProgress(nextCourse, progress).started
+            ? "Continue course"
+            : "Start course"}
+        </Button>
+      )}
+      {!assigned.length && personalCourseCount > 0 && (
+        <Button
+          variant="link"
+          className="text-sm text-foreground underline hover:text-foreground"
+          onClick={() => changeView("yours")}
+        >
+          View your courses
+        </Button>
+      )}
+      {assigned.length ? (
+        <Button variant="link" onClick={() => changeView("assigned")}>
+          View all for you <ArrowRight size={16} />
+        </Button>
+      ) : (
+        <Button variant="link" onClick={browseLibrary}>
+          All courses <ArrowRight size={16} />
+        </Button>
+      )}
     </Card>
   );
   return (
     <>
-      <PageHeader className="learner-page-header">
+      <PageHeader>
         {view !== "home" && (
           <Button variant="link" onClick={() => changeView("home")}>
             ← Back to courses
           </Button>
         )}
         <h1>{view === "home" ? "Courses" : "Your courses"}</h1>
-        <p>{view === "home" ? "Build your knowledge, one course at a time." : "Your progress, and what comes next."}</p>
-        {view === "home" && !guest && (
-          <Button variant="outline" className="learner-header-action" onClick={() => changeView("yours")}>
-            Your courses <ArrowRight size={16} aria-hidden="true" />
-          </Button>
-        )}
       </PageHeader>
       {view === "home" && (
         <section className="for-you">

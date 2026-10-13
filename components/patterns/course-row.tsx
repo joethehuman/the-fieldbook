@@ -1,8 +1,6 @@
 "use client";
-import { Children, useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Children, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SectionHeader, SplitPanel } from "./layout";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import { Button } from "../ui/button";
 
 /** Keep overflowing course strips keyboard-scrollable as their contents resize. */
 export function CourseRow({
@@ -21,7 +19,6 @@ export function CourseRow({
   splitAt?: "tablet" | "xl";
 }) {
   const row = useRef<HTMLDivElement>(null);
-  const rowId = useId();
   const [edges, setEdges] = useState({
     before: false,
     after: false,
@@ -61,32 +58,12 @@ export function CourseRow({
       mutation.disconnect();
     };
   }, [measure]);
-  function scroll(direction: -1 | 1) {
-    const element = row.current;
-    if (!element) return;
-    element.scrollBy({
-      left: direction * element.clientWidth,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-    });
-    measure();
-  }
   return (
     <div className="course-row-wrap">
       <SectionHeader
         title={heading || <h3>{title}</h3>}
         description={description}
-      >
-        {edges.scrollable && (
-          <div className="course-row-controls">
-            <Button variant="outline" size="icon" aria-label={`Scroll ${title} left`} aria-controls={rowId} disabled={!edges.before} onClick={() => scroll(-1)}>
-              <ArrowLeft size={16} aria-hidden="true" />
-            </Button>
-            <Button variant="outline" size="icon" aria-label={`Scroll ${title} right`} aria-controls={rowId} disabled={!edges.after} onClick={() => scroll(1)}>
-              <ArrowRight size={16} aria-hidden="true" />
-            </Button>
-          </div>
-        )}
-      </SectionHeader>
+      />
       <SplitPanel
         split={!!leading && Children.count(children) > 0}
         align="stretch"
@@ -95,7 +72,6 @@ export function CourseRow({
         {leading}
         <div
           ref={row}
-          id={rowId}
           className="course-row"
           role="region"
           aria-label={title}

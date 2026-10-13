@@ -7,7 +7,6 @@ import { Badge } from "./ui/badge";
 import { Alert } from "./ui/alert";
 import { Note } from "./ui/note";
 import { Card } from "./ui/card";
-import { Progress as ProgressBar } from "./ui/progress";
 import { QuizResults } from "./patterns/quiz-results";
 import { Radio, Checkbox } from "./ui/choice";
 import { Field, FieldGroup } from "./ui/field";
@@ -18,7 +17,6 @@ import { CourseVideo } from "./patterns/course-video";
 import Markdown from "./Markdown";
 import { correctOptionIds, optionIds, quizUnlocked, requiresPassing, type QuizAnswers } from "@/lib/course-quiz";
 import { isComplete, type Content, type Progress } from "@/lib/types";
-import { courseProgress } from "@/lib/course-progress";
 
 export function Course({ course, progress, onBack, backLabel, onProgress, onDemoProgress,
   guest = false, feedback, initialLessonId, curriculumTitle, backHref, lessonBaseHref }: {
@@ -60,7 +58,6 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const lessonContent = useMemo(() => lesson ? <Markdown linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown> : null, [lesson]);
   const allDone = course.lessons.every((item) => p?.lessons.includes(item.id));
   const complete = isComplete(course, progress);
-  const completion = courseProgress(course, progress);
   const latestAttempt = p?.attempts?.at(-1);
   const question = course.questions[questionIndex];
   const score = latestAttempt?.answers?.filter((answer) => answer.correct).length;
@@ -164,10 +161,6 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
               <details><summary><span>About this course</span><span className="course-about-toggle" aria-hidden="true"><Plus className="course-about-plus" size={16} /><Minus className="course-about-minus" size={16} /></span></summary><div className="course-about-content"><p>{course.summary}</p><div className="course-detail-meta"><span className="course-duration"><Clock size={16} aria-hidden="true" />{course.duration} min</span><span aria-hidden="true">·</span><span>{course.lessons.length} lessons</span></div></div></details>
               <p className="course-desktop-summary">{course.summary}</p>
               <div className="course-detail-meta course-desktop-summary"><span className="course-duration"><Clock size={16} aria-hidden="true" />{course.duration} min</span><span aria-hidden="true">·</span><span>{course.lessons.length} lessons</span><Badge variant="success" className={complete ? undefined : "invisible"} aria-hidden={!complete}>Completed</Badge></div>
-            </div>
-            <div className="course-player-progress">
-              <div><span>Your progress</span><span>{completion.percent}%</span></div>
-              <ProgressBar value={completion.percent} />
             </div>
           </div>
           <nav className="lesson-nav" aria-label="In this course">

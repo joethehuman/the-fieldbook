@@ -45,9 +45,8 @@ export default async function Page() {
   return (
     <WorkspacePage section="/updates">
       <>
-        <PageHeader className="learner-page-header">
+        <PageHeader>
           <h1>Updates</h1>
-          <p>The latest news, ideas, and changes worth knowing.</p>
         </PageHeader>
         {!!forYou.length && (
           <section className="updates-section">

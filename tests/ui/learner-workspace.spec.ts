@@ -1,9 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { learningUiFixture } from "../fixtures/learning-ui";
+import { defaultSettings } from "../../lib/settings";
 
 for (const complete of [false, true]) {
   test(`progress labels have breathing room at ${complete ? 100 : 0} percent and enlarged text`, async ({ page }, info) => {
     const data = learningUiFixture();
+    data.settings = { ...defaultSettings, ...data.settings, accent: complete ? "#8b2fc9" : "#005fab" };
     data.progress["demo-learner"] = complete
       ? data.content.filter((item) => item.kind === "course").map((course) => ({
         content_id: course.id,
@@ -18,7 +20,10 @@ for (const complete of [false, true]) {
     }, data);
     await page.goto("/#courses");
     const card = page.locator(".learning-progress-card");
+    await expect(card).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect(card).toHaveCSS("color", "rgb(23, 23, 23)");
     const ring = card.getByRole("progressbar");
+    await expect(ring.locator("circle").last()).toHaveCSS("color", complete ? "rgb(139, 47, 201)" : "rgb(0, 95, 171)");
     await expect(ring).toHaveAttribute("aria-valuenow", complete ? "100" : "0");
     if (info.project.name === "phone") await page.setViewportSize({ width: 320, height: 844 });
     for (const scale of [1, 2]) {
@@ -46,37 +51,8 @@ for (const complete of [false, true]) {
   });
 }
 
-test("course row controls reveal content and stop at either boundary", async ({ page }) => {
-  const data = learningUiFixture();
-  const course = data.content.find((item) => item.id === "course-2")!;
-  for (let index = 0; index < 6; index++) {
-    data.content.push({ ...course, id: `browse-${index}`, title: `More learning ${index}`, groups: [], assignments: [] });
-  }
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.addInitScript((workspace) => {
-    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
-    sessionStorage.setItem("fieldbook.profile.v1", "demo-learner");
-  }, data);
-  await page.goto("/#courses");
-  const row = page.getByRole("region", { name: "Sales foundations", exact: true });
-  const previous = page.getByRole("button", { name: "Scroll Sales foundations left", exact: true });
-  const next = page.getByRole("button", { name: "Scroll Sales foundations right", exact: true });
-  await expect(previous).toBeDisabled();
-  await expect(next).toBeEnabled();
-  await expect(next).toHaveAttribute("aria-controls", (await row.getAttribute("id"))!);
-  await next.press("Enter");
-  await expect.poll(() => row.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-  await expect(previous).toBeEnabled();
-  for (let index = 0; index < 12 && await next.isEnabled(); index++) await next.press("Enter");
-  await expect(next).toBeDisabled();
-  await expect(row.locator(".course-card").last()).toBeInViewport();
-  for (let index = 0; index < 12 && await previous.isEnabled(); index++) await previous.press("Enter");
-  await expect(previous).toBeDisabled();
-  await expect(row.locator(".course-card").first()).toBeInViewport();
-});
-
 for (const profile of ["demo-admin", "demo-contributor", "demo-manager"]) {
-  test(`${profile} keeps the learner presentation out of management and editing`, async ({ page }) => {
+  test(`${profile} shares neutral colors and typography across learner, management, and editing`, async ({ page }) => {
     const data = learningUiFixture();
     await page.addInitScript(({ workspace, profile }) => {
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
@@ -94,7 +70,7 @@ for (const profile of ["demo-admin", "demo-contributor", "demo-manager"]) {
     await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
     await expect(page.locator(".sidebar")).toHaveCSS("background-color", sidebarSurface);
     await expect(page.locator("main h1").first()).toHaveCSS("font-family", headingFont);
-    await expect.poll(() => page.locator(".app").evaluate((element) => getComputedStyle(element).getPropertyValue("--surface"))).not.toBe(learnerSurface);
+    await expect.poll(() => page.locator(".app").evaluate((element) => getComputedStyle(element).getPropertyValue("--surface"))).toBe(learnerSurface);
     if (profile === "demo-admin") {
       await page.getByRole("searchbox", { name: "Search content", exact: true }).fill("Know the platform");
       await page.getByRole("link", { name: "Know the platform", exact: true }).click();
@@ -132,13 +108,6 @@ test("learner search opens from the keyboard and preserves an AI draft across di
   await page.addInitScript(() => sessionStorage.setItem("fieldbook.profile.v1", "demo-learner"));
   await page.goto("/#courses");
   await expect(page.locator(".learner-workspace")).toBeVisible();
-  if (info.project.name === "phone") {
-    const card = (await page.locator(".learning-progress-card").boundingBox())!;
-    const ring = (await page.locator('.learning-progress-card [data-slot="progress-ring"]').boundingBox())!;
-    const copy = (await page.locator(".learning-progress-copy").boundingBox())!;
-    expect(card.height).toBeLessThan(330);
-    expect(copy.x).toBeGreaterThanOrEqual(ring.x + ring.width);
-  }
   await page.screenshot({ path: info.outputPath("learner-home.png") });
   await page.keyboard.press("Control+k");
   const search = page.getByRole("textbox", { name: "Search all content", exact: true });
