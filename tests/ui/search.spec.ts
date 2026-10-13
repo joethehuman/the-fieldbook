@@ -174,6 +174,13 @@ test("search preserves an unsaved editor and guards result navigation", async ({
   await expect(title).toHaveValue("Unsaved work survives search");
   await expect(page).toHaveURL(/#admin/);
   await searchInput(page);
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await page.getByRole("navigation", { name: "Browse content" }).getByRole("link", { name: "Docs", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(title).toHaveValue("Unsaved work survives search");
+  await searchInput(page);
+  await input.fill("Published destination");
   await expect(result).toBeVisible();
   await result.click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
@@ -345,12 +352,15 @@ test("Search returns to the first results and chat uses an embedded multiline co
     const fieldBox = (await field.boundingBox())!;
     expect(fieldBox.y + fieldBox.height).toBe(emptyComposerBottom);
   }
-  await reset.hover();
-  await expect
-    .poll(() =>
-      reset.evaluate((element) => getComputedStyle(element).backgroundColor),
-    )
-    .not.toBe("rgba(0, 0, 0, 0)");
+  if (await page.evaluate(() => matchMedia("(hover: hover)").matches)) {
+    await reset.hover();
+    await expect
+      .poll(() => reset.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .not.toBe("rgba(0, 0, 0, 0)");
+  } else {
+    await reset.tap();
+    await expect(chat.getByRole("log")).toBeEmpty();
+  }
   await page.screenshot({ path: info.outputPath("ask-ai-steady-chat.png") });
   if (info.project.name === "tablet") {
     await page.setViewportSize({ width: 1180, height: 740 });
@@ -388,7 +398,7 @@ test("Search returns to the first results and chat uses an embedded multiline co
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(input).toHaveValue("");
   await expect(panel.getByRole("tab", { name: "Search", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(panel.getByText("Search courses, updates, and docs.", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("navigation", { name: "Browse content" })).toBeVisible();
   await expect(chat).toHaveCount(0);
   expect(
     await page.evaluate(

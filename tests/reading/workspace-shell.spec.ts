@@ -128,7 +128,7 @@ test("learner and management routes share chrome while keeping separate content 
     else await expect(page.locator(".app")).toHaveClass(/learner-workspace/);
     await page.keyboard.press("Control+k");
     await expect(page.getByRole("textbox", { name: "Search all content", exact: true })).toBeFocused();
-    await expect(page.getByText("Search courses, updates, and docs.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Browse content" })).toBeVisible();
     await page.keyboard.press("Escape");
   }
 });

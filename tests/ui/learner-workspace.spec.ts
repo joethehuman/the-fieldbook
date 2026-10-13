@@ -113,7 +113,7 @@ test("learner search opens from the keyboard and preserves an AI draft across di
   const search = page.getByRole("textbox", { name: "Search all content", exact: true });
   const panel = page.locator('[data-slot="search-panel"]');
   await expect(search).toBeFocused();
-  await expect(panel.getByText("Search courses, updates, and docs.", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("navigation", { name: "Browse content" })).toBeVisible();
   await panel.getByRole("tab", { name: "Ask AI", exact: true }).click();
   const question = page.getByRole("textbox", { name: "Your question", exact: true });
   await question.click();

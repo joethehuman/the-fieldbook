@@ -10,10 +10,17 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { Plus, Search, X } from "lucide-react";
 import type { Content } from "@/lib/types";
-import type { SearchProvider, SearchResult } from "@/lib/search";
+import type { SearchProvider, SearchDestination } from "@/lib/search";
+import {
+  searchSuggestions,
+  type SearchSuggestion,
+  type SearchSuggestionsProvider,
+  type SearchBrowsePath,
+} from "@/lib/search-suggestions";
 import type { AiCitation } from "@/lib/ai";
 import type { AskAiSessionHandle, AskAiSessionProps } from "./AskAiSession";
 import { ContentSearch } from "./ContentSearch";
+import { SearchSuggestions } from "./SearchSuggestions";
 import { SearchPanel } from "./patterns/search-panel";
 import { SearchField } from "./patterns/search-field";
 import { useCompactLayout } from "./patterns/use-compact-layout";
@@ -54,18 +61,24 @@ export function SearchExperience({
   id,
   content,
   searchProvider,
+  suggestions,
+  suggestionsProvider,
   clientNavigation = false,
   aiMode,
   onRequestOpen,
   onOpen,
+  onBrowse,
 }: {
   id: string;
   content: Content[];
   searchProvider?: SearchProvider;
+  suggestions?: SearchSuggestion[];
+  suggestionsProvider?: SearchSuggestionsProvider;
   clientNavigation?: boolean;
   aiMode: "installed" | "demo" | "off";
   onRequestOpen?: () => void;
-  onOpen: (result: SearchResult) => void | Promise<boolean | void>;
+  onOpen: (result: SearchDestination) => void | Promise<boolean | void>;
+  onBrowse?: (href: SearchBrowsePath) => void | Promise<boolean | void>;
 }) {
   const [query, setQuery] = useState("");
   const compactLayout = useCompactLayout();
@@ -88,6 +101,28 @@ export function SearchExperience({
   const [shortcut, setShortcut] = useState("Ctrl K");
   const enabled = aiMode !== "off";
   const visible = open;
+  const fitContent = view === "search" && !query.trim();
+  const showSuggestions = visible && fitContent;
+  const [suggested, setSuggested] = useState<{
+    items: SearchSuggestion[];
+    loading: boolean;
+    error: boolean;
+  }>({ items: [], loading: false, error: false });
+  useEffect(() => {
+    if (!showSuggestions || !suggestionsProvider) return;
+    const controller = new AbortController();
+    setSuggested((previous) => ({ ...previous, loading: true, error: false }));
+    void suggestionsProvider(controller.signal)
+      .then((items) => {
+        if (!controller.signal.aborted)
+          setSuggested({ items, loading: false, error: false });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setSuggested({ items: [], loading: false, error: true });
+      });
+    return () => controller.abort();
+  }, [showSuggestions, suggestionsProvider]);
   useEffect(() => {
     setShortcut(/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl K");
     const focusSearch = (event: KeyboardEvent) => {
@@ -116,7 +151,9 @@ export function SearchExperience({
     if (view === "search") {
       const results = document
         .getElementById(id)
-        ?.querySelector('[data-slot="search-results-scroll"]');
+        ?.querySelector(
+          '[data-slot="search-suggestions-scroll"], [data-slot="search-results-scroll"]',
+        );
       if (results) results.scrollTop = 0;
     }
   }, [id, view, query, visible]);
@@ -128,16 +165,14 @@ export function SearchExperience({
     // Preserve the first question through chunk loading and repeated Enter.
     else setInitialQuestion((pending) => pending ?? query);
   }
-  async function openResult(result: SearchResult) {
+  async function openResult(result: SearchDestination) {
     if ((await onOpen(result)) !== false) setOpen(false);
   }
+  async function browse(href: SearchBrowsePath) {
+    if (onBrowse && (await onBrowse(href)) !== false) setOpen(false);
+  }
   function openSource(source: AiCitation) {
-    void openResult({
-      ...source,
-      excerpt: "",
-      highlights: [],
-      contentDate: null,
-    });
+    void openResult(source);
   }
   const results = query.trim() ? (
     <ContentSearch
@@ -181,12 +216,11 @@ export function SearchExperience({
             }
           }
           if (event.key === "ArrowDown") {
-            if (!query.trim()) return;
             setOpen(true);
             const first = document
               .getElementById(id)
               ?.querySelector<HTMLAnchorElement>(
-                '[aria-label="Search results"] a',
+                '[aria-label="Search results"] a, [aria-label="Search suggestions"] a',
               );
             if (first) {
               event.preventDefault();
@@ -216,15 +250,21 @@ export function SearchExperience({
     </SearchField>
   );
   const emptySearch = (
-    <p className="px-4 py-3 text-copy text-muted-foreground">
-      Search courses, updates, and docs.
-    </p>
+    <SearchSuggestions
+      items={suggestionsProvider ? suggested.items : suggestions || searchSuggestions({ content })}
+      loading={!!suggestionsProvider && suggested.loading}
+      error={suggested.error}
+      clientNavigation={clientNavigation}
+      onOpen={(item) => void openResult(item)}
+      onBrowse={onBrowse ? (href) => void browse(href) : undefined}
+    />
   );
   return (
     <SearchPanel
       id={id}
       open={visible}
       compact={compact}
+      fitContent={fitContent}
       onDismiss={() => setOpen(false)}
       returnFocus={compact ? searchTrigger : undefined}
       persistentContent={
@@ -264,7 +304,10 @@ export function SearchExperience({
         </Toolbar>
       }
     >
-      <div className="flex h-full min-h-0 flex-col">
+      <div
+        data-slot={fitContent ? "search-suggestions-scroll" : undefined}
+        className={`flex min-h-0 flex-1 flex-col ${fitContent ? "overflow-y-auto overscroll-contain" : ""}`}
+      >
         {compact && (
           <div className="flex shrink-0 items-center gap-2 p-4">
             <div className="min-w-0 flex-1">{searchField}</div>
@@ -279,7 +322,7 @@ export function SearchExperience({
             </Button>
           </div>
         )}
-        <div className="min-h-0 flex-1">
+        <div className={`flex min-h-0 flex-col ${fitContent ? "flex-none" : "flex-1"}`}>
           {enabled ? (
             <Tabs
               value={view}
@@ -287,7 +330,7 @@ export function SearchExperience({
                 if (next === "ai") setAiActivated(true);
                 setView(next);
               }}
-              className="flex h-full min-h-0 flex-col"
+              className="flex min-h-0 flex-1 flex-col"
             >
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-card px-4 pt-2">
                 <TabsList aria-label="Search and Ask AI">
@@ -312,18 +355,18 @@ export function SearchExperience({
                   </Button>
                 )}
               </div>
-              <TabsContent value="search" className="mt-0 min-h-0 flex-1">
+              <TabsContent value="search" className="mt-0 flex min-h-0 flex-1 flex-col">
                 <div
                   data-slot="search-results-scroll"
-                  className="h-full overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
+                  className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
                 >
                   {results || emptySearch}
                 </div>
               </TabsContent>
-              <TabsContent value="ai" className="mt-0 min-h-0 flex-1">
+              <TabsContent value="ai" className="mt-0 flex min-h-0 flex-1 flex-col">
                 <div
                   ref={setAiTarget}
-                  className="h-full min-h-0"
+                  className="min-h-0 flex-1"
                   aria-busy={!aiReady}
                 >
                   {!aiReady && (
@@ -337,7 +380,7 @@ export function SearchExperience({
           ) : (
             <div
               data-slot="search-results-scroll"
-              className="h-full overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
             >
               {results || emptySearch}
             </div>
