@@ -510,6 +510,9 @@
     --editor-dock-clearance: 80px;
     padding-block-end: max(var(--space-6), var(--phone-writing-clearance, var(--editor-dock-clearance)));
   }
+  .main-content:has(.editor-frame[data-dock="true"] .writing-content[contenteditable]) {
+    padding-block-end: 0;
+  }
   .editor-mobile-panels[data-dock="true"][data-panel-ready="false"] .editor-frame-panel { visibility: hidden; pointer-events: none; }
   .editor-mobile-panels { --scroll-fade-depth: var(--scroll-fade-size); }
   .editor-mobile-panels[data-dock="true"] .editor-frame-panel {

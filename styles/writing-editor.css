@@ -230,6 +230,17 @@
 .writing-editor .writing-content > :first-child {
   margin-top: 0;
 }
+.editor-frame[data-dock="true"] .writing-document > .mdxeditor-root-contenteditable > .mdxeditor-contenteditable-wrapper > .writing-content[contenteditable] {
+  /* Empty canvas stays outside editable geometry; native Return must not
+     scroll an artificial minimum-height tail into view. */
+  min-height: 0;
+  /* One physical end reserve. Stacked canvas/paragraph padding makes native
+     caret reveal scroll to the end before the visible writing space is used. */
+  padding-bottom: var(--phone-writing-clearance, var(--editor-dock-clearance, 80px));
+}
+.editor-frame[data-dock="true"] .writing-document > .mdxeditor-root-contenteditable > .mdxeditor-contenteditable-wrapper > .writing-content[contenteditable] > :last-child {
+  margin-bottom: 0;
+}
 .writing-editor .mdxeditor-root-contenteditable > .writing-content:not([contenteditable]) {
   position: absolute;
   inset-block-start: 0;

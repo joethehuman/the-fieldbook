@@ -1,0 +1,16 @@
+diff --git a/dist/plugins/table/TableEditor.js b/dist/plugins/table/TableEditor.js
+index 37f78dee795175a110eee3978c83fdcf0170602a..09c6524a58e39f898366ea00bf0e6124640e94b3 100644
+--- a/dist/plugins/table/TableEditor.js
++++ b/dist/plugins/table/TableEditor.js
+@@ -363,7 +363,10 @@ const CellEditor = ({ focus, setActiveCell, parentEditor, lexicalTable, contents
+     );
+   }, [colIndex, editor, rootEditor, rowIndex, saveAndFocus, setActiveCell]);
+   React__default.useEffect(() => {
+-    if (focus && editor) {
++    const root = editor == null ? void 0 : editor.getRootElement();
++    // Native cell focus already placed the caret. Only keyboard/programmatic
++    // cell activation needs another focus update.
++    if (focus && root && root.ownerDocument.activeElement !== root) {
+       editor.focus();
+     }
+   }, [focus, editor]);

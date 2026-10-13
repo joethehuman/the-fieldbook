@@ -152,9 +152,6 @@ export function EditorFrame({
     const setStyle = (target: HTMLElement | null | undefined, name: string, value: string) => {
       if (target && target.style.getPropertyValue(name) !== value) target.style.setProperty(name, value);
     };
-    // Keep the native accessory allowance in the writing/popup band once.
-    const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent)
-      || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
     const measure = () => {
       if (!active || !element.isConnected) return;
       const viewport = window.visualViewport;
@@ -179,10 +176,11 @@ export function EditorFrame({
         if (app) app.dataset.editorHeaderMetadata = keyboard && metadataWidth + statusGap > halfGap ? "hidden" : "visible";
       }
       const rect = element.getBoundingClientRect();
-      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const nativeGap = keyboard ? (appleTouch ? 8 : 3) * rem : 0;
       const usableTop = (header?.getBoundingClientRect().bottom || rootBounds?.top || 0) + 8;
-      const usableBottom = (keyboard ? bottom - nativeGap : rect.top) - 8;
+      // The visual viewport is the visible writing area. Reserving guessed
+      // browser/keyboard heights again makes a short document scroll too soon.
+      const viewportBottom = (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
+      const usableBottom = (keyboard ? Math.min(bottom, viewportBottom) : rect.top) - 8;
       if (layout) layout.band = { top: usableTop, bottom: usableBottom, keyboard };
       const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
       const panelTop = dock ? usableTop : rect.bottom + 8;
@@ -193,7 +191,7 @@ export function EditorFrame({
         setStyle(element, "--editor-usable-bottom", `${usableBottom}px`);
         setStyle(element, "--editor-writing-top", `${usableTop}px`);
         element.dataset.dockSettled = "true";
-        setStyle(owner, "--editor-dock-clearance", `${keyboard ? nativeGap + 16 : rect.height + 24}px`);
+        setStyle(owner, "--editor-dock-clearance", `${keyboard ? 16 : rect.height + 24}px`);
         const pending = openingPanel.current;
         if (pending) {
           const panel = overlayLayer.current?.querySelector<HTMLElement>('[data-open="true"]');

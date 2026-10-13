@@ -25,8 +25,28 @@ export function WritingTitle({
     const title = ref.current;
     if (!title) return;
     const resize = () => {
-      title.style.height = "0px";
-      title.style.height = `${title.scrollHeight}px`;
+      const width = title.getBoundingClientRect().width;
+      if (!width) return;
+      // Measure the same typography in place without collapsing the focused
+      // textarea. A zero-height live control can provoke native focus panning.
+      const measurement = title.cloneNode(false) as HTMLTextAreaElement;
+      measurement.removeAttribute("id");
+      measurement.removeAttribute("name");
+      measurement.removeAttribute("autofocus");
+      measurement.setAttribute("form", "");
+      measurement.setAttribute("aria-hidden", "true");
+      measurement.tabIndex = -1;
+      measurement.disabled = true;
+      measurement.inert = true;
+      measurement.value = title.value;
+      Object.assign(measurement.style, {
+        position: "absolute", inset: "0 auto auto 0", width: `${width}px`,
+        height: "0px", visibility: "hidden", pointerEvents: "none",
+      });
+      title.after(measurement);
+      const height = `${measurement.scrollHeight}px`;
+      measurement.remove();
+      if (title.style.height !== height) title.style.height = height;
     };
     resize();
     const observer = new ResizeObserver((entries) => {

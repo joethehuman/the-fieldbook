@@ -17,6 +17,9 @@ export function useMobileEditorViewport(
     let fullHeight = Math.max(document.documentElement.clientHeight, viewport?.height || window.innerHeight);
     let keyboard = false;
     let settledTimer = 0;
+    const setStyle = (name: string, value: string) => {
+      if (shell.style.getPropertyValue(name) !== value) shell.style.setProperty(name, value);
+    };
     const measure = () => {
       const height = viewport?.height || document.documentElement.clientHeight;
       const nextWidth = document.documentElement.clientWidth;
@@ -46,8 +49,8 @@ export function useMobileEditorViewport(
         // Fixed coordinates come straight from the browser, never from a box
         // this hook moved. A restored height can precede offsetTop clearing.
         const top = Math.min(viewport?.offsetTop || 0, Math.max(0, fullHeight - height));
-        shell.style.setProperty("--editor-viewport-top", `${top}px`);
-        shell.style.setProperty("--editor-viewport-height", `${height}px`);
+        setStyle("--editor-viewport-top", `${top}px`);
+        setStyle("--editor-viewport-height", `${height}px`);
       } else {
         shell.style.removeProperty("--editor-viewport-top");
         shell.style.removeProperty("--editor-viewport-height");
@@ -55,16 +58,16 @@ export function useMobileEditorViewport(
     };
     const schedule = () => layout.schedule("viewport");
     const viewportChanged = () => {
-      // Native panning already moved the visual viewport. Update its shell in
-      // the same event so header tracking does not wait for another frame.
+      // Follow the native origin immediately, then reread it at the next paint:
+      // a focus or scroll event can arrive before all viewport values agree.
       measure();
-      layout.schedule("dock");
+      schedule();
     };
     const unsubscribe = layout.subscribe("viewport", measure);
     viewport?.addEventListener("resize", viewportChanged);
     viewport?.addEventListener("scroll", viewportChanged);
     window.addEventListener("resize", schedule);
-    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("scroll", viewportChanged, { passive: true });
     document.addEventListener("focusin", schedule);
     document.addEventListener("focusout", schedule);
     return () => {
@@ -73,7 +76,7 @@ export function useMobileEditorViewport(
       viewport?.removeEventListener("resize", viewportChanged);
       viewport?.removeEventListener("scroll", viewportChanged);
       window.removeEventListener("resize", schedule);
-      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("scroll", viewportChanged);
       document.removeEventListener("focusin", schedule);
       document.removeEventListener("focusout", schedule);
       shell.style.removeProperty("--editor-viewport-top");

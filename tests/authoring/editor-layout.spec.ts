@@ -2467,6 +2467,260 @@ test("editor delete failure retains the draft and uses the latest saved revision
 test.describe("touch-only writing dock", () => {
   test.use({ hasTouch: true });
 
+test.describe("short mobile authoring with a rendered viewport", () => {
+  test.use({ isMobile: true, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" });
+
+  async function shortCourse(page: Page, installed: boolean, table = false) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, installed, "course", 1, item => {
+      item.body = "Paragraph 1." + (table ? "\n\n| Topic | Detail |\n| --- | --- |\n| First | Short detail. |" : "");
+      item.lessons = item.lessons.slice(0, 1);
+      item.lessons[0].body = item.body;
+    });
+    return page.getByRole("textbox", { name: "Lesson content", exact: true });
+  }
+
+  async function writingPosition(page: Page) {
+    return page.getByRole("textbox", { name: "Lesson content", exact: true }).evaluate(writer => {
+      const owner = writer.closest<HTMLElement>(".main-content")!;
+      const first = writer.querySelector(":scope > p")!.getBoundingClientRect();
+      const last = Array.from(writer.querySelectorAll(":scope > p")).at(-1)!.getBoundingClientRect();
+      const selection = window.getSelection();
+      const caret = selection?.rangeCount && writer.contains(selection.focusNode)
+        ? Array.from(selection.getRangeAt(0).getClientRects()).find(rect => rect.height > 0) : undefined;
+      return { scroll: owner.scrollTop, firstTop: first.top, lastTop: last.top,
+        caretBottom: caret?.bottom ?? last.bottom,
+        bottom: Math.min(owner.getBoundingClientRect().bottom, window.visualViewport!.offsetTop + window.visualViewport!.height) };
+    });
+  }
+
+  test("Return leaves earlier course lines still until the visible bottom is reached", async ({ page }, info) => {
+    const writer = await shortCourse(page, info.project.name.startsWith("production"));
+    await writer.fill("");
+    const title = page.getByRole("textbox", { name: "Title", exact: true });
+    await title.tap();
+    // Resize the rendering surface itself. This is browser layout coverage,
+    // not an emulated iOS keyboard or an overridden visualViewport getter.
+    await page.setViewportSize({ width: 390, height: 490 });
+    await title.fill("A short course");
+    const shortHeight = (await title.boundingBox())!.height;
+    await title.fill("A course title that grows naturally across several lines while its input keeps focus");
+    expect((await title.boundingBox())!.height).toBeGreaterThan(shortHeight);
+    await expect(title).toBeFocused();
+    await title.fill("A short course");
+    expect((await title.boundingBox())!.height).toBeCloseTo(shortHeight, 0);
+    await expect(title).toBeFocused();
+    const lesson = page.getByRole("textbox", { name: "Lesson title", exact: true });
+    await lesson.tap();
+    await lesson.fill("First lesson");
+    const empty = await writingPosition(page);
+    await lesson.press("Enter");
+    // No focus or selection stabilization between Return and the first input.
+    await page.keyboard.insertText("First line.");
+    await expect(writer.locator("p").first()).toHaveText("First line.");
+    let before = await writingPosition(page);
+    expect(before.firstTop).toBeCloseTo(empty.firstTop, 0);
+    expect(before.scroll).toBeCloseTo(empty.scroll, 0);
+    let stationary = 0;
+    let boundaryScrolls = 0;
+    for (let index = 2; index <= 12; index++) {
+      await page.keyboard.press("Enter");
+      await page.keyboard.insertText(`Line ${index}.`);
+      await writer.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
+      const after = await writingPosition(page);
+      const moved = after.scroll - before.scroll;
+      const lineAdvance = after.lastTop - before.lastTop + moved;
+      const unscrolledBottom = after.caretBottom + moved;
+      expect(lineAdvance).toBeGreaterThan(0);
+      expect(moved).toBeGreaterThanOrEqual(-1);
+      if (unscrolledBottom <= after.bottom - 18) {
+        stationary++;
+        expect(moved).toBeCloseTo(0, 0);
+        expect(after.firstTop).toBeCloseTo(before.firstTop, 0);
+      } else if (moved > 1) {
+        boundaryScrolls++;
+        // Native empty-line and text carets have different line-box metrics.
+        // Allow that shift within the same small visible-edge clearance.
+        const previousClearance = before.bottom - before.caretBottom;
+        const edgeAllowance = Math.max(0, 18 - previousClearance);
+        expect(moved, JSON.stringify({ index, before, after, moved, lineAdvance })).toBeLessThanOrEqual(lineAdvance + edgeAllowance + 1);
+        expect(after.caretBottom).toBeGreaterThanOrEqual(after.bottom - 18);
+        expect(after.caretBottom).toBeLessThanOrEqual(after.bottom);
+      }
+      before = after;
+      if (boundaryScrolls >= 3) break;
+    }
+    expect(stationary).toBeGreaterThanOrEqual(2);
+    expect(boundaryScrolls).toBeGreaterThanOrEqual(2);
+  });
+
+  test("a visible table cell accepts immediate typing without moving the short course", async ({ page }, info) => {
+    const writer = await shortCourse(page, info.project.name.startsWith("production"), true);
+    await page.getByRole("textbox", { name: "Lesson title", exact: true }).tap();
+    await page.setViewportSize({ width: 390, height: 560 });
+    const cells = writer.locator('table [contenteditable="true"]');
+    const target = cells.nth(2);
+    const box = (await target.boundingBox())!;
+    expect(box.y).toBeGreaterThan(60);
+    expect(box.y + box.height).toBeLessThan(560);
+    await writer.evaluate(writer => {
+      const owner = writer.closest<HTMLElement>(".main-content")!;
+      const table = writer.querySelector("table")!;
+      const state = { recording: true, frames: [] as { scroll: number; top: number }[] };
+      (window as unknown as { shortTableMotion: typeof state }).shortTableMotion = state;
+      const record = () => {
+        state.frames.push({ scroll: owner.scrollTop, top: table.getBoundingClientRect().top });
+        if (state.recording) requestAnimationFrame(record);
+      };
+      record();
+    });
+    await page.touchscreen.tap(box.x + 12, box.y + box.height / 2);
+    await page.keyboard.insertText("cell-marker ");
+    await expect(target).toContainText("cell-marker");
+    await page.keyboard.press("Tab");
+    await page.keyboard.insertText("next-marker ");
+    await expect(cells.nth(3)).toContainText("next-marker");
+    const frames = await writer.evaluate(async () => {
+      // Observe the aftermath too, without delaying either first input.
+      for (let index = 0; index < 12; index++) await new Promise(requestAnimationFrame);
+      const state = (window as unknown as { shortTableMotion: { recording: boolean; frames: { scroll: number; top: number }[] } }).shortTableMotion;
+      state.recording = false;
+      return state.frames;
+    });
+    expect(frames.length).toBeGreaterThan(2);
+    for (const frame of frames) {
+      expect(frame.scroll).toBeCloseTo(frames[0].scroll, 0);
+      expect(frame.top).toBeCloseTo(frames[0].top, 0);
+    }
+    await expect(cells.nth(3)).not.toContainText("cell-marker");
+    await expect(target).not.toContainText("next-marker");
+  });
+
+  for (const kind of ["doc", "course"] as const) {
+    test(`${kind}: a blank canvas tap resumes short writing without an early scroll`, async ({ page, browserName }, info) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      const installed = info.project.name.startsWith("production");
+      if (kind === "course") await shortCourse(page, installed);
+      else await open(page, installed, "doc", 1, item => { item.body = "Paragraph 1."; });
+      const writer = page.getByRole("textbox", { name: kind === "doc" ? "Doc content" : "Lesson content", exact: true });
+      await page.getByRole("textbox", { name: "Title", exact: true }).tap();
+      const box = (await writer.boundingBox())!;
+      const point = { x: box.x + 24, y: box.y + box.height + 40 };
+      expect(point.y).toBeLessThan(650);
+      expect(await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('[contenteditable="true"]'), point)).toBe(false);
+      if (browserName === "chromium") {
+        const touch = await page.context().newCDPSession(page);
+        await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...point, id: 1 }] });
+        await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: point.x, y: point.y + 25, id: 1 }] });
+        await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: point.x, y: point.y + 60, id: 1 }] });
+        await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await touch.detach();
+        await expect(writer).not.toBeFocused();
+      }
+      await writer.evaluate(writer => {
+        const owner = writer.closest<HTMLElement>(".main-content")!;
+        const state = { recording: true, frames: [] as { scroll: number; top: number }[] };
+        (window as unknown as { blankCanvasMotion: typeof state }).blankCanvasMotion = state;
+        const record = () => {
+          state.frames.push({ scroll: owner.scrollTop, top: writer.getBoundingClientRect().top });
+          if (state.recording) requestAnimationFrame(record);
+        };
+        record();
+      });
+      await page.touchscreen.tap(point.x, point.y);
+      await page.keyboard.insertText(" blank-marker");
+      await expect(writer.locator(":scope > p").last()).toHaveText("Paragraph 1. blank-marker");
+      const frames = await page.evaluate(async () => {
+        for (let index = 0; index < 4; index++) await new Promise(requestAnimationFrame);
+        const state = (window as unknown as { blankCanvasMotion: { recording: boolean; frames: { scroll: number; top: number }[] } }).blankCanvasMotion;
+        state.recording = false;
+        return state.frames;
+      });
+      for (const frame of frames) {
+        expect(frame.scroll).toBeCloseTo(frames[0].scroll, 0);
+        expect(frame.top).toBeCloseTo(frames[0].top, 0);
+      }
+    });
+  }
+
+  test("Commands follows its button when the viewport recovers after opening", async ({ page }, info) => {
+    const writer = await shortCourse(page, info.project.name.startsWith("production"));
+    await writer.locator("p").first().tap();
+    await page.setViewportSize({ width: 390, height: 490 });
+    const commands = page.getByRole("button", { name: /^Commands:/ });
+    await commands.tap();
+    const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+    // A browser may retain its short viewport after blur. Commands must stay
+    // usable there, then follow its button when the native report recovers.
+    await expect(menu).toBeVisible();
+    const initialMenu = (await menu.boundingBox())!;
+    const initialButton = (await commands.boundingBox())!;
+    expect(initialMenu.y).toBeGreaterThanOrEqual(initialButton.y + initialButton.height);
+    expect(initialMenu.y + initialMenu.height).toBeLessThanOrEqual(490);
+    await menu.evaluate(menu => {
+      const button = document.querySelector<HTMLButtonElement>('[aria-label^="Commands:"]')!;
+      const state = { recording: true, frames: [] as { menuTop: number; menuBottom: number; buttonTop: number; buttonBottom: number; height: number }[] };
+      (window as unknown as { commandRecovery: typeof state }).commandRecovery = state;
+      const record = () => {
+        const panel = menu.getBoundingClientRect();
+        const anchor = button.getBoundingClientRect();
+        state.frames.push({ menuTop: panel.top, menuBottom: panel.bottom, buttonTop: anchor.top, buttonBottom: anchor.bottom, height: window.visualViewport!.height });
+        if (state.recording) requestAnimationFrame(record);
+      };
+      record();
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(async () => (await commands.boundingBox())!.y).toBeGreaterThan(700);
+    await expect(menu).toBeVisible();
+    const recovery = await page.evaluate(() => {
+      const state = (window as unknown as { commandRecovery: { recording: boolean; frames: { menuTop: number; menuBottom: number; buttonTop: number; buttonBottom: number; height: number }[] } }).commandRecovery;
+      state.recording = false;
+      return state.frames;
+    });
+    for (const frame of recovery) {
+      if (frame.buttonTop < frame.height / 2) {
+        expect(frame.menuTop).toBeGreaterThanOrEqual(frame.buttonBottom);
+      } else {
+        expect(frame.menuBottom).toBeLessThanOrEqual(frame.buttonTop);
+        expect(frame.buttonTop - frame.menuBottom).toBeLessThanOrEqual(24);
+      }
+    }
+    const palette = (await menu.boundingBox())!;
+    const button = (await commands.boundingBox())!;
+    expect(button.y).toBeGreaterThan(700);
+    expect(palette.y + palette.height).toBeLessThanOrEqual(button.y);
+    expect(button.y - palette.y - palette.height).toBeLessThanOrEqual(24);
+    const heading = menu.getByRole("menuitem", { name: "Heading 2", exact: true });
+    const target = (await heading.boundingBox())!;
+    await page.touchscreen.tap(target.x + target.width / 2, target.y + target.height / 2);
+    await page.keyboard.insertText("heading-marker ");
+    await expect(writer.locator("h2")).toContainText("heading-marker");
+  });
+
+  test("empty Search keeps its intrinsic height as the rendered viewport changes", async ({ page }, info) => {
+    await shortCourse(page, info.project.name.startsWith("production"));
+    await page.getByRole("button", { name: "Open search", exact: true }).tap();
+    const panel = page.locator('[data-slot="search-panel"]');
+    const input = page.getByRole("textbox", { name: "Search all content", exact: true });
+    const hint = panel.getByText("Search courses, updates, and docs.", { exact: true });
+    await expect(hint).toBeVisible();
+    const heights: number[] = [];
+    for (const height of [844, 490, 620, 844]) {
+      await page.setViewportSize({ width: 390, height });
+      await expect(input).toBeFocused();
+      const box = (await panel.boundingBox())!;
+      const text = (await hint.boundingBox())!;
+      const header = (await page.locator(".topbar").boundingBox())!;
+      heights.push(box.height);
+      expect(box.y + box.height - text.y - text.height).toBeLessThanOrEqual(32);
+      expect(box.y).toBeGreaterThanOrEqual(header.y + header.height);
+      expect(box.y + box.height).toBeLessThanOrEqual(height);
+      expect(header.y).toBeCloseTo(0, 0);
+    }
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(1);
+  });
+});
+
 type CommandViewport = { height: number; offsetTop: number; clientHeight: number; appPan: number };
 type CommandLifecycle = {
   viewport: CommandViewport;
@@ -2632,17 +2886,16 @@ async function restoredCommandGeometry(page: Page) {
     const margin = parseFloat(getComputedStyle(writer).lineHeight);
     const header = writer.closest(".app")!.querySelector(".topbar")!.getBoundingClientRect();
     const topDock = document.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]')!.dataset.dockPosition === "top";
-    const apple = /iPad|iPhone|iPod/.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-    const nativeBottom = window.visualViewport!.offsetTop + window.visualViewport!.height - (apple ? 128 : 48);
+    const nativeBottom = Math.min(ownerBounds.bottom, window.visualViewport!.offsetTop + window.visualViewport!.height);
     const rawTop = Math.max(ownerBounds.top, window.visualViewport!.offsetTop, header.bottom + 8);
     const safeTop = rawTop + parseFloat(getComputedStyle(document.documentElement).fontSize);
-    const safeBottom = Math.min(ownerBounds.bottom, topDock ? nativeBottom : dock.top) - margin;
+    const safeBottom = Math.min(ownerBounds.bottom, topDock ? nativeBottom : dock.top) - 8;
     const focusGap = rect!.bottom - (topDock ? nativeBottom : dock.top);
     return { dockTop: dock.top, dockBottom: dock.bottom, topDock, headerBottom: Math.max(header.bottom, window.visualViewport!.offsetTop), nativeBottom, focusGap, selectedText: selection.toString(), rangeText: native.toString(), collapsed: selection.isCollapsed, backward, focusTop: rect!.top, focusBottom: rect!.bottom, focusHeight: rect!.height, rawTop, safeTop, safeBottom, margin, scrollTop: owner.scrollTop, scrollMax: owner.scrollHeight - owner.clientHeight, viewport: (window as unknown as { commandLifecycle?: CommandLifecycle }).commandLifecycle?.viewport };
   });
 }
 
-async function expectMobileWritingBand(page: Page, gap = 15) {
+async function expectMobileWritingBand(page: Page, gap = 7) {
   // Native pan and frame compensation settle on the next paint. Require the
   // whole band together; lower clearance alone can pass in an intermediate frame.
   await expect.poll(async () => {
@@ -2660,9 +2913,8 @@ async function expectFloatingSurfaceClearDock(page: Page, surface: ReturnType<Pa
   const lane = (await page.getByRole("group", { name: "Editor controls", exact: true }).boundingBox())!;
   const band = await page.evaluate(() => {
     const header = document.querySelector(".topbar")!.getBoundingClientRect();
-    const apple = /iPad|iPhone|iPod/.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
     const dock = document.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]')!;
-    return { top: Math.max(header.bottom, window.visualViewport!.offsetTop), bottom: window.visualViewport!.offsetTop + window.visualViewport!.height - (apple ? 128 : 48), keyboard: dock.dataset.dockPosition === "top" };
+    return { top: Math.max(header.bottom, window.visualViewport!.offsetTop), bottom: window.visualViewport!.offsetTop + window.visualViewport!.height, keyboard: dock.dataset.dockPosition === "top" };
   });
   expect(box.y).toBeGreaterThanOrEqual(band.top + 7);
   if (band.keyboard) {
@@ -2951,7 +3203,7 @@ test("two-position mobile metadata input keeps its panel below a visible top doc
   await expectKeyboardTopDock(page);
   const topDock = (await dock.boundingBox())!, openPanel = (await panel.boundingBox())!;
   expect(openPanel.y).toBeGreaterThanOrEqual(topDock.y + topDock.height + 7);
-  expect(openPanel.y + openPanel.height).toBeLessThanOrEqual(490 - 128 - 7);
+  expect(openPanel.y + openPanel.height).toBeLessThanOrEqual(490 - 7);
   await expect(page.locator("#editor-summary")).toBeFocused();
   expect(await page.evaluate(() => window.getSelection()!.toString())).toBe("");
   const paint = await savedWritingPaint(page);
@@ -3111,9 +3363,9 @@ test("iPhone Commands insertion retains the keyboard lane after an eager return"
   ]) {
     await changeCommandViewport(page, state);
     await expectKeyboardTopDock(page);
-    await expectMobileWritingBand(page, 27);
+    await expectMobileWritingBand(page);
     const geometry = await restoredCommandGeometry(page);
-    expect(geometry.focusGap, JSON.stringify(geometry)).toBeLessThanOrEqual(-27);
+    expect(geometry.focusGap, JSON.stringify(geometry)).toBeLessThanOrEqual(-7);
     expect(geometry.focusTop).toBeGreaterThanOrEqual(geometry.rawTop - 1);
   }
   await page.keyboard.type(" Resumed after Commands.");
@@ -3144,7 +3396,7 @@ test("iPhone Commands closing restores a backward selection above the dock", asy
     expect(geometry.collapsed).toBe(false);
     expect(geometry.backward).toBe(true);
     await expectKeyboardTopDock(page);
-    await expectMobileWritingBand(page, 27);
+    await expectMobileWritingBand(page);
     const settled = await restoredCommandGeometry(page);
     expect(settled.selectedText).toBe(selected);
     expect(settled.backward).toBe(true);
@@ -3231,12 +3483,11 @@ for (const reduced of [false, true]) {
 test.describe("continuous mobile keyboard transitions", () => {
   test.use({ isMobile: true });
 
-  for (const scenario of ["smooth", "reduced", "cancel-waiting", "cancel-moving"] as const) {
+  for (const scenario of ["resting", "reduced", "cancel-waiting"] as const) {
     const title = {
-      smooth: "keyboard geometry settles before smoothly revealing a resting caret",
+      resting: "keyboard geometry settles before minimally revealing a resting caret",
       reduced: "a settled keyboard reveals the caret without animation for reduced motion",
       "cancel-waiting": "a touch scroll cancels the reveal waiting for keyboard geometry",
-      "cancel-moving": "a new touch stops an in-progress smooth caret reveal",
     }[scenario];
     test(title, async ({ page }, info) => {
       await page.emulateMedia({ reducedMotion: scenario === "reduced" ? "reduce" : "no-preference" });
@@ -3313,7 +3564,6 @@ test.describe("continuous mobile keyboard transitions", () => {
           while (performance.now() - started < 900) {
             await new Promise(requestAnimationFrame);
             samples.push(owner.scrollTop);
-            if (scenario === "cancel-moving" && chosenScroll === null && owner.scrollTop > initialScroll + 10) interrupt();
           }
           return { scrolls, initialScroll, samples, chosenScroll, finalScroll: owner.scrollTop };
         } finally { owner.scrollTo = originalScrollTo; }
@@ -3322,40 +3572,18 @@ test.describe("continuous mobile keyboard transitions", () => {
       if (scenario === "cancel-waiting") {
         expect(result.scrolls).toEqual([]);
         expect(result.finalScroll).toBeCloseTo(result.chosenScroll!, 0);
-      } else if (scenario === "cancel-moving") {
-        expect(result.chosenScroll).not.toBeNull();
-        expect(result.scrolls.length).toBeGreaterThan(0);
-        expect(result.scrolls.filter(scroll => scroll.interrupted)).toEqual([]);
-        expect(result.finalScroll).toBeCloseTo(result.chosenScroll!, 0);
       } else {
         expect(result.scrolls.length).toBeGreaterThan(0);
         for (const scroll of result.scrolls) expect(scroll.sinceViewport).toBeGreaterThanOrEqual(96);
         expect(result.finalScroll - result.initialScroll).toBeGreaterThan(100);
-        if (scenario === "smooth") {
-          // A single short, monotonic trip reaches the final band. Guard
-          // against repeated retargeting and overshoot, while allowing both
-          // ordinary and high-refresh-rate animation frame counts.
-          expect(result.scrolls.length).toBeLessThanOrEqual(24);
-          const elapsed = result.scrolls.at(-1)!.sinceViewport - result.scrolls[0].sinceViewport;
-          expect(elapsed).toBeGreaterThanOrEqual(100);
-          expect(elapsed).toBeLessThanOrEqual(260);
-          let previous = result.initialScroll;
-          for (const top of result.samples) {
-            expect(top).toBeGreaterThanOrEqual(previous - 1);
-            expect(top).toBeLessThanOrEqual(result.finalScroll + 1);
-            previous = top;
-          }
-          for (const scroll of result.scrolls) {
-            expect(scroll.top).toBeGreaterThanOrEqual(result.initialScroll);
-            expect(scroll.top).toBeLessThanOrEqual(result.finalScroll + 1);
-          }
-          expect(result.samples.filter(top => top > result.initialScroll + 1 && top < result.finalScroll - 1).length).toBeGreaterThan(2);
-        } else {
-          expect(result.scrolls.length).toBeLessThanOrEqual(2);
-          expect(result.scrolls.every(scroll => scroll.behavior !== "smooth")).toBe(true);
-          expect(result.samples.filter(top => top > result.initialScroll + 1 && top < result.finalScroll - 1)).toEqual([]);
-        }
-        await expectMobileWritingBand(page);
+        expect(result.scrolls.length).toBeLessThanOrEqual(2);
+        expect(result.scrolls.every(scroll => scroll.behavior !== "smooth")).toBe(true);
+        expect(result.samples.filter(top => top > result.initialScroll + 1 && top < result.finalScroll - 1)).toEqual([]);
+        const caret = await restoredCommandGeometry(page);
+        const bottom = await page.locator(".main-content").evaluate(owner => Math.min(owner.getBoundingClientRect().bottom,
+          window.visualViewport!.offsetTop + window.visualViewport!.height));
+        expect(bottom - caret.focusBottom).toBeGreaterThanOrEqual(7);
+        expect(bottom - caret.focusBottom).toBeLessThanOrEqual(18);
       }
     });
   }
@@ -3507,7 +3735,7 @@ test("iPhone Commands to media does not reopen prose input before Cancel", async
   await expect(writer).toBeFocused();
   await changeCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 490, appPan: 0 });
   await expectKeyboardTopDock(page);
-  await expectMobileWritingBand(page, 27);
+  await expectMobileWritingBand(page);
   await page.keyboard.type(" Returned from the chooser.");
   await expect(paragraph).toHaveText(`${original} Returned from the chooser.`);
 });
@@ -3997,15 +4225,22 @@ test("typing stays above the dock while the keyboard viewport keeps changing", a
       state.height = Math.max(410, state.height - 7);
       window.visualViewport!.dispatchEvent(new Event("resize"));
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        const selection = window.getSelection();
-        if (!selection?.isCollapsed || !selection.rangeCount) return;
-        const caret = Array.from(selection.getRangeAt(0).getClientRects()).find(rect => rect.height > 0);
-        const dock = document.querySelector('.editor-frame-controls[data-dock="true"]');
-        if (caret && dock) {
-          const bounds = dock.getBoundingClientRect();
-          const nativeBottom = window.visualViewport!.offsetTop + window.visualViewport!.height - 48;
-          samples.push(Math.max(bounds.bottom + 7 - caret.top, caret.bottom - nativeBottom + 7));
-        }
+        const signature = `${state.height}:${state.offsetTop}`;
+        // Other callbacks in this same frame may still apply the caret
+        // correction. Observe after those callbacks, unless another synthetic
+        // resize has already begun a new frame's work.
+        setTimeout(() => {
+          if (`${state.height}:${state.offsetTop}` !== signature) return;
+          const selection = window.getSelection();
+          if (!selection?.isCollapsed || !selection.rangeCount) return;
+          const caret = Array.from(selection.getRangeAt(0).getClientRects()).find(rect => rect.height > 0);
+          const dock = document.querySelector('.editor-frame-controls[data-dock="true"]');
+          if (caret && dock) {
+            const bounds = dock.getBoundingClientRect();
+            const nativeBottom = window.visualViewport!.offsetTop + window.visualViewport!.height;
+            samples.push(Math.max(bounds.bottom + 7 - caret.top, caret.bottom - nativeBottom + 7));
+          }
+        }, 0);
       }));
     }, 16);
     (window as unknown as { movingKeyboardTest: { samples: number[]; timer: number } }).movingKeyboardTest = { samples, timer };
@@ -4019,6 +4254,40 @@ test("typing stays above the dock while the keyboard viewport keeps changing", a
   expect(samples.length).toBeGreaterThan(10);
   expect(Math.max(...samples)).toBeLessThanOrEqual(0);
   await expect(writer).toContainText("Keep this line visible.");
+  const resting = await writer.evaluate(async writer => {
+    // Editing may protect the caret through its current keyboard burst, but
+    // that ownership must expire before a later resize with no further input.
+    await new Promise(resolve => setTimeout(resolve, 130));
+    const state = (window as unknown as { movingKeyboardViewport: { height: number; offsetTop: number } }).movingKeyboardViewport;
+    const owner = writer.closest<HTMLElement>(".main-content")!;
+    const originalScrollTo = owner.scrollTo;
+    const scrollTo = originalScrollTo.bind(owner);
+    const writes: { moving: boolean; sinceViewport: number }[] = [];
+    let moving = true;
+    let lastViewportAt = performance.now();
+    owner.scrollTo = ((options: ScrollToOptions | number, y?: number) => {
+      writes.push({ moving, sinceViewport: performance.now() - lastViewportAt });
+      if (typeof options === "number") scrollTo(options, y ?? 0);
+      else scrollTo(options);
+    }) as typeof owner.scrollTo;
+    for (let step = 1; step <= 12; step++) {
+      state.height = 410 - step * 4;
+      lastViewportAt = performance.now();
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      await new Promise(requestAnimationFrame);
+    }
+    moving = false;
+    await new Promise(resolve => setTimeout(resolve, 160));
+    await new Promise(requestAnimationFrame);
+    owner.scrollTo = originalScrollTo;
+    const caret = Array.from(window.getSelection()!.getRangeAt(0).getClientRects()).find(rect => rect.height > 0)!;
+    return { writes, caretBottom: caret.bottom, visibleBottom: window.visualViewport!.offsetTop + window.visualViewport!.height };
+  });
+  expect(resting.writes.filter(write => write.moving)).toHaveLength(0);
+  expect(resting.writes.length).toBeGreaterThan(0);
+  expect(resting.writes.length).toBeLessThanOrEqual(2);
+  expect(resting.writes.every(write => write.sinceViewport >= 90)).toBe(true);
+  expect(resting.caretBottom).toBeLessThanOrEqual(resting.visibleBottom - 7);
   await page.screenshot({ path: info.outputPath("mobile-keyboard-viewport-burst.png") });
 });
 
@@ -4058,7 +4327,7 @@ for (const kind of ["doc", "brief", "course"] as const) {
         const dock = element.closest(".app")!.querySelector('.editor-frame-controls[data-dock="true"]')!.getBoundingClientRect();
         const header = element.closest(".app")!.querySelector(".topbar")!.getBoundingClientRect();
         if (dock.top - Math.max(header.bottom, window.visualViewport!.offsetTop) < 32) {
-          const nativeBottom = window.visualViewport!.offsetTop + window.visualViewport!.height - 48;
+          const nativeBottom = window.visualViewport!.offsetTop + window.visualViewport!.height;
           return Math.max(dock.bottom + 7 - line.top, line.bottom - nativeBottom + 7);
         }
         return line.bottom - dock.top + 7;

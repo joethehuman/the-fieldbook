@@ -17,7 +17,6 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     const layout = mobileEditorLayout(owner);
     const phone = window.matchMedia(compactLayoutQuery);
     const touch = window.matchMedia(touchWritingQuery);
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let dragging = false;
     let moved = false;
     let manualGesture = false;
@@ -28,8 +27,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     let caretOffset = -1;
     let pendingReveal = false;
     let immediateReveal = false;
-    let deferredViewport = false;
-    let smoothScroll: { from: number; target: number; startedAt: number; viewport: string | undefined } | null = null;
+    let typingThroughViewportMotion = false;
     let space = -1;
     let correctionsLeft = 0;
     let appliedScroll: number | null = null;
@@ -37,14 +35,9 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     function clear() {
       owner!.style.removeProperty("--phone-writing-clearance");
     }
-    function lineMargin() {
-      const content = root!.querySelector<HTMLElement>(".writing-content") || root!;
-      return parseFloat(getComputedStyle(content).lineHeight)
-        || parseFloat(getComputedStyle(document.documentElement).fontSize);
-    }
-    function writingBottom(margin: number) {
+    function writingBottom() {
       const bounds = owner!.getBoundingClientRect();
-      return Math.min(bounds.bottom, layout.band?.bottom ?? bounds.bottom) - margin;
+      return Math.min(bounds.bottom, layout.band?.bottom ?? bounds.bottom);
     }
     function reserveSpace() {
       const managed = phone.matches && touch.matches && viewport!.scale === 1 && !!layout.band;
@@ -59,7 +52,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       // controls and the keyboard. Layout-height guesses can disagree with
       // the dock on phones whose clientHeight already shrank for the keyboard.
       const bounds = owner!.getBoundingClientRect();
-      const bottom = writingBottom(lineMargin());
+      const bottom = writingBottom();
       // Translation moves the shell and caret together. Only a changed usable
       // band may grant another check; browser panning never acquires ownership.
       const usableTop = layout.band.top;
@@ -73,25 +66,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       owner!.style.setProperty("--phone-writing-clearance", `${space}px`);
       return changed;
     }
-    function cancelSmoothScroll() {
-      if (!smoothScroll) return;
-      smoothScroll = null;
-      appliedScroll = null;
-    }
-    function advanceSmoothScroll() {
-      if (!smoothScroll) return;
-      const progress = Math.min(1, (performance.now() - smoothScroll.startedAt) / 180);
-      const eased = progress * progress * (3 - 2 * progress);
-      const next = smoothScroll.from + (smoothScroll.target - smoothScroll.from) * eased;
-      owner!.scrollTo({ top: next, behavior: "instant" });
-      if (progress < 1) layout.schedule("caret");
-      else {
-        appliedScroll = smoothScroll.target;
-        smoothScroll = null;
-        schedule();
-      }
-    }
-    function revealCaret(smooth = false) {
+    function revealCaret() {
       const active = document.activeElement;
       if (!protecting || dragging || !phone.matches || !touch.matches || viewport!.scale !== 1 || !(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)) return;
       const selection = window.getSelection();
@@ -116,7 +91,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       const rawTop = Math.max(bounds.top, layout.band?.top ?? bounds.top);
       // Protect the actual toolbar boundary, including native app panning,
       // rather than deriving its location from a viewport height difference.
-      const bottom = writingBottom(lineMargin());
+      const bottom = writingBottom();
       const available = bottom - rawTop;
       if (available < caret.height - 1) return;
       // Larger formatted glyphs can fit in the writing band while the extra
@@ -129,13 +104,9 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       const previous = owner!.scrollTop;
       if (Math.abs(next - previous) < 1) return;
       correctionsLeft -= 1;
-      if (smooth && !reducedMotion.matches) {
-        // One fixed-target animation runs in the caret phase. Native smooth
-        // scrolling can apply a queued compositor delta after a user cancels it.
-        smoothScroll = { from: previous, target: next, startedAt: performance.now(), viewport: layout.viewport?.signature };
-        layout.schedule("caret");
-        return;
-      }
+      // A new line uses the space below it first. Only its out-of-bounds
+      // portion moves the canvas; there is no separate scroll animation that
+      // can continue after the next tap, selection, or native keyboard move.
       appliedScroll = next;
       owner!.scrollTo({ top: next, behavior: "instant" });
       // Check achieved positioning once after the browser/editor has rendered.
@@ -145,8 +116,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     function cancelReveal() {
       pendingReveal = false;
       immediateReveal = false;
-      deferredViewport = false;
-      cancelSmoothScroll();
+      typingThroughViewportMotion = false;
     }
     function schedule() {
       if (!protecting || dragging || !phone.matches || !touch.matches || viewport!.scale !== 1) return;
@@ -157,31 +127,28 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     function measure() {
       const changed = reserveSpace();
       if (!root!.hasAttribute("data-mobile-caret-owner")) { cancelReveal(); return; }
-      const interrupted = !!smoothScroll && (changed || smoothScroll.viewport !== layout.viewport?.signature);
-      if (interrupted) cancelSmoothScroll();
-      if ((changed || interrupted) && protecting && !manualGesture && !awaitingCaret) {
+      if (changed && protecting && !manualGesture && !awaitingCaret) {
         correctionsLeft = Math.max(correctionsLeft, 1);
         pendingReveal = true;
       }
-      if (smoothScroll) { advanceSmoothScroll(); return; }
+      const viewportMoving = !!layout.viewport && performance.now() - layout.viewport.changedAt < mobileViewportQuietTime;
+      if (!viewportMoving) typingThroughViewportMotion = false;
       if (!pendingReveal) return;
       // The browser is already moving focus into view during keyboard motion.
       // Keep the reserve current, then make one correction to the settled band
       // instead of adding an instant canvas scroll to every animation sample.
-      if (!immediateReveal && layout.viewport && performance.now() - layout.viewport.changedAt < mobileViewportQuietTime) {
-        deferredViewport = true;
+      // Once the author starts typing during native motion, keep that live
+      // line visible between keystrokes until the same motion settles.
+      if (!immediateReveal && !typingThroughViewportMotion && viewportMoving) {
         return;
       }
-      const smooth = deferredViewport && !immediateReveal;
-      deferredViewport = false;
       pendingReveal = false;
-      revealCaret(smooth);
+      revealCaret();
       // Preserve an edit's second bounded check if its first correction moved.
       immediateReveal &&= pendingReveal;
     }
     const resize = () => layout.schedule("viewport");
     function ownerScrolled() {
-      if (smoothScroll) return;
       if (appliedScroll !== null && Math.abs(owner!.scrollTop - appliedScroll) < 1) {
         appliedScroll = null;
         return;
@@ -193,9 +160,9 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       schedule();
     }
     function editing(event?: Event) {
-      cancelSmoothScroll();
-      deferredViewport = false;
       immediateReveal = event?.type === "beforeinput" || event?.type === "input";
+      if (immediateReveal && layout.viewport && performance.now() - layout.viewport.changedAt < mobileViewportQuietTime)
+        typingThroughViewportMotion = true;
       returningSelection = false;
       // Native focus can precede the caret chosen by a touch tap. Input itself
       // is an explicit edit and may resume protection without a caret change.
@@ -211,8 +178,6 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     }
     function blur() { returningSelection = false; protecting = false; cancelReveal(); layout.schedule("caret"); }
     function resumeWriting() {
-      cancelSmoothScroll();
-      deferredViewport = false;
       const active = document.activeElement;
       const selection = window.getSelection();
       if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)
@@ -236,8 +201,6 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
         return;
       }
       if (selection.focusNode === caretNode && selection.focusOffset === caretOffset) return;
-      cancelSmoothScroll();
-      deferredViewport = false;
       caretNode = selection.focusNode; caretOffset = selection.focusOffset;
       if (awaitingCaret) manualGesture = false;
       if (!manualGesture) { renewProtection(); schedule(); }
@@ -264,8 +227,6 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     function navigateCaret(event: KeyboardEvent) {
       const active = document.activeElement;
       if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)) return;
-      cancelSmoothScroll();
-      deferredViewport = false;
       if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(event.key)) return;
       returningSelection = false;
       immediateReveal = true;
@@ -293,7 +254,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     root.addEventListener("keydown", navigateCaret, true);
     document.addEventListener("selectionchange", selectionMoved);
     owner.addEventListener("scroll", ownerScrolled, { passive: true });
-    owner.addEventListener("pointerdown", cancelSmoothScroll, { passive: true });
+    owner.addEventListener("pointerdown", cancelReveal, { passive: true });
     owner.addEventListener("wheel", wheel, { passive: true });
     owner.addEventListener("touchstart", startDrag, { passive: true });
     owner.addEventListener("touchmove", moveDrag, { passive: true });
@@ -316,7 +277,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       root.removeEventListener("keydown", navigateCaret, true);
       document.removeEventListener("selectionchange", selectionMoved);
       owner.removeEventListener("scroll", ownerScrolled);
-      owner.removeEventListener("pointerdown", cancelSmoothScroll);
+      owner.removeEventListener("pointerdown", cancelReveal);
       owner.removeEventListener("wheel", wheel);
       owner.removeEventListener("touchstart", startDrag);
       owner.removeEventListener("touchmove", moveDrag);

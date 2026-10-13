@@ -185,7 +185,7 @@ export function SearchExperience({
           onClick={() => {
             setQuery("");
             setView("search");
-            input.current?.focus();
+            input.current?.focus({ preventScroll: true });
             setOpen(compact);
           }}
         >
@@ -199,6 +199,7 @@ export function SearchExperience({
       id={id}
       open={visible}
       compact={compact}
+      intrinsic={view === "search" && !query.trim()}
       onDismiss={() => setOpen(false)}
       returnFocus={compact ? searchTrigger : undefined}
       persistentContent={

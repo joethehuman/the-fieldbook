@@ -32,6 +32,10 @@ The pinned `lexical@0.48.0` dependency includes a narrow selection-synchronizati
 
 Copyright (c) Meta Platforms, Inc. and affiliates. These upstream changes remain under the MIT terms reproduced above, together with Lexical's packaged license; they are not relicensed under ELv2.
 
+## MDXEditor table focus
+
+The pinned `@mdxeditor/editor@4.2.5` dependency includes a [table focus patch](../patches/@mdxeditor__editor@4.2.5.patch). A cell that already owns native focus no longer receives a redundant programmatic focus update; keyboard navigation still focuses newly selected cells. pnpm applies the patch to both apps. When updating MDXEditor, verify native tap placement and keyboard cell navigation before removing it. MDXEditor retains its MIT license and packaged copyright notice.
+
 ## Code highlighting
 
 Fieldbook uses [Highlight.js](https://github.com/highlightjs/highlight.js) for automatic language detection and reader syntax highlighting. It retains its BSD 3-Clause license; the complete [copyright notice and license](../public/licenses/highlightjs-bsd-3-clause.txt) ship with both apps at `/licenses/highlightjs-bsd-3-clause.txt`. CodeMirror and Lezer provide code editing and retain their MIT licenses and packaged notices. Preserve these dependency licenses when redistributing bundled software.

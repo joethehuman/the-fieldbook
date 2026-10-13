@@ -12,6 +12,7 @@ import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWid
 import { $applyWritingBlockStyle, $isMediaParagraph, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu, type SelectionMenuController } from "./writing-selection-menu";
 import { normalizeWritingSelection, writingSelectionBoundariesPlugin } from "./writing-selection-boundaries";
+import { writingMobileScrollPolicyPlugin } from "./writing-mobile-scroll-policy";
 import { EditorCompactControlsContext, EditorWritingActionsContext } from "./editor-frame";
 import { useWritingControlsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { blurWritingInput } from "./writing-cursor";
@@ -124,6 +125,8 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
     });
   }, [lexical]);
   function enterBody() {
+    const surface = lexical?.getRootElement();
+    const mobile = surface?.closest<HTMLElement>(".writing-root[data-mobile-caret-owner]");
     lexical?.update(() => {
       const root = $getRoot();
       const first = root.getFirstChild();
@@ -134,9 +137,10 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
         if (first) first.insertBefore(paragraph); else root.append(paragraph);
       }
       paragraph.selectStart();
-    }, { discrete: true });
+    }, { discrete: true, tag: mobile ? SKIP_SCROLL_INTO_VIEW_TAG : undefined });
     // Keep the title-to-body handoff inside the same keyboard gesture.
-    lexical?.getRootElement()?.focus({ preventScroll: true });
+    if (surface && document.activeElement !== surface) surface.focus({ preventScroll: true });
+    mobile?.dispatchEvent(new Event("fieldbook:writing-resume"));
   }
   const fade = useScrollFade<HTMLDivElement>();
   return <div ref={fade.ref} data-state="active" className="writing-viewport writing-scroll-area scroll-fade mt-0 focus-visible:ring-0"
@@ -307,24 +311,12 @@ function WritingToolbar({
   }, [editor, onEditorReady, divider]);
   useEffect(() => {
     if (!editor) return;
-    const skipMobileScroll = () => {
-      const surface = editor.getRootElement();
-      if (surface?.closest(".writing-root[data-mobile-caret-owner]")
-        && !surface.closest(".writing-code-block") && window.visualViewport?.scale === 1) {
-        // The mobile layout phase reveals the committed native caret after the
-        // shell and dock agree. Preserve selection reconciliation and focus.
-        $addUpdateTag(SKIP_SCROLL_INTO_VIEW_TAG);
-      }
-    };
-    const unregisterTransform = editor.registerNodeTransform(RootNode, skipMobileScroll);
     // Native selectionchange can arrive after a keyboard menu takes focus.
     // Keep the canvas selection synchronized without stealing menu focus.
-    const unregisterSelection = editor.registerCommand(SELECTION_CHANGE_COMMAND, () => {
-      skipMobileScroll();
+    return editor.registerCommand(SELECTION_CHANGE_COMMAND, () => {
       if (ownsMenuFocus()) $addUpdateTag(SKIP_SELECTION_FOCUS_TAG);
       return false;
     }, COMMAND_PRIORITY_HIGH);
-    return () => { unregisterTransform(); unregisterSelection(); };
   }, [editor, ownsMenuFocus]);
   useEffect(() => {
     if (!editor) return;
@@ -438,7 +430,6 @@ export default function WritingEditorEngine({
   const paletteSession = useRef<{
     menu: HTMLDivElement;
     ready: boolean;
-    mode: "above" | "below" | null;
     opening: ReturnType<typeof createMobileEditorOpening>;
     cancel?: () => void;
   } | null>(null);
@@ -594,7 +585,7 @@ export default function WritingEditorEngine({
     if (!dock || !menu) return;
     const layout = mobileEditorLayout(dock);
     if (paletteSession.current?.menu !== menu) paletteSession.current = {
-      menu, ready: false, mode: null, opening: createMobileEditorOpening(performance.now(), layout.viewport),
+      menu, ready: false, opening: createMobileEditorOpening(performance.now(), layout.viewport),
     };
     const session = paletteSession.current;
     const waitsForKeyboard = !!mediaChooser || slashFromToolbar;
@@ -624,31 +615,19 @@ export default function WritingEditorEngine({
       const width = Math.min(mediaChooser ? 324 : 288, visibleWidth - 16);
       setStyle("width", `${width}px`);
       const available = Math.max(0, bottom - top);
-      const style = getComputedStyle(menu);
-      const chrome = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
-        + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-      const preferred = Math.min(360, mediaChooser ? menu.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)
-        : (menu.querySelector<HTMLElement>(".writing-slash-options")?.scrollHeight || 0)
-          + (menu.querySelector<HTMLElement>(".writing-slash-footer")?.offsetHeight || 0) + chrome);
-      const candidate = dockPosition === "top" ? "below" : "above";
-      const mode = session.mode || candidate;
+      const mode = dockPosition === "top" ? "below" : "above";
       const wasReady = session.ready;
+      // Wait for native motion before the first paint. A quiet fallback keeps
+      // controls reachable if a browser never reports keyboard dismissal;
+      // neither that fallback nor the first paint chooses a permanent anchor.
       if (!session.ready) {
         clearTimeout(readinessCheck);
-        const opening = mobileEditorOpeningReady(session.opening, layout.band, preferred,
+        const opening = mobileEditorOpeningReady(session.opening, layout.band, 360,
           [viewport?.height || window.innerHeight, viewport?.offsetTop || 0,
             viewport?.width || window.innerWidth, viewport?.offsetLeft || 0, viewport?.scale || 1], performance.now(), layout.viewport);
         session.ready = !waitsForKeyboard || opening.ready;
-        if (!session.ready) readinessCheck = window.setTimeout(() => {
-          readinessCheck = 0;
-          // Reread native geometry before deciding; a timer alone cannot make
-          // the palette visible or lock it to a transient dock position.
-          layout.schedule("viewport");
-        }, opening.checkIn);
+        if (!session.ready) readinessCheck = window.setTimeout(() => layout.schedule("viewport"), opening.checkIn);
       }
-      // Choose a lane once the opening is ready. Native keyboard dismissal
-      // may grow its room, but cannot flip the visible menu to another lane.
-      if (session.ready && !session.mode) session.mode = mode;
       setStyle("top", `${mode === "above" ? bottom : top}px`);
       setStyle("left", `${Math.max(left + 8, Math.min(anchor.x + anchor.width / 2 - width / 2, left + visibleWidth - width - 8))}px`);
       setStyle("transform", mode === "above" ? "translateY(-100%)" : "none");
@@ -1163,6 +1142,7 @@ export default function WritingEditorEngine({
   }
   const plugins = useMemo(() => [
     writingViewPanelPlugin(),
+    writingMobileScrollPolicyPlugin(),
     writingTrailingLinePlugin(),
     writingVideoPlugin(),
     writingUploadPlugin(),
