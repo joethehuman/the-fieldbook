@@ -336,7 +336,11 @@
 .bn-shadcn .bn-suggestion-menu {
   width: 17rem;
   max-width: calc(100vw - 2rem);
-  max-height: min(24rem, 60dvh);
+  max-height: min(
+    24rem,
+    calc(var(--bn-vv-height, 100dvh) * 0.6),
+    var(--available-height, 24rem)
+  );
   padding: 6px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -416,6 +420,14 @@
   outline-offset: 2px;
 }
 @media (any-pointer: coarse) {
+  .bn-shadcn [data-slot="input"],
+  .fieldbook-blocknote .writing-code-language {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+  .bn-shadcn .bn-suggestion-menu-item [data-position="right"] {
+    display: none;
+  }
   .bn-shadcn .bn-suggestion-menu > .bn-suggestion-menu-item,
   .bn-shadcn :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
     min-height: 44px;

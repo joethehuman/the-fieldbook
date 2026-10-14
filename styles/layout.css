@@ -418,7 +418,7 @@
   .editor-publication-details { display: none; }
 
   /* Mobile editing uses the document's native scroll/focus path. The toolbar
-     is a sibling of the canvas: sticky ancestors would stop CodeMirror's
+     is a sibling of the canvas: sticky ancestors would stop the writing canvas's
      normal scroll walk. Viewport compensation belongs to the toolbar only. */
   html:has(.app[data-mobile-editor]) {
     overflow: visible;

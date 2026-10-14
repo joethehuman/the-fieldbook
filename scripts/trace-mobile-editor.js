@@ -8,7 +8,7 @@
  * restores every patched browser API.
  *
  * Records geometry and native/model selection ownership only: no text, values,
- * Lexical node keys, keyboard keys, labels,
+ * editor node keys, keyboard keys, labels,
  * element IDs, attributes containing content, page URLs, or source URLs.
  * Instrumentation can affect timing; compare with an uninstrumented recording.
  */
