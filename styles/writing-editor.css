@@ -116,7 +116,7 @@
   left: 50%;
   transform: translateX(-50%);
   width: min(18rem, calc(100% - 16px));
-  max-height: min(24rem, 65svh);
+  max-height: min(24rem, var(--editor-mobile-overlay-height, 65svh));
   pointer-events: auto;
 }
 .writing-media-chooser[data-mobile-palette="true"] {

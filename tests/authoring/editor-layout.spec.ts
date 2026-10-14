@@ -2722,12 +2722,12 @@ test.describe("native mobile editing", () => {
   async function expectToolbar(page: Page) {
     const toolbar = page.locator(".editor-mobile-toolbar");
     await expect(toolbar).toBeVisible();
-    await expect(toolbar).toHaveCSS("position", "sticky");
+    await expect(page.locator(".editor-mobile-toolbar-slot")).toHaveCSS("position", "sticky");
     await expect(toolbar.getByRole("button", { name: "Back to content", exact: true })).toBeVisible();
     await expect.poll(() => toolbar.evaluate(element => {
       const box = element.getBoundingClientRect();
       const buttons = Array.from(element.querySelectorAll<HTMLButtonElement>(".editor-mobile-navigation button, .editor-frame-controls button"));
-      return box.top >= -1 && box.bottom <= innerHeight && buttons.length > 0 && buttons.every(button => {
+      return box.top >= -1 && box.bottom <= (visualViewport?.height ?? innerHeight) && buttons.length > 0 && buttons.every(button => {
         const rect = button.getBoundingClientRect();
         const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
         return rect.height >= 44 && rect.width >= 44 && rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1
@@ -2758,6 +2758,12 @@ test.describe("native mobile editing", () => {
         range.setStart(selection.focusNode, offset); range.setEnd(selection.focusNode, offset + 1);
         rect = range.getBoundingClientRect();
       }
+      if (!rect && selection.focusNode instanceof Element) {
+        // Safari returns no collapsed Range rect in a blank paragraph. Lexical
+        // measures the child at the element offset, normally its trailing BR.
+        const child = selection.focusNode.childNodes[selection.focusOffset];
+        if (child instanceof Element) rect = child.getBoundingClientRect();
+      }
       if (node.matches(".cm-content")) {
         // CodeMirror draws its caret separately, including in an empty line.
         // Focus and DOM selection must still belong to this exact native surface.
@@ -2767,7 +2773,7 @@ test.describe("native mobile editing", () => {
       const toolbar = document.querySelector(".editor-mobile-toolbar")!.getBoundingClientRect();
       return { focused: document.activeElement === node, collapsed: selection.isCollapsed,
         text: selection.focusNode.textContent, offset: selection.focusOffset,
-        top: rect?.top, bottom: rect?.bottom, toolbarBottom: toolbar.bottom, viewportBottom: innerHeight };
+        top: rect?.top, bottom: rect?.bottom, toolbarBottom: toolbar.bottom, viewportBottom: visualViewport?.height ?? innerHeight };
     });
   }
 
@@ -2777,6 +2783,82 @@ test.describe("native mobile editing", () => {
       if (!caret?.focused || !caret.collapsed || caret.top === undefined || caret.bottom === undefined) return -Infinity;
       return Math.min(caret.top - caret.toolbarBottom, caret.viewportBottom - caret.bottom);
     }).toBeGreaterThanOrEqual(0);
+  }
+
+  for (const pan of [76, 50]) {
+    test(`viewport pan ${pan}px keeps the toolbar and Commands in the visible area`, async ({ page }, info) => {
+      const { writer } = await fixture(page, info.project.name.startsWith("production"), { kind: "doc", empty: true });
+      await writer.tap();
+      await expect(page.getByRole("button", { name: /^Commands:/ })).toBeEnabled();
+      const mounted = await writer.elementHandle();
+      const initial = await page.locator(".editor-mobile-toolbar").boundingBox();
+      const scrollBefore = await page.evaluate(() => scrollY);
+      await page.evaluate(pan => {
+        const viewport = visualViewport!;
+        Object.defineProperties(viewport, {
+          height: { configurable: true, get: () => 358 },
+          offsetTop: { configurable: true, get: () => CSS.supports("-webkit-backdrop-filter", "none") ? pan : 0 },
+        });
+        // Model the captured native pan in client coordinates. Desktop browser
+        // emulation cannot produce the iOS keyboard's compositor movement.
+        document.querySelector<HTMLElement>(".main-shell")!.style.transform = `translateY(-${pan}px)`;
+        viewport.dispatchEvent(new Event("scroll"));
+        viewport.dispatchEvent(new Event("resize"));
+      }, pan);
+      await expectToolbar(page);
+      await expect.poll(async () => (await page.locator(".editor-mobile-toolbar").boundingBox())!.y).toBeCloseTo(Math.max(0, initial!.y - pan), 0);
+      expect(await page.evaluate(() => scrollY)).toBe(scrollBefore);
+      expect(await mounted!.evaluate(node => node === document.querySelector('.writing-content[contenteditable="true"]'))).toBe(true);
+      await page.locator(".editor-mobile-toolbar").getByRole("button", { name: /^Commands:/ }).click();
+      const commands = page.locator('.writing-slash-menu[data-mobile-palette="true"]');
+      await expect(commands).toBeVisible();
+      await expect.poll(async () => {
+        const bounds = (await commands.boundingBox())!;
+        return bounds.y + bounds.height;
+      }).toBeLessThanOrEqual(358);
+      await page.keyboard.press("Escape");
+      await page.evaluate(() => {
+        document.querySelector<HTMLElement>(".main-shell")!.style.removeProperty("transform");
+        delete (visualViewport as unknown as { height?: number }).height;
+        delete (visualViewport as unknown as { offsetTop?: number }).offsetTop;
+        visualViewport!.dispatchEvent(new Event("resize"));
+      });
+      await expect.poll(async () => (await page.locator(".editor-mobile-toolbar").boundingBox())!.y).toBeCloseTo(initial!.y, 0);
+    });
+
+    test(`Return reveals blank lines with a ${pan}px visual viewport offset`, async ({ page }, info) => {
+      const { writer } = await fixture(page, info.project.name.startsWith("production"), { kind: "doc" });
+      await page.setViewportSize({ width: 390, height: 500 });
+      await page.evaluate(pan => {
+        // Supply desktop scroll range in place of native keyboard panning, then
+        // replay the measured visible height/offset independently of layout size.
+        const runway = document.createElement("div");
+        runway.style.height = "500px";
+        runway.inert = true;
+        document.querySelector(".editor-frame")!.after(runway);
+        Object.defineProperties(visualViewport!, {
+          height: { configurable: true, get: () => 358 },
+          offsetTop: { configurable: true, get: () => pan },
+        });
+        visualViewport!.dispatchEvent(new Event("resize"));
+      }, pan);
+      const last = writer.locator(":scope > p").last();
+      await last.tap();
+      await last.evaluate(node => {
+        const range = document.createRange();
+        range.selectNodeContents(node); range.collapse(false);
+        const selection = window.getSelection()!;
+        selection.removeAllRanges(); selection.addRange(range);
+        document.dispatchEvent(new Event("selectionchange"));
+      });
+      for (let line = 0; line < 6; line++) await page.keyboard.press("Enter");
+      const boundary = await page.evaluate(pan => {
+        const webkit = CSS.supports("-webkit-backdrop-filter", "none");
+        return 358 + (webkit ? 0 : pan) - parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom);
+      }, pan);
+      await expect.poll(async () => (await nativeCaret(writer))?.bottom ?? Infinity).toBeLessThanOrEqual(boundary + 1);
+      await expect(writer.locator(":scope > p").last()).toBeEmpty();
+    });
   }
 
   for (const kind of ["doc", "course"] as const) {

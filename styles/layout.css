@@ -419,11 +419,12 @@
 
   /* Mobile editing uses the document's native scroll/focus path. The toolbar
      is a sibling of the canvas: sticky ancestors would stop CodeMirror's
-     normal scroll walk. No keyboard height or visual-viewport offsets. */
+     normal scroll walk. Viewport compensation belongs to the toolbar only. */
   html:has(.app[data-mobile-editor]) {
     overflow: visible;
     overscroll-behavior: auto;
     scroll-padding-block-start: 4rem;
+    scroll-padding-block-end: var(--space-3);
   }
   body:has(.app[data-mobile-editor]) { overflow: visible; }
   .app[data-mobile-editor] {
@@ -453,10 +454,14 @@
   .editor-frame[data-mobile] { overflow-anchor: auto; }
   .editor-frame[data-mobile] .editor-frame-body { display: block; }
   .editor-frame[data-mobile] .editor-frame-canvas { overflow: visible; }
-  .editor-mobile-toolbar {
+  .editor-mobile-toolbar-slot {
     position: sticky;
     top: 0;
     z-index: 14;
+  }
+  .editor-mobile-toolbar {
+    position: relative;
+    transform: translateY(var(--editor-toolbar-offset, 0px));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -498,7 +503,7 @@
     transform: translateX(-50%);
     width: min(320px, 100%);
     height: auto;
-    max-height: min(32rem, 70svh);
+    max-height: min(32rem, var(--editor-mobile-overlay-height, 70svh));
     padding: 0;
     pointer-events: auto;
   }

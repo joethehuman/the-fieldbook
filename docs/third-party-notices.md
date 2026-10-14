@@ -26,9 +26,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Lexical selection synchronization
+## Lexical selection synchronization and Safari visibility
 
-The pinned `lexical@0.48.0` dependency includes a narrow selection-synchronization backport from [Lexical PR #8931](https://github.com/facebook/lexical/pull/8931). The [dependency patch](../patches/lexical@0.48.0.patch) records programmatically applied selection endpoints so a stale acknowledgment flag cannot discard a later native cursor move. It includes equivalent source, development and production changes; the unrelated decorator-paint changes are excluded. pnpm applies this patch from the locked workspace configuration for both apps. When updating the editor dependencies, remove it only after verifying the upstream endpoint guard is included and native-selection regression checks pass.
+The pinned `lexical@0.48.0` dependency includes a narrow selection-synchronization backport from [Lexical PR #8931](https://github.com/facebook/lexical/pull/8931). The [dependency patch](../patches/lexical@0.48.0.patch) records programmatically applied selection endpoints so a stale acknowledgment flag cannot discard a later native cursor move. It includes equivalent source, development and production changes; the unrelated decorator-paint changes are excluded. pnpm applies this patch from the locked workspace configuration for both apps. The same patch corrects the document caret-reveal boundary for WebKit: ordinary client rectangles already include visual-viewport panning, so its offset must not be added to the visible boundary a second time. Non-WebKit offset handling and CSS scroll padding remain in the existing reveal path. When updating the editor dependencies, remove the patch only after verifying both the upstream endpoint guard and the WebKit visibility correction are included, and native-selection and viewport regression checks pass.
 
 Copyright (c) Meta Platforms, Inc. and affiliates. These upstream changes remain under the MIT terms reproduced above, together with Lexical's packaged license; they are not relicensed under ELv2.
 

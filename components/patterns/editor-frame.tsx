@@ -9,6 +9,7 @@ import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
 import { blurWritingInput, captureWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout } from "./use-editor-cards-layout";
+import { useMobileEditorToolbar } from "./use-mobile-editor-toolbar";
 
 export const EditorMobileOverlayContext = createContext<HTMLElement | null>(null);
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
@@ -61,6 +62,9 @@ export function EditorFrame({
   const phone = useEditorCardsLayout();
   const frame = useRef<HTMLElement>(null);
   const controls = useRef<HTMLDivElement>(null);
+  const toolbarSlot = useRef<HTMLDivElement>(null);
+  const toolbar = useRef<HTMLDivElement>(null);
+  useMobileEditorToolbar(phone, toolbarSlot, toolbar);
   const [writingActionsHost, setWritingActionsHost] = useState<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
@@ -386,13 +390,13 @@ export function EditorFrame({
     <EditorMobileOverlayContext.Provider value={overlayHost}>
     <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-mobile={phone || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
       {!phone && panelControls}
-      {phone && <div className="editor-mobile-toolbar">
+      {phone && <div ref={toolbarSlot} className="editor-mobile-toolbar-slot"><div ref={toolbar} className="editor-mobile-toolbar">
         {navigation && <div className="editor-mobile-navigation">{navigation}</div>}
         {panelControls}
         <div ref={setOverlayHost} className="editor-mobile-overlays">
           <div className="editor-mobile-panels">{panelSurfaces}</div>
         </div>
-      </div>}
+      </div></div>}
       <div className="editor-frame-body">
         {!phone && panelSurfaces}
         <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!phone && navigation && <div className="editor-canvas-navigation">{navigation}</div>}{children}</div>
