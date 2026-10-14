@@ -136,31 +136,76 @@
   border-left-color: var(--border);
   color: var(--foreground);
 }
-/* A light code palette changes appearance, not the native layout or selector. */
+/* Only code chrome is customized. The native code DOM, content padding,
+   line metrics, scrolling and trailing placeholder remain BlockNote-owned. */
 .fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] {
-  background-color: var(--muted);
-  color: var(--foreground);
+  flex-direction: column;
+  padding: 0;
+  background-color: var(--foreground);
+  color: var(--background);
   border-radius: var(--radius);
 }
+.fieldbook-blocknote .writing-code-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: calc(var(--control-height-sm) + 2 * var(--space-2));
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid color-mix(in srgb, var(--background) 18%, transparent);
+  color: color-mix(in srgb, var(--background) 70%, transparent);
+  font-family: var(--font-geist-sans), sans-serif;
+}
+.fieldbook-blocknote .writing-code-language {
+  min-height: var(--control-height-sm);
+  height: auto;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--control-radius);
+  color: var(--background);
+  font-size: var(--type-label);
+}
+.fieldbook-blocknote .writing-code-language:is(:hover, [aria-expanded="true"]) {
+  background-color: color-mix(in srgb, var(--background) 12%, transparent);
+  color: var(--background);
+}
+.fieldbook-blocknote .writing-code-language:focus-visible {
+  outline: 2px solid var(--background);
+  outline-offset: 2px;
+}
 .fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] > pre {
-  --bn-suggestion-surface: var(--muted);
+  --bn-suggestion-surface: var(--foreground);
   color: inherit;
-  caret-color: var(--foreground);
+  caret-color: var(--background);
 }
 .fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] code {
   font-family:
     var(--font-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace;
 }
 .fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] .shiki {
-  color: var(--shiki-light, var(--foreground));
+  color: var(--shiki-dark, var(--background));
 }
-.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] select {
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), sans-serif;
-}
-.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] option {
+.bn-shadcn .writing-code-language-menu {
+  width: 15rem;
+  max-width: calc(100vw - 2rem);
+  max-height: min(22rem, var(--available-height));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   background-color: var(--popover);
   color: var(--popover-foreground);
+  box-shadow: var(--elevation-floating);
+  font-family: var(--font-geist-sans), sans-serif;
+}
+.writing-code-menu-check {
+  display: inline-flex;
+  width: 1rem;
+  flex-shrink: 0;
+}
+@media (any-pointer: coarse) {
+  .fieldbook-blocknote .writing-code-header {
+    min-height: calc(44px + 2 * var(--space-2));
+  }
+  .fieldbook-blocknote .writing-code-language {
+    min-height: 44px;
+  }
 }
 .editor-mobile-navigation {
   flex: none;

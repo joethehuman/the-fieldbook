@@ -139,11 +139,23 @@ export function createWritingSchema(document: BlockDocument) {
   const nativeRender = codeBlock.implementation.render!;
   codeBlock.implementation.render = function (block, editor) {
     const rendered = nativeRender.call(this, block, editor);
-    // Label and style the native select; keep its DOM, listeners and contentDOM.
+    // Replace only the non-editable language chrome. Preserve the native
+    // code DOM, contentDOM, node view, keyboard extensions and cleanup.
     const select = rendered.dom.querySelector("select");
-    select?.setAttribute("aria-label", "Code language");
-    select?.classList.add("writing-code-language");
-    return rendered;
+    const header = select?.parentElement;
+    if (header) {
+      header.replaceChildren();
+      header.className = "writing-code-header";
+      header.dataset.writingCodeHeader = block.id;
+    }
+    return {
+      ...rendered,
+      // Header updates are UI, not code edits. Keep all selection and native
+      // content/sibling mutations visible to ProseMirror (including mobile Enter).
+      ignoreMutation: (mutation) =>
+        (mutation.type !== "selection" && !!header?.contains(mutation.target)) ||
+        (rendered.ignoreMutation?.(mutation) ?? false),
+    };
   };
   const schema = BlockNoteSchema.create({
     blockSpecs: {
@@ -174,5 +186,5 @@ export function createWritingSchema(document: BlockDocument) {
       backgroundColor: defaultStyleSpecs.backgroundColor,
     },
   });
-  return { schema, registerLanguages };
+  return { schema, registerLanguages, languages };
 }

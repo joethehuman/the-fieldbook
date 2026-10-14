@@ -684,7 +684,7 @@ test("checklists and collapsible blocks persist and export all nested text", asy
   await expect(editor).toContainText("More details");
   expect((await downloadMarkdown(page)).body).toContain("Nested explanation");
 });
-test("native code block and language select preserve editing and saved formatting", async ({
+test("code header preserves native editing and saved formatting", async ({
   page,
 }, info) => {
   const errors: string[] = [];
@@ -698,16 +698,18 @@ test("native code block and language select preserve editing and saved formattin
   );
   const code = editor.locator('[data-content-type="codeBlock"]');
   const source = code.locator("pre code");
-  const picker = code.getByRole("combobox", { name: "Code language" });
+  const picker = code.getByRole("button", { name: "Code language" });
   const geometry = await code.evaluate((element) => {
     const style = getComputedStyle(element.querySelector("pre code")!);
     return {
       color: style.color,
       background: getComputedStyle(element).backgroundColor,
+      headerBottom: element.querySelector(".writing-code-header")!.getBoundingClientRect().bottom,
+      codeTop: element.querySelector("pre")!.getBoundingClientRect().top,
     };
   });
-  expect(geometry.color).not.toBe("rgb(255, 255, 255)");
-  expect(geometry.background).not.toBe("rgb(22, 22, 22)");
+  expect(geometry.color).not.toBe(geometry.background);
+  expect(geometry.headerBottom).toBeLessThanOrEqual(geometry.codeTop);
   await source.click({ position: { x: 3, y: 8 } });
   for (const _ of "const value = 1;") await page.keyboard.press("ArrowRight");
   await page.keyboard.type(" // edited");
@@ -719,8 +721,9 @@ test("native code block and language select preserve editing and saved formattin
   await source.dblclick();
   await expect(page.getByRole("listbox")).toHaveCount(0);
 
-  await picker.selectOption("python");
-  await expect(picker).toHaveValue("python");
+  await picker.click();
+  await page.getByRole("menuitem", { name: "Python", exact: true }).click();
+  await expect(picker).toHaveText("Python");
   await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(source).toContainText('print("done")');
   await source.click({ position: { x: 3, y: 8 } });
@@ -740,19 +743,19 @@ test("native code block and language select preserve editing and saved formattin
       const style = getComputedStyle(token);
       return {
         color: style.color,
-        light: style.getPropertyValue("--shiki-light").trim(),
+        dark: style.getPropertyValue("--shiki-dark").trim(),
       };
     });
-  expect(palette.light).not.toBe("");
+  expect(palette.dark).not.toBe("");
   expect(palette.color).not.toBe("rgb(255, 255, 255)");
   await page.reload();
-  await expect(picker).toHaveValue("python");
+  await expect(picker).toHaveText("Python");
   await expect(source).toContainText('print("done")');
   expect((await downloadMarkdown(page)).body).toContain("```python\n");
   expect(errors).toEqual([]);
 });
 
-test("native code language menu opens without moving a scrolled canvas", async ({
+test("code header menu opens without moving a scrolled canvas", async ({
   page,
 }, info) => {
   const { editor } = await setup(
@@ -767,7 +770,7 @@ test("native code language menu opens without moving a scrolled canvas", async (
     true,
   );
   const code = editor.locator('[data-content-type="codeBlock"]');
-  const picker = code.getByRole("combobox", { name: "Code language" });
+  const picker = code.getByRole("button", { name: "Code language" });
   await picker.scrollIntoViewIfNeeded();
   await code.locator("pre code").click({ position: { x: 3, y: 8 } });
   const measure = () =>
@@ -799,11 +802,63 @@ test("native code language menu opens without moving a scrolled canvas", async (
   for (const key of Object.keys(before) as (keyof typeof before)[]) {
     expect(Math.abs(closed[key] - before[key]), key).toBeLessThanOrEqual(2);
   }
-  await expect(picker).toHaveValue("text");
-  await picker.selectOption("python");
-  await expect(picker).toHaveValue("python");
+  await expect(picker).toHaveText("Plain Text");
+  await picker.click();
+  await page.getByRole("menuitem", { name: "Python", exact: true }).click();
+  await expect(picker).toHaveText("Python");
   await expect(code.locator("pre code")).toHaveText("example_code");
 });
+
+for (const initialCode of ["", "example_code"]) {
+  test(`code header keeps the caret below ${initialCode ? "populated" : "empty"} code after menu use`, async ({ page }, info) => {
+    const { editor, read } = await setup(
+      page,
+      info.project.name.startsWith("production"),
+      "doc",
+      `Intro.\n\n\`\`\`text\n${initialCode}\n\`\`\``,
+      true,
+    );
+    const code = editor.locator('[data-content-type="codeBlock"]');
+    const picker = code.getByRole("button", { name: "Code language" });
+    const codeId = await code.locator("xpath=..").getAttribute("data-id");
+    await editor.locator(".bn-trailing-block").click();
+    await page.keyboard.type("After code.");
+    const caretBlock = () => editor.evaluate(() => {
+      const node = getSelection()?.anchorNode;
+      const element = node?.nodeType === 1 ? node as Element : node?.parentElement;
+      return element?.closest("[data-content-type]")?.getAttribute("data-content-type");
+    });
+    expect(await caretBlock()).toBe("paragraph");
+    await picker.click();
+    await expect(page.getByRole("menu", { name: "Code language" })).toBeVisible();
+    await expect(editor).toBeFocused();
+    await page.getByRole("menuitem", { name: "Python", exact: true }).click();
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(picker).toHaveText("Python");
+    await expect(editor).toBeFocused();
+    expect(await caretBlock()).toBe("paragraph");
+    await page.keyboard.type(" Still below.");
+    await expect(editor.locator('[data-content-type="paragraph"]').last())
+      .toHaveText("After code. Still below.");
+    await expect(code.locator("pre code")).toHaveText(initialCode);
+    // The header supports native keyboard menu navigation as well as pointer use.
+    await picker.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menu", { name: "Code language" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(editor).toBeFocused();
+    expect(await caretBlock()).toBe("paragraph");
+    await waitForDraftSaved(page);
+    const saved = (await read()).bodyDocument!.blocks.find(b => b.type === "codeBlock")!;
+    expect(saved.id).toBe(codeId);
+    expect(saved.props.language).toBe("python");
+    await page.reload();
+    await expect(editor.locator('[data-content-type="paragraph"]').last())
+      .toHaveText("After code. Still below.");
+    expect((await downloadMarkdown(page)).body).toContain("```python");
+  });
+}
 
 test("unrecognized code language labels remain editable and export unchanged", async ({
   page,

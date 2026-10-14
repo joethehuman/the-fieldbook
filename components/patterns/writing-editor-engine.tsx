@@ -72,6 +72,7 @@ import { Alert } from "../ui/alert";
 import { createWritingSchema, writingDictionary } from "./blocknote-schema";
 import { WritingTableHandle } from "./blocknote-table-handle";
 import { WritingFilePanel } from "./blocknote-file-panel";
+import { WritingCodeHeaders } from "./blocknote-code-header";
 import {
   blockDocumentSchema,
   exportBlockMarkdown,
@@ -222,7 +223,7 @@ export default function WritingEditorEngine({
   const [error, setError] = useState("");
   const applying = useRef(false);
   const interacted = useRef(false);
-  const { schema: writingSchema, registerLanguages } = useMemo(
+  const { schema: writingSchema, registerLanguages, languages } = useMemo(
     () => createWritingSchema(initialDocument),
     [],
   );
@@ -491,6 +492,7 @@ export default function WritingEditorEngine({
               <SideMenuController sideMenu={WritingSideMenu} />
               <TableHandlesController tableHandle={WritingTableHandle} />
               <FilePanelController filePanel={WritingFilePanel} />
+              <WritingCodeHeaders languages={languages} disabled={disabled} />
             </BlockNoteView>
           </div>
         </WritingTitleEnterContext.Provider>
