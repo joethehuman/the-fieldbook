@@ -14,7 +14,7 @@ const tableBody = writeTableWidths(
   [[176, 260]],
 );
 
-async function open(page: Page, installed: boolean) {
+async function open(page: Page, installed: boolean, beforeControls?: (writer: Locator) => Promise<void>) {
   let state = withPublishedSnapshots(freshWorkspace());
   const item = {
     ...state.content.find((entry) => entry.kind === "doc")!,
@@ -43,6 +43,7 @@ async function open(page: Page, installed: boolean) {
   await page.goto(installed ? `/admin/content/${fixtureId}/edit` : `/#admin/content/${fixtureId}/edit`);
   const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
   await expect(writer).toBeVisible();
+  await beforeControls?.(writer);
   await expect(writer.locator(".writing-table-row")).toHaveCount(3);
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await afterPaints(page);
@@ -162,25 +163,43 @@ test.describe("desktop table action visibility", () => {
   test.use({ hasTouch: false, isMobile: false, viewport: { width: 1440, height: 1000 } });
 
   test("table actions initialize when their host mounts beneath a stationary pointer", async ({ page }, info) => {
-    const { writer } = await open(page, info.project.name.startsWith("production"));
-    const host = writer.locator(".writing-table-block");
-    await host.getByText("First", { exact: true }).hover();
     await page.addInitScript(() => {
       const mounts: boolean[] = [];
       (window as typeof window & { tableActionMountHover?: boolean[] }).tableActionMountHover = mounts;
       const addListener = EventTarget.prototype.addEventListener;
       EventTarget.prototype.addEventListener = function (type, listener, options) {
-        if (type === "pointerenter" && this instanceof HTMLElement && this.classList.contains("writing-table-block")) {
-          mounts.push(this.matches(":hover"));
-        }
+        if (type === "pointerenter" && this instanceof HTMLElement && this.classList.contains("writing-table-block")) mounts.push(this.matches(":hover"));
         return addListener.call(this, type, listener, options);
       };
+      // Hold the initial control discovery until the rendered table is hovered.
+      // This exercises mount-time hover without relying on browser reload policy.
+      const request = window.requestAnimationFrame.bind(window);
+      const cancel = window.cancelAnimationFrame.bind(window);
+      const pending = new Map<number, FrameRequestCallback>();
+      let paused = true;
+      window.requestAnimationFrame = (callback) => {
+        const id = request(time => { if (paused) pending.set(id, callback); else callback(time); });
+        return id;
+      };
+      window.cancelAnimationFrame = (id) => { pending.delete(id); cancel(id); };
+      (window as typeof window & { releaseTableControls?: () => void }).releaseTableControls = () => {
+        paused = false;
+        window.requestAnimationFrame = request;
+        window.cancelAnimationFrame = cancel;
+        for (const callback of pending.values()) request(callback);
+        pending.clear();
+      };
     });
-    await page.reload();
-    await expect(writer.locator(".writing-table-row")).toHaveCount(3);
-    await afterPaints(page);
-    // Establish that hover existed before the controls subscribed, rather than
-    // letting a later pointerenter accidentally satisfy this regression.
+    const { writer } = await open(page, info.project.name.startsWith("production"), async (writer) => {
+      const cell = writer.getByText("First", { exact: true });
+      await expect(cell).toBeVisible();
+      const bounds = await cell.boundingBox();
+      expect(bounds).not.toBeNull();
+      await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+      await expect.poll(() => cell.evaluate(element => element.matches(":hover"))).toBe(true);
+      await page.evaluate(() => (window as typeof window & { releaseTableControls?: () => void }).releaseTableControls!());
+    });
+    const host = writer.locator(".writing-table-block");
     await expect.poll(() => page.evaluate(() =>
       (window as typeof window & { tableActionMountHover?: boolean[] }).tableActionMountHover?.includes(true),
     )).toBe(true);

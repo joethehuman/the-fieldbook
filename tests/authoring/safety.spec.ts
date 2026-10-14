@@ -435,6 +435,41 @@ test("failed learning-group save shows one concise inline error", async ({
   });
 });
 
+async function openInlineFileChooser(
+  page: Page,
+  writing: Locator,
+  media: "image" | "video",
+) {
+  await writing.locator(":scope > p").last().click();
+  await writing.locator(":scope > p").last().selectText();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => writing.locator(":scope > p").last().evaluate((line) => {
+    const surface = line.parentElement!;
+    const scroller = line.closest<HTMLElement>(".writing-scroll-area")!;
+    const bounds = line.getBoundingClientRect();
+    const port = scroller.getBoundingClientRect();
+    const canvas = line.closest(".main-content")!.getBoundingClientRect();
+    const selection = window.getSelection();
+    const anchor = selection?.anchorNode;
+    const atLine = !!anchor && (line.contains(anchor)
+      || anchor === surface && surface.childNodes[selection!.anchorOffset] === line);
+    return {
+      empty: line.textContent === "",
+      focused: document.activeElement === surface,
+      caret: !!selection?.isCollapsed && atLine,
+      visible: bounds.top >= Math.max(0, port.top + scroller.clientTop, canvas.top)
+        && bounds.bottom <= Math.min(window.innerHeight, port.top + scroller.clientTop + scroller.clientHeight, canvas.bottom),
+    };
+  })).toEqual({ empty: true, focused: true, caret: true, visible: true });
+  await page.keyboard.press("/");
+  await page.getByRole("menuitem", { name: media === "image" ? "Image" : "Upload video", exact: true }).click();
+  const chooser = page.getByRole("dialog", { name: `Insert ${media}`, exact: true });
+  const pending = page.waitForEvent("filechooser");
+  await chooser.getByRole("button", { name: `Choose ${media}`, exact: true }).click();
+  return pending;
+}
+
 for (const failure of [false, true])
   test(`pending inline upload blocks save and navigation; failure=${failure}`, async ({
     page,
@@ -449,8 +484,10 @@ for (const failure of [false, true])
       .getByRole("textbox", { name: "Doc content", exact: true })
       .fill("Keep the original body");
     await waitForDraftSaved(page);
+    const fileChooser = await openInlineFileChooser(page, page.getByRole("textbox", { name: "Doc content", exact: true }), "image");
+    await waitForDraftSaved(page);
     const savesBeforeUpload = control.saves;
-    await page.locator('.writing-editor input[type="file"]').setInputFiles({
+    await fileChooser.setFiles({
       name: "example.png",
       mimeType: "image/png",
       buffer: Buffer.from("synthetic"),
@@ -568,12 +605,10 @@ for (const media of ["inline-video", "card-art"] as const)
     };
     if (media === "card-art") {
       await openContentSettings(page);
+      await page.getByLabel("Upload card artwork", { exact: true }).setInputFiles(file);
+    } else {
+      await (await openInlineFileChooser(page, page.getByRole("textbox", { name: "Lesson content", exact: true }), "video")).setFiles(file);
     }
-    const input =
-      media === "card-art"
-        ? page.getByLabel("Upload card artwork", { exact: true })
-        : page.locator('.writing-editor input[type="file"]').first();
-    await input.setInputFiles(file);
     await expect.poll(() => control.uploaded).toBe(true);
     const actions = page.getByRole("button", { name: "Lesson actions", exact: true });
     if (await actions.isVisible()) await expect(actions).toBeDisabled();
@@ -1589,7 +1624,7 @@ test("large media resumes a lost chunk acknowledgement and inserts only verified
   const file = Buffer.alloc(54 * 1024 * 1024);
   const filePath = info.outputPath("large.png");
   await writeFile(filePath, file);
-  await page.locator('.writing-editor input[type="file"]').setInputFiles(filePath);
+  await (await openInlineFileChooser(page, editor, "image")).setFiles(filePath);
   await expect.poll(() => !!release).toBe(true);
   await expect(editor.getByRole("status")).toHaveText("Loading…");
   await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
@@ -1626,17 +1661,18 @@ for (const failure of ["storage limit", "expired permission", "verification"] as
     });
     await page.route("https://test.supabase.co/ui4-upload", (route) => route.fulfill({ status: failed && failure !== "verification" ? (failure === "storage limit" ? 413 : 403) : 200, json: { message: "private token details must never reach the UI" } }));
     const file = { name: "retry.png", mimeType: "image/png", buffer: Buffer.from("synthetic") };
-    await page.locator('.writing-editor input[type="file"]').setInputFiles(file);
+    await (await openInlineFileChooser(page, editor, "image")).setFiles(file);
     const alert = page.locator(".writing-editor").getByRole("alert");
     await expect(alert).toContainText(failure === "storage limit" ? "exceeds the upload size limit" : failure === "expired permission" ? "permission expired or was denied" : "upload couldn’t be verified");
     await expect(alert).not.toContainText("private token");
     await expect(editor).toHaveText("Keep this draft intact");
+    await expect(editor.locator("img:not([data-lexical-managed-linebreak])")).toHaveCount(0);
     expect(state.content[0].body).toBe("Keep this draft intact");
     expect(completed).toBe(failure === "verification" ? 1 : 0);
     await page.screenshot({ path: info.outputPath("upload-recovery.png"), fullPage: true });
     failed = false;
-    await page.locator('.writing-editor input[type="file"]').setInputFiles(file);
-    await expect(editor.locator("img")).toHaveAttribute("src", "/api/media/retry-ready.png");
+    await (await openInlineFileChooser(page, editor, "image")).setFiles(file);
+    await expect(editor.getByRole("img", { name: "retry.png", exact: true })).toHaveAttribute("src", "/api/media/retry-ready.png");
     await waitForDraftSaved(page);
     expect(state.content[0].body).toContain("Keep this draft intact");
     expect(state.content[0].body).toContain("/api/media/retry-ready.png");
