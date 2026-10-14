@@ -41,3 +41,27 @@ index 4110014e650114ed496f3fb7e65acd7152cab276..986d969d662be1aa1dcda986c54deafe
      }
    };
  }
+diff --git a/dist/utils/voidEmitter.js b/dist/utils/voidEmitter.js
+index 5c97782badef73fbfbdf657b7befcec98a977ba9..54e81c3f9cddc455e865ef1448ff51495aa349af 100644
+--- a/dist/utils/voidEmitter.js
++++ b/dist/utils/voidEmitter.js
+@@ -1,12 +1,18 @@
+ import { noop } from "./fp.js";
+ function voidEmitter() {
+   let subscription = noop;
++  let pending = false;
+   return {
+     publish: () => {
+-      subscription();
++      if (subscription === noop) pending = true;
++      else subscription();
+     },
+     subscribe: (cb) => {
+       subscription = cb;
++      if (pending) {
++        pending = false;
++        cb();
++      }
+     }
+   };
+ }

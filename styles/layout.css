@@ -455,19 +455,24 @@
   .editor-frame[data-mobile] .editor-frame-body { display: block; }
   .editor-frame[data-mobile] .editor-frame-canvas { overflow: visible; }
   .editor-mobile-toolbar-slot {
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 14;
   }
   .editor-mobile-toolbar {
     position: relative;
-    transform: translateY(var(--editor-toolbar-offset, 0px));
     display: flex;
     align-items: center;
     justify-content: center;
     flex: none;
     background: var(--background);
     border-block-end: 1px solid var(--border);
+  }
+  .editor-mobile-toolbar[data-pinned] {
+    position: fixed;
+    top: var(--editor-toolbar-top, 0px);
+    left: var(--editor-toolbar-left, 0px);
+    width: var(--editor-toolbar-width);
+    z-index: 14;
   }
   .editor-mobile-toolbar .editor-frame-controls {
     position: static;

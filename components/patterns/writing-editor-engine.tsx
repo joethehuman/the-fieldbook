@@ -2,6 +2,7 @@
 
 import { WritingImageDialog, WritingImageToolbar } from "./writing-image";
 import { WritingCodeEditor } from "./writing-code";
+import { revealMobileWritingInsertion } from "./mobile-writing-insertion";
 import { writingDesktopScrollPlugin } from "./writing-desktop-scroll";
 import { writingTableControlsPlugin } from "./writing-table-controls";
 import { $createWritingVideoNode, writingVideoPlugin } from "./writing-video";
@@ -374,8 +375,9 @@ function WritingToolbar({
           $insertNodes([node]);
         } else $insertNodeToNearestRootAtCaret(node, $caretFromPoint(selection.focus, "next"), { removeEmptyDestination: !item });
         $finishWritingInsertion(source, node);
-        // Focus the code editor after its decorator has mounted.
-        setTimeout(() => { if (editor?.getElementByKey(node.getKey())) node.select(); });
+        // The emitter queues this request until its mounted editor subscribes,
+        // just like the first-cell table handoff. No mount-delay timer is needed.
+        node.select();
       }, { discrete: true }),
       divider: (editor) => {
         synchronize(editor);
@@ -545,6 +547,7 @@ export default function WritingEditorEngine({
           line.selectStart();
         }
       }, { discrete: true, tag: canvas && compactRef.current ? HISTORY_MERGE_TAG : [HISTORY_MERGE_TAG, SKIP_SCROLL_INTO_VIEW_TAG] });
+      revealMobileWritingInsertion(lexical.getRootElement());
       writingHighlight.clear();
       setUploadCaret(null);
     };
@@ -780,6 +783,7 @@ export default function WritingEditorEngine({
     const target = slashSelection.current;
     if (!target || !hasAttachedInsertTarget(target)) return;
     const { editor: lexical, selection: saved } = target;
+    let insertedKey = "";
     setSlashOpen(false);
     lexical.update(() => {
       if (saved) $setSelection(saved.clone());
@@ -794,6 +798,7 @@ export default function WritingEditorEngine({
           children: Array.from({ length: 3 }, () => ({ type: "tableCell" as const, children: [] })),
         })),
       });
+      insertedKey = table.getKey();
       if (line.getType() === "quote") {
         // A table is a block: split the callout at the caret rather than
         // flattening the decorator into its paragraph and losing the table.
@@ -806,6 +811,13 @@ export default function WritingEditorEngine({
       $setSelection(null);
       table.select([0, 0]);
     }, { discrete: true, tag: SKIP_DOM_SELECTION_TAG });
+    if (insertedKey) revealMobileWritingInsertion(lexical.getRootElement(), {
+      target: () => lexical.getElementByKey(insertedKey)?.querySelector<HTMLElement>('td [contenteditable="true"], th [contenteditable="true"]') || null,
+    });
+  }
+  function insertCodeAtCaret() {
+    setSlashOpen(false);
+    if (slashSelection.current) writingActions.current?.codeBlock(slashSelection.current.editor);
   }
   const keepSlashAsText = useCallback((query = slashQuery, restoreCaret = true) => {
     const target = slashSelection.current;
@@ -914,6 +926,7 @@ export default function WritingEditorEngine({
       if (canvas && compactRef.current) lexical.focus();
     }, { discrete: true, tag: HISTORY_PUSH_TAG });
     closeMedia();
+    revealMobileWritingInsertion(lexical.getRootElement());
     if (!canvas || !compactRef.current) editor.current?.focus(undefined, { preventScroll: true });
   }
   function closeMedia(returnFocus = false) {
@@ -956,7 +969,7 @@ export default function WritingEditorEngine({
   const blockCommands = [
     ...writingBlockStyles.map(({ kind, ...command }) => ({ ...command, group: "Basic blocks", run: () => chooseBlock(kind) })),
     { name: "Table", group: "Basic blocks", icon: Table, terms: "table grid rows columns", run: insertTableAtCaret },
-    { name: "Code block", group: "Basic blocks", icon: CodeXml, terms: "code block", run: () => { setSlashOpen(false); if (slashSelection.current) writingActions.current?.codeBlock(slashSelection.current.editor); } },
+    { name: "Code block", group: "Basic blocks", icon: CodeXml, terms: "code block", run: insertCodeAtCaret },
     { name: "Divider", group: "Basic blocks", icon: Minus, terms: "divider separator horizontal rule line", run: () => { setSlashOpen(false); if (slashSelection.current) writingActions.current?.divider(slashSelection.current.editor); } },
     { name: "Image", group: "Media", icon: ImageIcon, terms: "image photo", run: () => openMedia("image") },
     { name: "Upload video", group: "Media", icon: Video, terms: "video upload file", run: () => openMedia("video") },
@@ -1160,7 +1173,10 @@ export default function WritingEditorEngine({
       } else {
         if (!restoreInsertTarget(target)) return;
         writingHighlight.clear();
-        lexical.update(run, { discrete: true });
+        // Each command owns its transaction. A force-commit read inside a
+        // redundant outer update destroys the divider's pending nested state.
+        run();
+        if (run !== insertCodeAtCaret) revealMobileWritingInsertion(lexical.getRootElement());
       }
       return;
     }

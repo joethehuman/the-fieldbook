@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, type RefObject } from "react";
 
-/** Follow the visible viewport without moving the document or its selection. */
+/** One fixed surface and a normal-flow placeholder, as in CKEditor's sticky panel. */
 export function useMobileEditorToolbar(
   mobile: boolean,
   slotRef: RefObject<HTMLDivElement | null>,
@@ -13,8 +13,9 @@ export function useMobileEditorToolbar(
     const toolbar = toolbarRef.current;
     if (!mobile || !slot || !toolbar) return;
     const viewport = window.visualViewport;
-    // Like Floating UI's absolute positioning, WebKit client rects already
-    // include visual viewport panning. Other engines use layout coordinates.
+    const frame = slot.closest<HTMLElement>(".editor-frame")!;
+    // Ordinary WebKit client rects are visual-relative. Fixed CSS coordinates
+    // need the visual offset back, unlike the prose reveal calculation.
     const webkit = CSS.supports("-webkit-backdrop-filter", "none");
     let request = 0;
     const set = (name: string, value: number) => {
@@ -26,18 +27,24 @@ export function useMobileEditorToolbar(
       const bounds = slot.getBoundingClientRect();
       const top = webkit ? 0 : viewport?.offsetTop || 0;
       const bottom = top + (viewport?.height ?? window.innerHeight);
-      const offset = Math.max(0, top - bounds.top);
-      const available = Math.max(0, bottom - (bounds.bottom + offset) - 8);
-      // The sticky slot retains its natural height. Only its visual surface
-      // moves; menus inherit both its position and remaining visible height.
-      set("--editor-toolbar-offset", offset);
-      set("--editor-mobile-overlay-height", available);
+      const height = toolbar.offsetHeight;
+      const pinned = bounds.top <= top + 1 && frame.getBoundingClientRect().bottom > top;
+      // Keep the same DOM surface, focus and menu host through pin/unpin.
+      // Measuring a static origin avoids stale compensation on scroll reversal.
+      slot.style.height = `${height}px`;
+      set("--editor-toolbar-top", viewport?.offsetTop || 0);
+      set("--editor-toolbar-left", bounds.left + (webkit ? viewport?.offsetLeft || 0 : 0));
+      set("--editor-toolbar-width", bounds.width);
+      set("--editor-mobile-overlay-height", Math.max(0, bottom - (pinned ? top + height : bounds.top + height) - 8));
+      toolbar.toggleAttribute("data-pinned", pinned);
     };
     const schedule = () => {
       if (!request) request = requestAnimationFrame(measure);
     };
     const resize = new ResizeObserver(schedule);
     resize.observe(slot);
+    resize.observe(toolbar);
+    resize.observe(frame);
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     window.addEventListener("pageshow", schedule);
@@ -52,8 +59,10 @@ export function useMobileEditorToolbar(
       window.removeEventListener("pageshow", schedule);
       viewport?.removeEventListener("scroll", schedule);
       viewport?.removeEventListener("resize", schedule);
-      toolbar.style.removeProperty("--editor-toolbar-offset");
-      toolbar.style.removeProperty("--editor-mobile-overlay-height");
+      slot.style.removeProperty("height");
+      toolbar.removeAttribute("data-pinned");
+      ["--editor-toolbar-top", "--editor-toolbar-left", "--editor-toolbar-width", "--editor-mobile-overlay-height"]
+        .forEach(name => toolbar.style.removeProperty(name));
     };
   }, [mobile, slotRef, toolbarRef]);
 }
