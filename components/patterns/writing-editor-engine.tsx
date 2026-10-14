@@ -40,6 +40,7 @@ import {
   addEditorWrapper$,
   createRootEditorSubscription$,
   activeEditor$,
+  currentSelection$,
   rootEditor$,
   $createTableNode,
   $createCodeBlockNode,
@@ -251,11 +252,25 @@ const writingTrailingLinePlugin = realmPlugin({
 });
 
 type WritingActions = {
-  block: (kind: WritingBlock) => void;
-  codeBlock: () => void;
-  divider: () => void;
-  link: () => void;
+  block: (editor: LexicalEditor, kind: WritingBlock) => void;
+  codeBlock: (editor: LexicalEditor) => void;
+  divider: (editor: LexicalEditor) => void;
+  link: (editor: LexicalEditor) => void;
 };
+
+type WritingBookmark = { editor: LexicalEditor; selection: BaseSelection };
+
+/** Nested cells and outer prose have separate models, even inside one canvas. */
+function nativeWritingEditor(scope: HTMLElement | null) {
+  const selection = window.getSelection();
+  if (!scope || !selection?.rangeCount || !selection.anchorNode || !selection.focusNode) return null;
+  const anchor = selection.anchorNode instanceof Element ? selection.anchorNode : selection.anchorNode.parentElement;
+  if (anchor?.closest(".writing-code-block")) return null;
+  const editor = getNearestEditorFromDOMNode(selection.anchorNode);
+  const surface = editor?.getRootElement();
+  return editor && surface && scope.contains(surface) && editor.isEditable()
+    && getNearestEditorFromDOMNode(selection.focusNode) === editor ? editor : null;
+}
 
 /** A DOM Range is ordered; native anchor/focus also carry selection direction. */
 function applyNativeWritingRange(selection: RangeSelection, native: Selection) {
@@ -323,11 +338,18 @@ function WritingToolbar({
   }, [commandGesture]);
   const divider = usePublisher(insertThematicBreak$);
   const openLink = usePublisher(openLinkEditDialog$);
+  const activate = usePublisher(activeEditor$);
+  const publishSelection = usePublisher(currentSelection$);
   const [canUndo, setCanUndo] = useState(false),
     [canRedo, setCanRedo] = useState(false);
   useEffect(() => {
-    const convert = (kind: WritingBlock) =>
-      editor?.update(() => {
+    const synchronize = (owner: LexicalEditor) => owner.read(() => {
+      activate(owner);
+      const selection = $getSelection();
+      publishSelection($isRangeSelection(selection) ? selection : null);
+    });
+    const convert = (owner: LexicalEditor, kind: WritingBlock) =>
+      owner.update(() => {
         $prepareWritingLine();
         const selection = $getSelection();
         if (!$isRangeSelection(selection)) return;
@@ -336,8 +358,8 @@ function WritingToolbar({
       }, { discrete: true });
     onEditorReady(editor, {
       block: convert,
-      link: openLink,
-      codeBlock: () => editor?.update(() => {
+      link: (owner) => { synchronize(owner); openLink(); },
+      codeBlock: (editor) => editor.update(() => {
         $prepareWritingLine();
         const selection = $getSelection();
         if (!$isRangeSelection(selection)) return;
@@ -354,18 +376,21 @@ function WritingToolbar({
         // Focus the code editor after its decorator has mounted.
         setTimeout(() => { if (editor?.getElementByKey(node.getKey())) node.select(); });
       }, { discrete: true }),
-      divider: () => editor?.update(() => {
-        $prepareWritingLine();
-        const selection = $getSelection();
-        const source = $isRangeSelection(selection) ? $writingInsertionSource(selection) : null;
-        divider();
-        // Consume only the empty command line replaced by this divider.
-        // Intentional neighboring blank lines and the writable trailing line stay.
-        const block = source?.container?.getNextSibling();
-        if (block?.getType() === "horizontalrule") $finishWritingInsertion(source, block);
-      }, { discrete: true }),
+      divider: (editor) => {
+        synchronize(editor);
+        editor.update(() => {
+          $prepareWritingLine();
+          const selection = $getSelection();
+          const source = $isRangeSelection(selection) ? $writingInsertionSource(selection) : null;
+          divider();
+          // Consume only the empty command line replaced by this divider.
+          // Intentional neighboring blank lines and the writable trailing line stay.
+          const block = source?.container?.getNextSibling();
+          if (block?.getType() === "horizontalrule") $finishWritingInsertion(source, block);
+        }, { discrete: true });
+      },
     });
-  }, [editor, onEditorReady, divider, openLink]);
+  }, [editor, onEditorReady, divider, openLink, activate, publishSelection]);
   useEffect(() => {
     if (!editor) return;
     // Native selectionchange can arrive after a keyboard menu takes focus.
@@ -491,9 +516,9 @@ export default function WritingEditorEngine({
   const tableEditor = useRef<LexicalEditor | null>(null);
   const writingActions = useRef<WritingActions | null>(null);
   const selectionTools = useRef<SelectionMenuController | null>(null);
-  const mediaSelection = useRef<BaseSelection | null>(null);
+  const mediaSelection = useRef<WritingBookmark | null>(null);
   const pendingMedia = useRef(false);
-  const slashSelection = useRef<BaseSelection | null>(null);
+  const slashSelection = useRef<WritingBookmark | null>(null);
   const toolbarSelection = useRef<{
     editor: LexicalEditor;
     trigger: HTMLButtonElement;
@@ -506,15 +531,14 @@ export default function WritingEditorEngine({
   const [media, setMedia] = useState<"image" | "video">("image");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const [uploadCaret, setUploadCaret] = useState<string | null>(null);
+  const [uploadCaret, setUploadCaret] = useState<{ editor: LexicalEditor; key: string } | null>(null);
   useEffect(() => {
     if (!uploadCaret || busy || disabled) return;
-    const lexical = lexicalEditor.current;
-    if (!lexical) return;
+    const lexical = uploadCaret.editor;
     const restore = () => {
       if (!lexical.isEditable()) return;
       lexical.update(() => {
-        const line = $getNodeByKey(uploadCaret);
+        const line = $getNodeByKey(uploadCaret.key);
         if ($isElementNode(line) && line.isAttached()) {
           lexical.getRootElement()?.focus({ preventScroll: true });
           line.selectStart();
@@ -679,12 +703,12 @@ export default function WritingEditorEngine({
     }
   }
   async function insertUploadedMedia(items: { file: File; alt: string }[]) {
-    const lexical = lexicalEditor.current;
-    if (!lexical || pendingMedia.current) return;
+    const target = mediaSelection.current;
+    if (!target || !hasAttachedInsertTarget(target) || pendingMedia.current) return;
+    const { editor: lexical, selection } = target;
     if (canvas && compactRef.current) writingHighlight.clear();
     const beforeUpload = lexical.getEditorState();
     let keys: string[] = [];
-    const selection = mediaSelection.current;
     pendingMedia.current = true;
     lexical.update(() => {
       if (selection) $setSelection(selection.clone());
@@ -712,7 +736,7 @@ export default function WritingEditorEngine({
           const block = file.type.startsWith("image/")
             ? $createParagraphNode().append($createImageNode({ src: urls[index], altText: alt }))
             : $createWritingVideoNode(urls[index]);
-          if (index === items.length - 1) setUploadCaret($finishMediaInsertion(loading[index]!, block));
+          if (index === items.length - 1) setUploadCaret({ editor: lexical, key: $finishMediaInsertion(loading[index]!, block) });
           else loading[index]!.replace(block);
         });
       }, { discrete: true, tag: HISTORY_MERGE_TAG });
@@ -725,7 +749,8 @@ export default function WritingEditorEngine({
     }
   }
   function chooseBlock(kind: WritingBlockStyle) {
-    const lexical = lexicalEditor.current;
+    const lexical = slashSelection.current?.editor;
+    if (!lexical) return;
     let index = -1;
     let emptyBlock = false;
     lexical?.getEditorState().read(() => {
@@ -742,7 +767,7 @@ export default function WritingEditorEngine({
       lexical?.focus();
       return;
     }
-    writingActions.current?.block(kind);
+    writingActions.current?.block(lexical, kind);
     // Commit the empty block and its caret before accepting the next keystroke.
     // A deferred selection reset can overwrite characters typed meanwhile.
     if (lexical && emptyBlock && index >= 0) lexical.update(() => {
@@ -751,9 +776,9 @@ export default function WritingEditorEngine({
     }, { discrete: true });
   }
   function insertTableAtCaret() {
-    const lexical = lexicalEditor.current;
-    if (!lexical) return;
-    const saved = slashSelection.current;
+    const target = slashSelection.current;
+    if (!target || !hasAttachedInsertTarget(target)) return;
+    const { editor: lexical, selection: saved } = target;
     setSlashOpen(false);
     lexical.update(() => {
       if (saved) $setSelection(saved.clone());
@@ -782,13 +807,13 @@ export default function WritingEditorEngine({
     }, { discrete: true, tag: SKIP_DOM_SELECTION_TAG });
   }
   const keepSlashAsText = useCallback((query = slashQuery, restoreCaret = true) => {
-    const lexical = lexicalEditor.current;
-    const saved = slashSelection.current;
+    const target = slashSelection.current;
     slashSelection.current = null;
     setSlashOpen(false);
-    if (!lexical || !$isRangeSelection(saved)) return;
+    if (!target || !hasAttachedInsertTarget(target)) return;
+    const { editor: lexical, selection: saved } = target;
+    if (!$isRangeSelection(saved)) return;
     if (restoreCaret && canvas && compactRef.current) {
-      if (!hasAttachedInsertTarget(saved)) return;
       lexical.getRootElement()?.focus({ preventScroll: true });
     }
     lexical.update(() => {
@@ -802,7 +827,7 @@ export default function WritingEditorEngine({
     }, {
       discrete: true,
       tag: !restoreCaret
-        ? !lexical.getRootElement()?.contains(document.activeElement)
+        ? getNearestEditorFromDOMNode(document.activeElement!) !== lexical
           ? [SKIP_SCROLL_INTO_VIEW_TAG, SKIP_DOM_SELECTION_TAG] : SKIP_SCROLL_INTO_VIEW_TAG
         : canvas && compactRef.current ? undefined : SKIP_SCROLL_INTO_VIEW_TAG,
     });
@@ -845,14 +870,19 @@ export default function WritingEditorEngine({
     };
   }, [canvas, !!compactControls, slashOpen, slashFromToolbar, slashQuery, keepSlashAsText]);
 
-  function rememberSelection() {
+  function rememberSelection(target?: WritingBookmark | null) {
     mediaSelection.current = null;
-    const lexical = lexicalEditor.current;
+    if (target) {
+      if (hasAttachedInsertTarget(target)) mediaSelection.current = { editor: target.editor, selection: target.selection.clone() };
+      return;
+    }
+    const native = nativeWritingEditor(root.current);
+    const lexical = native || lexicalEditor.current;
     lexical?.read(() => {
       let selection = $getSelection()?.clone() || null;
       const dom = window.getSelection();
       const surface = lexical.getRootElement();
-      if (dom?.rangeCount && surface) {
+      if (native === lexical && dom?.rangeCount && surface) {
         const range = dom.getRangeAt(0);
         if (surface.contains(range.startContainer) && surface.contains(range.endContainer)) {
           const current = $isRangeSelection(selection) ? selection : $createRangeSelection();
@@ -862,15 +892,14 @@ export default function WritingEditorEngine({
         }
       }
       if ($isRangeSelection(selection)) normalizeWritingSelection(selection);
-      mediaSelection.current = selection;
+      mediaSelection.current = selection ? { editor: lexical, selection } : null;
     });
   }
   function insertAtMediaSelection(createBlock: () => LexicalNode) {
-    const selection = mediaSelection.current;
-    const lexical = lexicalEditor.current;
-    if (!lexical) return;
+    const target = mediaSelection.current;
+    if (!target || !hasAttachedInsertTarget(target)) return;
+    const { editor: lexical, selection } = target;
     if (canvas && compactRef.current) {
-      if (!hasAttachedInsertTarget(selection)) return;
       writingHighlight.clear();
       lexical.getRootElement()?.focus({ preventScroll: true });
     }
@@ -896,7 +925,7 @@ export default function WritingEditorEngine({
     if (returnFocus && canvas && compactRef.current) restoreInsertTarget(selection);
   }
   function openMedia(type: "image" | "video", tab: "upload" | "link" = "upload") {
-    rememberSelection();
+    rememberSelection(slashSelection.current);
     if (canvas && compactRef.current) {
       writingHighlight.capture();
       blurWritingInput();
@@ -926,8 +955,8 @@ export default function WritingEditorEngine({
   const blockCommands = [
     ...writingBlockStyles.map(({ kind, ...command }) => ({ ...command, group: "Basic blocks", run: () => chooseBlock(kind) })),
     { name: "Table", group: "Basic blocks", icon: Table, terms: "table grid rows columns", run: insertTableAtCaret },
-    { name: "Code block", group: "Basic blocks", icon: CodeXml, terms: "code block", run: () => { setSlashOpen(false); writingActions.current?.codeBlock(); } },
-    { name: "Divider", group: "Basic blocks", icon: Minus, terms: "divider separator horizontal rule line", run: () => { setSlashOpen(false); writingActions.current?.divider(); } },
+    { name: "Code block", group: "Basic blocks", icon: CodeXml, terms: "code block", run: () => { setSlashOpen(false); if (slashSelection.current) writingActions.current?.codeBlock(slashSelection.current.editor); } },
+    { name: "Divider", group: "Basic blocks", icon: Minus, terms: "divider separator horizontal rule line", run: () => { setSlashOpen(false); if (slashSelection.current) writingActions.current?.divider(slashSelection.current.editor); } },
     { name: "Image", group: "Media", icon: ImageIcon, terms: "image photo", run: () => openMedia("image") },
     { name: "Upload video", group: "Media", icon: Video, terms: "video upload file", run: () => openMedia("video") },
     { name: "Embed video link", group: "Media", icon: Link, terms: "video embed link", run: () => openMedia("video", "link") },
@@ -939,21 +968,21 @@ export default function WritingEditorEngine({
     { name: "Inline code", icon: Code, format: "code" as const },
   ].map(({ name, icon, format }) => ({ name, icon, group: "Format text", terms: name.toLowerCase(), run: () => {
     setSlashOpen(false);
-    lexicalEditor.current?.dispatchCommand(FORMAT_TEXT_COMMAND, format);
+    slashSelection.current?.editor.dispatchCommand(FORMAT_TEXT_COMMAND, format);
   } }));
   const mobileCommands = canvas && !!compactControls && slashFromToolbar;
-  const tableCellTarget = !!lexicalEditor.current?.getRootElement()?.closest("td, th");
+  const tableCellTarget = !!slashSelection.current?.editor.getRootElement()?.closest("td, th");
   const slashCommands = mobileCommands
     ? [...formatCommands, { name: "Link", icon: Link, group: "Format text", terms: "link url", run: () => {
       setSlashOpen(false);
-      writingActions.current?.link();
+      if (slashSelection.current) writingActions.current?.link(slashSelection.current.editor);
     } }, ...(tableCellTarget ? [] : blockCommands)]
     : blockCommands;
   const commandsFor = (query: string) => slashCommands.filter(({ name, terms }) => `${name} ${terms}`.toLowerCase().includes(query.trim().toLowerCase()));
   const matchingCommands = commandsFor(slashQuery);
-  function hasAttachedInsertTarget(selection: BaseSelection | null) {
-    const lexical = lexicalEditor.current;
-    if (!lexical || !selection) return false;
+  function hasAttachedInsertTarget(target: WritingBookmark | null) {
+    if (!target || !root.current?.contains(target.editor.getRootElement())) return false;
+    const { editor: lexical, selection } = target;
     let attached = false;
     lexical.read(() => {
       try {
@@ -964,9 +993,9 @@ export default function WritingEditorEngine({
     });
     return attached;
   }
-  function restoreInsertTarget(selection: BaseSelection | null) {
-    const lexical = lexicalEditor.current;
-    if (!lexical || !selection || !hasAttachedInsertTarget(selection)) return false;
+  function restoreInsertTarget(target: WritingBookmark | null) {
+    if (!target || !hasAttachedInsertTarget(target)) return false;
+    const { editor: lexical, selection } = target;
     lexical.getRootElement()?.focus({ preventScroll: true });
     lexical.update(() => {
       $setSelection(selection.clone());
@@ -982,9 +1011,9 @@ export default function WritingEditorEngine({
         restoreInsertTarget(slashSelection.current);
       } else insertTrigger.current?.focus({ preventScroll: true });
     } else {
+      const lexical = slashSelection.current?.editor;
       keepSlashAsText();
       if (canvas && compactRef.current) {
-        const lexical = lexicalEditor.current;
         lexical?.update(() => lexical.focus(), { discrete: true });
       } else editor.current?.focus(undefined, { preventScroll: true });
     }
@@ -1009,11 +1038,33 @@ export default function WritingEditorEngine({
   function openSlash(trigger?: HTMLButtonElement, fromKeyboard = false) {
     if (trigger && slashMenu.current && insertTrigger.current === trigger) {
       closeInsertMenu();
-      return;
+      return true;
     }
     const prepared = toolbarSelection.current;
     const savedToolbar = trigger && !fromKeyboard && prepared?.trigger === trigger
-      && prepared.editor === lexicalEditor.current ? prepared : null;
+      && hasAttachedInsertTarget(prepared) ? prepared : null;
+    const native = nativeWritingEditor(root.current);
+    const lexical = savedToolbar?.editor || native || (trigger ? lexicalEditor.current : null);
+    if (!lexical) return false;
+    // Resolve the native owner now, before React's active-editor effect catches
+    // up with a cell-to-prose handoff. Keep that owner with the saved selection.
+    slashSelection.current = savedToolbar ? { editor: lexical, selection: savedToolbar.selection.clone() } : null;
+    const domSelection = window.getSelection();
+    if (!savedToolbar && native === lexical && domSelection?.rangeCount) {
+      lexical.update(() => {
+        const current = $getSelection();
+        const selection = $isRangeSelection(current) ? current.clone() : $createRangeSelection();
+        applyNativeWritingRange(selection, domSelection);
+        $setSelection(selection);
+        slashSelection.current = { editor: lexical, selection: selection.clone() };
+      }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
+    } else if (trigger && !savedToolbar) {
+      lexical.read(() => {
+        const selection = $getSelection();
+        if (selection) slashSelection.current = { editor: lexical, selection: selection.clone() };
+      });
+    }
+    if (!hasAttachedInsertTarget(slashSelection.current)) return false;
     if (canvas && compactRef.current) {
       writingHighlight.clear();
       writingHighlight.capture(savedToolbar?.range);
@@ -1021,28 +1072,11 @@ export default function WritingEditorEngine({
     insertTrigger.current = trigger || null;
     focusInsertItem.current = fromKeyboard;
     setSlashFromToolbar(!!trigger);
-    slashSelection.current = savedToolbar?.selection.clone() || null;
-    const domSelection = window.getSelection();
-    const lexical = lexicalEditor.current;
-    // Capture the caret that opened the slash menu even when selectionchange
-    // has not yet synchronized a fresh browser selection into Lexical.
-    if (!trigger && domSelection?.isCollapsed && domSelection.rangeCount && lexical?.getRootElement()?.contains(domSelection.anchorNode)
-      && lexical.getRootElement()?.contains(domSelection.focusNode)) {
-      const range = domSelection.getRangeAt(0).cloneRange();
-      lexical.update(() => {
-        const currentSelection = $getSelection();
-        const selection = $isRangeSelection(currentSelection) ? currentSelection.clone() : $createRangeSelection();
-        selection.applyDOMRange(range);
-        $setSelection(selection);
-        slashSelection.current = selection.clone();
-      }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
-    }
     let savedLine: HTMLElement | null = null;
-    lexicalEditor.current?.getEditorState().read(() => {
-      const selection = $getSelection();
-      if (!slashSelection.current) slashSelection.current = selection?.clone() || null;
-      if ($isRangeSelection(slashSelection.current)) {
-        const anchor = lexicalEditor.current?.getElementByKey(slashSelection.current.anchor.getNode().getKey());
+    lexical.getEditorState().read(() => {
+      const selection = slashSelection.current?.selection;
+      if ($isRangeSelection(selection)) {
+        const anchor = lexical.getElementByKey(selection.anchor.getNode().getKey());
         savedLine = anchor?.closest("p, h1, h2, h3, h4, h5, h6, li, blockquote") as HTMLElement | null;
       }
     });
@@ -1056,7 +1090,7 @@ export default function WritingEditorEngine({
     if (!canvas || !compactRef.current) {
       const rangeRect = selection?.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
       const rect = trigger?.getBoundingClientRect() || (rangeRect?.height ? rangeRect : line?.getBoundingClientRect());
-      if (!rect) return;
+      if (!rect) return false;
       const viewport = root.current?.closest(".main-content")?.getBoundingClientRect();
       const spaceAbove = rect.top - (viewport?.top ?? 0);
       const spaceBelow = (viewport?.bottom ?? window.innerHeight) - rect.bottom;
@@ -1072,6 +1106,7 @@ export default function WritingEditorEngine({
     slashNavigation.current = "keyboard";
     slashPointer.current = null;
     setSlashQuery(""); setSlashIndex(0); setSlashOpen(true);
+    return true;
   }
   function openCommands(trigger: HTMLButtonElement, fromKeyboard: boolean) {
     if (canvas && compactRef.current && slashMenu.current && insertTrigger.current === trigger) {
@@ -1082,15 +1117,15 @@ export default function WritingEditorEngine({
       // A normal button click may blur the editor before it fires. The target
       // belongs to this gesture, captured before the browser moves focus.
       const savedTarget = !fromKeyboard && hasPreparedSelection(trigger);
-      if (compactRef.current.panelsOpen || !savedTarget && !hasWritingTarget(lexicalEditor.current, true)) return;
+      if (compactRef.current.panelsOpen || !savedTarget && !hasWritingTarget(nativeWritingEditor(root.current) || lexicalEditor.current, true)) return;
     }
     if (!(canvas && compactRef.current) && selectionTools.current?.show(fromKeyboard, trigger)) {
       setSlashOpen(false);
       return;
     }
-    openSlash(trigger, fromKeyboard);
+    const opened = openSlash(trigger, fromKeyboard);
     toolbarSelection.current = null;
-    if (canvas && compactRef.current) {
+    if (opened && canvas && compactRef.current) {
       focusInsertItem.current = true;
       blurWritingInput();
       window.getSelection()?.removeAllRanges();
@@ -1098,22 +1133,20 @@ export default function WritingEditorEngine({
   }
   function hasPreparedSelection(trigger: HTMLButtonElement) {
     const prepared = toolbarSelection.current;
-    return !!prepared && prepared.trigger === trigger && prepared.editor === lexicalEditor.current
-      && hasAttachedInsertTarget(prepared.selection);
+    return !!prepared && prepared.trigger === trigger && hasAttachedInsertTarget(prepared);
   }
   function runInsertCommand(run: () => void, mediaCommand = false) {
+    const target = slashSelection.current;
+    if (!target || !hasAttachedInsertTarget(target)) {
+      writingHighlight.clear();
+      slashSelection.current = null;
+      focusInsertItem.current = false;
+      setSlashOpen(false);
+      return;
+    }
+    const { editor: lexical, selection } = target;
     if (canvas && compactRef.current) {
-      const lexical = lexicalEditor.current;
-      const selection = slashSelection.current;
-      const dismissInvalidTarget = () => {
-        writingHighlight.clear();
-        slashSelection.current = null;
-        focusInsertItem.current = false;
-        setSlashOpen(false);
-      };
-      if (!lexical) { dismissInvalidTarget(); return; }
       if (mediaCommand || run === insertTableAtCaret) {
-        if (!hasAttachedInsertTarget(selection)) { dismissInvalidTarget(); return; }
         // A chooser or nested-cell handoff restores only the insertion target.
         // Its destination owns focus; the outer prose must not take it first.
         lexical.update(() => { if (selection) $setSelection(selection.clone()); }, {
@@ -1121,20 +1154,17 @@ export default function WritingEditorEngine({
         });
         run();
       } else {
-        if (!restoreInsertTarget(selection)) { dismissInvalidTarget(); return; }
+        if (!restoreInsertTarget(target)) return;
         writingHighlight.clear();
         lexical.update(run, { discrete: true });
       }
       return;
     }
-    if (!slashFromToolbar || run === insertTableAtCaret) { run(); return; }
-    const lexical = lexicalEditor.current;
-    const selection = slashSelection.current;
-    if (!lexical) { run(); return; }
+    if (run === insertTableAtCaret) { run(); return; }
     lexical.update(() => {
-      if (selection) $setSelection(selection.clone());
-    }, { discrete: true });
-    lexical.focus();
+      $setSelection(selection.clone());
+    }, { discrete: true, tag: [SKIP_DOM_SELECTION_TAG, SKIP_SCROLL_INTO_VIEW_TAG] });
+    if (slashFromToolbar) lexical.focus();
     run();
   }
   function insertVideo() {
@@ -1209,7 +1239,8 @@ export default function WritingEditorEngine({
     <div ref={root} data-editor-interacting={popupActive || slashOpen || !!mediaChooser || undefined} className="writing-editor writing-surface rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {
       toolbarSelection.current = null;
       const trigger = event.target instanceof Element ? event.target.closest<HTMLButtonElement>(".writing-toolbar-controls button") : null;
-      const lexical = lexicalEditor.current;
+      const native = nativeWritingEditor(root.current);
+      const lexical = native || lexicalEditor.current;
       if (trigger && lexical) {
         lexical.read(() => {
           const current = $getSelection();
@@ -1220,6 +1251,10 @@ export default function WritingEditorEngine({
             applyNativeWritingRange(selection, range);
             normalizeWritingSelection(selection);
             toolbarSelection.current = { editor: lexical, trigger, selection: selection.clone(), range: range.getRangeAt(0).cloneRange() };
+          } else if (native && range?.rangeCount) {
+            const selection = $isRangeSelection(current) ? current.clone() : $createRangeSelection();
+            applyNativeWritingRange(selection, range);
+            toolbarSelection.current = { editor: lexical, trigger, selection };
           } else if (current) toolbarSelection.current = { editor: lexical, trigger, selection: current.clone() };
         });
       }
@@ -1308,8 +1343,9 @@ export default function WritingEditorEngine({
           before.selectNodeContents(paragraph);
           before.setEnd(selection.anchorNode!, selection.anchorOffset);
           if (!before.toString().trim()) {
-            event.preventDefault();
-            openSlash();
+            // Failed capture leaves the slash to native input instead of
+            // swallowing text against a stale or unrelated editor selection.
+            if (openSlash()) event.preventDefault();
           }
         }
       }

@@ -97,8 +97,18 @@ function GutterActions({
       });
     };
     const schedule = () => { if (!frameId) frameId = requestAnimationFrame(measure); };
-    const show = () => setHovered(true);
-    const hide = () => setHovered(false);
+    // The host can already be hovered or focused before its controls mount.
+    let pointerInside = host.matches(":hover");
+    let focusInside = host.contains(host.ownerDocument.activeElement);
+    const updateVisibility = () => setHovered(pointerInside || focusInside);
+    const enter = () => { pointerInside = true; updateVisibility(); };
+    const leave = () => { pointerInside = false; updateVisibility(); };
+    const focus = () => { focusInside = true; updateVisibility(); };
+    const blur = (event: FocusEvent) => {
+      focusInside = event.relatedTarget instanceof Node && host.contains(event.relatedTarget);
+      updateVisibility();
+    };
+    updateVisibility();
     measure();
     const resize = new ResizeObserver(schedule);
     resize.observe(frame);
@@ -107,10 +117,10 @@ function GutterActions({
     const unregister = editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
       if (dirtyElements.size || dirtyLeaves.size) schedule();
     });
-    host.addEventListener("pointerenter", show);
-    host.addEventListener("pointerleave", hide);
-    host.addEventListener("focusin", show);
-    host.addEventListener("focusout", hide);
+    host.addEventListener("pointerenter", enter);
+    host.addEventListener("pointerleave", leave);
+    host.addEventListener("focusin", focus);
+    host.addEventListener("focusout", blur);
     host.addEventListener("scroll", schedule, { passive: true });
     document.addEventListener("scroll", schedule, true);
     window.addEventListener("resize", schedule);
@@ -118,10 +128,10 @@ function GutterActions({
       cancelAnimationFrame(frameId);
       unregister();
       resize.disconnect();
-      host.removeEventListener("pointerenter", show);
-      host.removeEventListener("pointerleave", hide);
-      host.removeEventListener("focusin", show);
-      host.removeEventListener("focusout", hide);
+      host.removeEventListener("pointerenter", enter);
+      host.removeEventListener("pointerleave", leave);
+      host.removeEventListener("focusin", focus);
+      host.removeEventListener("focusout", blur);
       host.removeEventListener("scroll", schedule);
       document.removeEventListener("scroll", schedule, true);
       window.removeEventListener("resize", schedule);
@@ -134,8 +144,6 @@ function GutterActions({
       className="writing-block-gutter-actions"
       data-hovered={hovered}
       contentEditable={false}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
     >
       {children}
     </span>,

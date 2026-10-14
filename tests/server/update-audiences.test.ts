@@ -23,6 +23,10 @@ test("publisher Update team targeting validates current teams and revisions; dra
     groups: [],
     assignments: [],
   };
+  const settings = {
+    ...defaultSettings,
+    contentCategories: { course: [], brief: [original.category] },
+  };
   let row: DocumentRecord = {
     id: original.id,
     draft: original,
@@ -33,9 +37,9 @@ test("publisher Update team targeting validates current teams and revisions; dra
   };
   let writes = 0;
   Object.assign(store, {
-    readSettings: async () => ({ settings: defaultSettings, revision: 1 }),
+    readSettings: async () => ({ settings, revision: 1 }),
     readConfiguration: async () => ({
-      settings: defaultSettings,
+      settings,
       revision: 1,
       governance_revision: 1,
       groups: [],

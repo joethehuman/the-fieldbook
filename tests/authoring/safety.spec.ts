@@ -667,6 +667,8 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   });
   await openCourseOutline(page);
   await page.getByRole("button", { name: "Add lesson" }).click();
+  await expect(page.locator(".writing-document-heading .eyebrow")).toHaveText("Lesson 2 of 2");
+  await expect(page.getByLabel("Lesson title", { exact: true })).toHaveValue("");
   await page.getByLabel("Lesson title").fill("Second lesson");
   await expect(page.getByLabel("Lesson title", { exact: true })).toHaveValue("Second lesson");
   const writing = page.getByRole("textbox", { name: "Lesson content" });
@@ -933,10 +935,30 @@ test("non-text block menus sit in the left writing gutter", async ({ page }, inf
   await page.screenshot({ path: info.outputPath("block-gutter.png") });
 });
 
+async function recordSlashOwners(writing: Locator) {
+  // Observe the marker without adding a wait between slash and the next key.
+  await writing.evaluate((root) => {
+    const observed = root as HTMLElement & { commandLineOwners?: string[] };
+    observed.commandLineOwners = [];
+    new MutationObserver((changes) => {
+      for (const { target } of changes) {
+        if (!(target instanceof HTMLElement) || !target.matches(".writing-command-line")) continue;
+        observed.commandLineOwners!.push(target.parentElement === root ? "prose" : target.closest("td, th") ? "table" : "other");
+      }
+    }).observe(root, { subtree: true, attributes: true, attributeFilter: ["class"] });
+  });
+  return async () => {
+    const owners = await writing.evaluate((root) => (root as HTMLElement & { commandLineOwners?: string[] }).commandLineOwners || []);
+    expect(owners.length).toBeGreaterThan(0);
+    expect([...new Set(owners)]).toEqual(["prose"]);
+  };
+}
+
 test("slash Table inserts at the selected line and unmatched searches can return to writing", async ({
   page,
 }, info) => {
-  await setup(page, info.project.name.startsWith("production"), "course", true, false, "Before\n\nAfter");
+  const production = info.project.name.startsWith("production");
+  const { state } = await setup(page, production, "course", true, false, "Before\n\nAfter");
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.locator("p").first().click();
   await page.keyboard.press("End");
@@ -962,7 +984,8 @@ test("slash Table inserts at the selected line and unmatched searches can return
     );
   expect(beforeTable).toBe("Before");
   await expectMarkdown(page, /Before[\s\S]*\|[\s\S]*After/);
-  await writing.locator("p").last().click();
+  const expectProseSlashOwner = await recordSlashOwners(writing);
+  await writing.locator(":scope > p").last().click();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.press("/");
@@ -973,17 +996,79 @@ test("slash Table inserts at the selected line and unmatched searches can return
   await expect(writing.locator(".writing-command-line")).toHaveCount(0);
   await expect(writing).toBeFocused();
   await page.keyboard.type(" continues");
-  await writing.locator("p", { hasText: "After" }).click();
+  await expect(writing.locator(":scope > p").last()).toHaveText("/unlikely-block-name continues");
+  await expectProseSlashOwner();
+  await writing.locator(":scope > p", { hasText: "After" }).click();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.press("/");
   await page.keyboard.type("another-unknown-block");
-  await writing.locator("p", { hasText: "Before" }).click();
+  await expect(writing.locator(":scope > p", { hasText: "/another-unknown-block" })).toHaveText("/another-unknown-block");
+  await writing.locator(":scope > p", { hasText: "Before" }).click();
   await expect(page.getByRole("menu", { name: /^Insert content/ })).toHaveCount(
     0,
   );
+  await expectProseSlashOwner();
   await expectMarkdown(page, /\/unlikely-block-name continues/);
+  await waitForDraftSaved(page);
+  if (production) {
+    await syncAuthoringProvider(page, state);
+    await page.reload();
+  } else {
+    // The demo fixture seeds on page load; reopen within its browser-local app.
+    await returnToContent(page);
+    await page.getByRole("link", { name: "Safety fixture", exact: true }).click();
+  }
+  await expect(writing.locator("table")).toHaveCount(1);
+  await expect(writing.locator(":scope > p")).toHaveText(["Before", "After", "/another-unknown-block", "/unlikely-block-name continues"]);
 });
+
+for (const { command, query } of [
+  { command: "Heading 2", query: "h2" },
+  { command: "Code block", query: "code" },
+  { command: "Divider", query: "divider" },
+] as const) {
+  test(`table-to-prose after Markdown download runs ${command} in the outer editor`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "course", true, false, "Before\n\nAfter");
+    const writing = page.getByRole("textbox", { name: "Lesson content" });
+    await writing.locator(":scope > p").first().click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("/");
+    await page.keyboard.type("table");
+    await page.keyboard.press("Enter");
+    await expect(writing.locator("table")).toBeVisible();
+    await expectMarkdown(page, /Before[\s\S]*\|[\s\S]*After/);
+    const expectProseSlashOwner = await recordSlashOwners(writing);
+    await writing.locator(":scope > p").last().click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("/");
+    await page.keyboard.type(query);
+    await page.keyboard.press("Enter");
+    if (command === "Heading 2") {
+      await page.keyboard.type("Owned heading");
+      await expect(writing.locator(":scope > h2")).toHaveText("Owned heading");
+    } else if (command === "Code block") {
+      const code = writing.locator(".writing-code-block .cm-content");
+      await expect(code).toBeFocused();
+      await page.keyboard.type("const owned = true;");
+      await expect(code).toHaveText("const owned = true;");
+    } else {
+      await expect(writing.locator("hr")).toHaveCount(1);
+    }
+    await expectProseSlashOwner();
+    await expect(writing.locator("table h2, table .writing-code-block, table hr")).toHaveCount(0);
+    await expect(writing.locator("table [contenteditable=true]")).toHaveText(Array(9).fill(""));
+    await expect(writing.locator(":scope > p").filter({ hasText: /^(Before|After)$/ })).toHaveText(["Before", "After"]);
+    await waitForDraftSaved(page);
+    await expectMarkdown(page, command === "Heading 2"
+      ? /Before[\s\S]*\|[\s\S]*After\n\n## Owned heading/
+      : command === "Code block"
+        ? /Before[\s\S]*\|[\s\S]*After\n\n```\nconst owned = true;\n```/
+        : /Before[\s\S]*\|[\s\S]*After\n\n(?:\*\*\*|---)/);
+  });
+}
 
 test("slash Table can be chosen with the pointer", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);

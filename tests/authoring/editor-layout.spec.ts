@@ -2445,6 +2445,13 @@ for (const kind of ["doc", "brief", "course"] as const) {
       };
     });
     expect(placement).toEqual({ followsRecovery: true, divider: "solid", lastButton: true });
+    // Native mouse focus differs by browser. Capture the actual pre-dialog
+    // owner; separately verify keyboard activation returns to Delete below.
+    const pointerReturn = await remove.evaluateHandle(button => {
+      const captured: { element: Element | null } = { element: null };
+      button.addEventListener("click", () => { captured.element = document.activeElement; }, { once: true });
+      return captured;
+    });
     await remove.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading")).toHaveText("Delete");
@@ -2454,6 +2461,17 @@ for (const kind of ["doc", "brief", "course"] as const) {
     await dialog.getByRole("checkbox").check();
     await expect(dialog.getByRole("button", { name: "Delete", exact: true })).toBeEnabled();
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(() => pointerReturn.evaluate(({ element }) =>
+      !!element?.isConnected && element === document.activeElement)).toBe(true);
+    await pointerReturn.dispose();
+    expect((await read()).content[0].id).toBe(item.id);
+    await remove.focus();
+    await remove.press("Enter");
+    await expect(dialog.getByRole("button", { name: "Delete", exact: true })).toBeDisabled();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(dialog).toHaveCount(0);
     await expect(remove).toBeFocused();
     expect((await read()).content[0].id).toBe(item.id);
     await returnToContent(page);

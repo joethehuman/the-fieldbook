@@ -157,3 +157,69 @@ test("table controls follow prose movement, cell wrapping, and resizing without 
   await expect(resize).toHaveAttribute("aria-valuenow", "192");
   await expect.poll(() => controlError(host)).toBeLessThan(1.5);
 });
+
+test.describe("desktop table action visibility", () => {
+  test.use({ hasTouch: false, isMobile: false, viewport: { width: 1440, height: 1000 } });
+
+  test("table actions initialize when their host mounts beneath a stationary pointer", async ({ page }, info) => {
+    const { writer } = await open(page, info.project.name.startsWith("production"));
+    const host = writer.locator(".writing-table-block");
+    await host.getByText("First", { exact: true }).hover();
+    await page.addInitScript(() => {
+      const mounts: boolean[] = [];
+      (window as typeof window & { tableActionMountHover?: boolean[] }).tableActionMountHover = mounts;
+      const addListener = EventTarget.prototype.addEventListener;
+      EventTarget.prototype.addEventListener = function (type, listener, options) {
+        if (type === "pointerenter" && this instanceof HTMLElement && this.classList.contains("writing-table-block")) {
+          mounts.push(this.matches(":hover"));
+        }
+        return addListener.call(this, type, listener, options);
+      };
+    });
+    await page.reload();
+    await expect(writer.locator(".writing-table-row")).toHaveCount(3);
+    await afterPaints(page);
+    // Establish that hover existed before the controls subscribed, rather than
+    // letting a later pointerenter accidentally satisfy this regression.
+    await expect.poll(() => page.evaluate(() =>
+      (window as typeof window & { tableActionMountHover?: boolean[] }).tableActionMountHover?.includes(true),
+    )).toBe(true);
+    await expect.poll(() => host.evaluate((element) => element.matches(":hover"))).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: "Table actions", exact: true }).evaluate((element) =>
+      getComputedStyle(element.closest(".writing-block-gutter-actions")!).opacity,
+    )).toBe("1");
+  });
+
+  test("table actions retain independent hover and focus through handoffs", async ({ page }, info) => {
+    const { writer } = await open(page, info.project.name.startsWith("production"));
+    const host = writer.locator(".writing-table-block");
+    const cells = host.locator('table [contenteditable="true"]');
+    const actions = page.getByRole("button", { name: "Table actions", exact: true });
+    const opacity = () => actions.evaluate((element) => getComputedStyle(element.closest(".writing-block-gutter-actions")!).opacity);
+
+    await page.mouse.move(1430, 980);
+    await writer.focus();
+    await expect(writer).toBeFocused();
+    await expect.poll(opacity).toBe("0");
+    await cells.nth(2).focus();
+    await expect.poll(opacity).toBe("1");
+    await host.getByText("First", { exact: true }).hover();
+    await page.mouse.move(1430, 980);
+    await expect(cells.nth(2)).toBeFocused();
+    await expect.poll(opacity).toBe("1");
+    await cells.nth(3).focus();
+    await expect.poll(opacity).toBe("1");
+
+    await host.getByText("First", { exact: true }).hover();
+    await writer.focus();
+    await expect(writer).toBeFocused();
+    await expect.poll(opacity).toBe("1");
+    await page.mouse.move(1430, 980);
+    await expect.poll(opacity).toBe("0");
+    await host.getByText("First", { exact: true }).hover();
+    await actions.hover();
+    await expect.poll(opacity).toBe("1");
+    await actions.click();
+    await expect(page.getByRole("menuitem", { name: "Copy table", exact: true })).toBeVisible();
+  });
+});
