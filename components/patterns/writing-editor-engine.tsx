@@ -1059,10 +1059,13 @@ export default function WritingEditorEngine({
         slashSelection.current = { editor: lexical, selection: selection.clone() };
       }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
     } else if (trigger && !savedToolbar) {
-      lexical.read(() => {
-        const selection = $getSelection();
+      lexical.update(() => {
+        // Desktop and embedded toolbars also work before the first caret is
+        // placed. Give that explicit action an owned insertion point without
+        // moving native focus away from its button or opening a keyboard.
+        const selection = $getSelection() || (!(canvas && compactRef.current) ? $getRoot().selectEnd() : null);
         if (selection) slashSelection.current = { editor: lexical, selection: selection.clone() };
-      });
+      }, { discrete: true, tag: [SKIP_DOM_SELECTION_TAG, SKIP_SCROLL_INTO_VIEW_TAG] });
     }
     if (!hasAttachedInsertTarget(slashSelection.current)) return false;
     if (canvas && compactRef.current) {

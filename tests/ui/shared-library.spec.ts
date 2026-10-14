@@ -224,6 +224,11 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   });
   const commands = editor.getByRole("button", { name: /^Commands:/ });
   const menu = page.getByRole("menu", { name: /^Insert content/ });
+  const policyText = editor.getByRole("textbox", {
+    name: "Privacy policy draft",
+    exact: true,
+  });
+  await expect(policyText).toHaveText("");
   await commands.scrollIntoViewIfNeeded();
   await commands.focus();
   await page.keyboard.press("Enter");
@@ -234,6 +239,17 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   await expect(
     menu.getByRole("menuitem", { name: "Heading 1", exact: true }),
   ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Privacy policy heading");
+  await expect(policyText.locator(":scope > h1")).toHaveText(
+    "Privacy policy heading",
+  );
+  await expect(policyText).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(policyText).toHaveText("");
+  await commands.focus();
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(commands).toBeFocused();

@@ -942,7 +942,7 @@ async function recordSlashOwners(writing: Locator) {
     observed.commandLineOwners = [];
     new MutationObserver((changes) => {
       for (const { target } of changes) {
-        if (!(target instanceof HTMLElement) || !target.matches(".writing-command-line")) continue;
+        if (!(target instanceof HTMLElement) || !root.contains(target) || !target.matches(".writing-command-line")) continue;
         observed.commandLineOwners!.push(target.parentElement === root ? "prose" : target.closest("td, th") ? "table" : "other");
       }
     }).observe(root, { subtree: true, attributes: true, attributeFilter: ["class"] });
