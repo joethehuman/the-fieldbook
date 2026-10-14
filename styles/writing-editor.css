@@ -488,8 +488,8 @@
   height: 36px;
 }
 .bn-container.bn-shadcn .bn-side-menu {
-  --writing-side-control-size: 1.75rem;
-  --writing-side-icon-size: 0.875rem;
+  --writing-side-control-size: var(--control-height-sm);
+  --writing-side-icon-size: 1.5rem;
   gap: var(--space-1);
   padding: var(--space-1);
 }
@@ -552,7 +552,6 @@
 @media (any-pointer: coarse) {
   .bn-container.bn-shadcn .bn-side-menu {
     --writing-side-control-size: max(2.75rem, var(--control-height-sm));
-    --writing-side-icon-size: 1rem;
   }
   .bn-shadcn :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
     min-height: 44px;
