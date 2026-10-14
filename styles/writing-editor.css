@@ -512,6 +512,10 @@
   background: transparent;
   color: var(--foreground);
 }
+/* These native bars size to the plus icon, rather than a form button's minimum height. */
+.bn-shadcn .bn-extend-button {
+  min-height: 0;
+}
 /* Keep the native drag cursor on the bar; only the plus signals click-to-add. */
 .bn-shadcn .bn-extend-button svg[data-test="extendButton"] {
   cursor: pointer;
