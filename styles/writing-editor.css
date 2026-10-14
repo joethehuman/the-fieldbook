@@ -167,7 +167,9 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
-.fieldbook-blocknote [data-content-type="codeBlock"] > .writing-code-header {
+.fieldbook-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  > div:has(> select) {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -176,7 +178,7 @@
   color: var(--muted-foreground);
   font-family: var(--font-geist-sans), sans-serif;
 }
-.fieldbook-blocknote [data-content-type="codeBlock"] > .writing-code-content {
+.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] > pre {
   --bn-suggestion-surface: var(--muted);
   margin: 0;
   padding: var(--space-3) var(--space-4);
@@ -192,7 +194,10 @@
   font-size: 0.8125rem;
   line-height: 1.75;
 }
-.fieldbook-blocknote .writing-code-content code {
+.fieldbook-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  > pre
+  code {
   display: block;
   min-height: 1.75em;
   padding: 0;
@@ -205,7 +210,10 @@
   font-size: inherit;
 }
 /* BlockNote's bundled Shiki themes supply both palettes; use the light palette. */
-.fieldbook-blocknote .writing-code-content .shiki {
+.fieldbook-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  > pre
+  .shiki {
   color: var(--shiki-light, var(--foreground));
 }
 .fieldbook-blocknote [data-content-type="table"] {
@@ -606,7 +614,10 @@
     --writing-side-icon-size: 1rem;
   }
   .bn-shadcn [data-slot="input"],
-  .bn-shadcn.fieldbook-blocknote .writing-code-language {
+  .bn-container.bn-shadcn.fieldbook-blocknote
+    .bn-block-content[data-content-type="codeBlock"]
+    > div
+    > select {
     min-height: 44px;
     font-size: 1rem;
   }
@@ -618,8 +629,17 @@
     height: 44px;
   }
 }
-.fieldbook-blocknote .writing-code-language {
+.bn-container.fieldbook-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  > div
+  > select {
+  position: static;
+  opacity: 1;
+  transition: none;
+  appearance: auto;
   width: auto;
+  max-width: 100%;
+  min-width: 0;
   min-height: var(--control-height-sm);
   margin: 0;
   padding: var(--space-1) var(--space-2);
@@ -630,15 +650,23 @@
   font-family: var(--font-geist-sans), sans-serif;
   font-size: var(--type-label);
 }
-.fieldbook-blocknote .writing-code-language:hover:not(:disabled) {
+.bn-container.fieldbook-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  > div
+  > select:hover:not(:disabled) {
   background: var(--accent);
 }
-.bn-shadcn .writing-code-language-menu {
-  width: 15rem;
-  min-width: 15rem;
-  max-height: min(22rem, var(--available-height));
+.bn-container.fieldbook-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  > div
+  > select:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
 }
-.fieldbook-blocknote .writing-code-language:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+.bn-container.fieldbook-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  > div
+  > select
+  > option {
+  background: var(--popover);
+  color: var(--popover-foreground);
 }

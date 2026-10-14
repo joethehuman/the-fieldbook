@@ -140,9 +140,9 @@ for (const [ending, body] of Object.entries({
     await page.keyboard.type("Next line.");
     await waitForDraftSaved(page);
     await expect.poll(async () => (await read()).body).toContain("Next line.");
-      // BlockNote fills its default props on the first edit; authored values
-      // and the original block's identity and content must be retained.
-      expect((await read()).bodyDocument!.blocks[0]).toMatchObject(original[0]);
+    // BlockNote fills its default props on the first edit; authored values
+    // and the original block's identity and content must be retained.
+    expect((await read()).bodyDocument!.blocks[0]).toMatchObject(original[0]);
     await page.reload();
     await expect(
       editor.locator('[data-content-type="paragraph"]').last(),
@@ -610,7 +610,7 @@ test("checklists and collapsible blocks persist and export all nested text", asy
   await expect(editor).toContainText("More details");
   expect((await downloadMarkdown(page)).body).toContain("Nested explanation");
 });
-test("code clicks edit text while the separate language picker preserves native code behavior", async ({
+test("native code block and language select preserve editing and saved formatting", async ({
   page,
 }, info) => {
   const errors: string[] = [];
@@ -627,8 +627,8 @@ test("code clicks edit text while the separate language picker preserves native 
   const picker = code.getByRole("combobox", { name: "Code language" });
   const geometry = await code.evaluate((element) => {
     const header = element
-      .querySelector(".writing-code-header")!
-      .getBoundingClientRect();
+      .querySelector("select")!
+      .parentElement!.getBoundingClientRect();
     const pre = element.querySelector("pre")!.getBoundingClientRect();
     const style = getComputedStyle(element.querySelector("pre code")!);
     return {
@@ -652,18 +652,8 @@ test("code clicks edit text while the separate language picker preserves native 
   await source.dblclick();
   await expect(page.getByRole("listbox")).toHaveCount(0);
 
-  await picker.click();
-  await expect(
-    page.getByRole("option", { name: "Plain Text", exact: true }),
-  ).toBeFocused();
-  // Native typeahead brings a long-list item into view before pointer selection.
-  await page.keyboard.press("p");
-  await page.keyboard.press("y");
-  await expect(
-    page.getByRole("option", { name: "Python", exact: true }),
-  ).toBeFocused();
-  await page.getByRole("option", { name: "Python", exact: true }).click();
-  await expect(picker).toContainText("Python");
+  await picker.selectOption("python");
+  await expect(picker).toHaveValue("python");
   await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(source).toContainText('print("done")');
   await source.click({ position: { x: 3, y: 8 } });
@@ -689,10 +679,63 @@ test("code clicks edit text while the separate language picker preserves native 
   expect(palette.light).not.toBe("");
   expect(palette.color).not.toBe("rgb(255, 255, 255)");
   await page.reload();
-  await expect(picker).toContainText("Python");
+  await expect(picker).toHaveValue("python");
   await expect(source).toContainText('print("done")');
   expect((await downloadMarkdown(page)).body).toContain("```python\n");
   expect(errors).toEqual([]);
+});
+
+test("native code language menu opens without moving a scrolled canvas", async ({
+  page,
+}, info) => {
+  const { editor } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    Array.from(
+      { length: 24 },
+      (_, i) =>
+        `Paragraph ${i + 1}. Keep the code block below the initial viewport.`,
+    ).join("\n\n") + "\n\n```text\nexample_code\n```",
+    true,
+  );
+  const code = editor.locator('[data-content-type="codeBlock"]');
+  const picker = code.getByRole("combobox", { name: "Code language" });
+  await picker.scrollIntoViewIfNeeded();
+  await code.locator("pre code").click({ position: { x: 3, y: 8 } });
+  const measure = () =>
+    code.evaluate(async (element) => {
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      );
+      return {
+        page: scrollY,
+        main: element.closest(".main-content")!.scrollTop,
+        canvas: element.closest(".writing-viewport")!.scrollTop,
+        mobile: element.closest(".bn-scroll-container")?.scrollTop || 0,
+        codeY: element.getBoundingClientRect().top,
+      };
+    });
+  const before = await measure();
+  const button = (await picker.boundingBox())!;
+  // A screen-point click avoids an automation scroll before opening the native popup.
+  await page.mouse.click(
+    button.x + button.width / 2,
+    button.y + button.height / 2,
+  );
+  const opened = await measure();
+  for (const key of Object.keys(before) as (keyof typeof before)[]) {
+    expect(Math.abs(opened[key] - before[key]), key).toBeLessThanOrEqual(2);
+  }
+  await page.keyboard.press("Escape");
+  const closed = await measure();
+  for (const key of Object.keys(before) as (keyof typeof before)[]) {
+    expect(Math.abs(closed[key] - before[key]), key).toBeLessThanOrEqual(2);
+  }
+  await expect(picker).toHaveValue("text");
+  await picker.selectOption("python");
+  await expect(picker).toHaveValue("python");
+  await expect(code.locator("pre code")).toHaveText("example_code");
 });
 
 test("unrecognized code language labels remain editable and export unchanged", async ({
