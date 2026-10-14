@@ -329,15 +329,6 @@
   background-color: var(--popover);
   color: var(--popover-foreground);
 }
-.bn-shadcn :is(.bn-side-menu .bn-button, .bn-table-handle) {
-  color: var(--muted-foreground);
-  border-radius: var(--control-radius);
-}
-.bn-shadcn
-  :is(.bn-side-menu .bn-button, .bn-table-handle):is(:hover, [aria-expanded="true"]) {
-  background-color: var(--accent);
-  color: var(--accent-foreground);
-}
 /* Preserve the single media-panel surface and approved menu/handle controls. */
 .bn-shadcn .bn-panel {
   border: 1px solid var(--border);
