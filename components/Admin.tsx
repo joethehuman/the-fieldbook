@@ -112,7 +112,7 @@ import {
   type AdminDestination,
   type AdminTab,
 } from "@/lib/admin-destination";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   NavigationGuard,
   RegisterNavigationGuard,
@@ -2292,13 +2292,15 @@ export function Editor({
     queue.current!.reset(baseline.current);
     setC(current.current);
   }, [assignmentSave, latestAssignmentContent]);
-  const signature = contentSignature(c);
+  const signature = useMemo(() => contentSignature(c), [c]);
+  const baselineContent = baseline.current;
+  const baselineSignature = useMemo(() => contentSignature(baselineContent), [baselineContent]);
   const observedSignature = useRef(signature);
   if (observedSignature.current !== signature) {
     observedSignature.current = signature;
     queue.current.markEdited();
   }
-  const dirty = signature !== contentSignature(baseline.current);
+  const dirty = signature !== baselineSignature;
   const needsRecovery = queue.current.blocked;
   async function flushDraft(intent: SaveIntent = "draft") {
     if (pendingUploads.current || recoveringNow.current) return false;
@@ -2346,7 +2348,7 @@ export function Editor({
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy, saving, needsRecovery]);
-  const upload: UploadMedia | undefined = onUpload
+  const upload = useMemo<UploadMedia | undefined>(() => onUpload
     ? async (file, onProgress) => {
         pendingUploads.current++;
         setUploadCount(pendingUploads.current);
@@ -2357,7 +2359,7 @@ export function Editor({
           setUploadCount(pendingUploads.current);
         }
       }
-    : undefined;
+    : undefined, [onUpload]);
   function downloadDraft() {
     const url = URL.createObjectURL(
       new Blob(
@@ -2679,6 +2681,11 @@ export function Editor({
   const audienceLabel = audienceAssigned ? "Edit Audience" : "Assign audience";
   const details = (
     <FieldGroup disabled={busy} className="editor-details-content">
+      <div className="editor-publication-details">
+        <EditorDetailsGroup id="writing-publication" title="Publication status">
+          <PublicationStatus published={!!c.publishedRevision} />
+        </EditorDetailsGroup>
+      </div>
       {requirements.length > 0 && <EditorDetailsGroup id="writing-readiness" title="Before publishing">
           <ul className="grid gap-2">
             {requirements.map((item) => (
@@ -3017,6 +3024,7 @@ export function Editor({
           items={[
             {
               label: "Back to content",
+              shortLabel: "Back",
               onSelect: async () => {
                 if (await guard.current()) onCancel();
               },

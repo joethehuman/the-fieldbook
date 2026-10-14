@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { LexicalEditor } from "lexical";
 
 /** A real prose caret/selection, not an old editor selection behind another field. */
-export function hasWritingTarget(editor: LexicalEditor | null, allowDock = false) {
+export function hasWritingTarget(editor: LexicalEditor | null, allowToolbar = false) {
   const surface = editor?.getRootElement();
   const active = document.activeElement;
   const selection = window.getSelection();
@@ -13,9 +13,9 @@ export function hasWritingTarget(editor: LexicalEditor | null, allowDock = false
   const proseFocus = active instanceof HTMLElement && surface.contains(active)
     && active.isContentEditable && !active.closest(".writing-code-block");
   const touchSelection = active === document.body && !selection.isCollapsed;
-  const dockFocus = allowDock && active instanceof HTMLButtonElement && !active.disabled
+  const toolbarFocus = allowToolbar && active instanceof HTMLButtonElement && !active.disabled
     && !!active.closest(".writing-toolbar-controls") && !!active.getAttribute("aria-label")?.startsWith("Commands:");
-  return (proseFocus || touchSelection || dockFocus) && surface.contains(range.startContainer)
+  return (proseFocus || touchSelection || toolbarFocus) && surface.contains(range.startContainer)
     && (surface.contains(range.endContainer) || !selection.isCollapsed && range.intersectsNode(surface));
 }
 
@@ -36,6 +36,9 @@ export function useWritingTarget(editor: LexicalEditor | null, enabled: boolean)
     document.addEventListener("focusout", blur);
     document.addEventListener("selectionchange", update);
     document.addEventListener("pointerup", update);
+    // Touch pointerup can precede native mouse/focus caret placement. Refresh
+    // after the completed click so the toolbar is ready for keyboard focus.
+    document.addEventListener("click", update);
     const unregister = editor?.registerUpdateListener(update);
     return () => {
       active = false;
@@ -44,6 +47,7 @@ export function useWritingTarget(editor: LexicalEditor | null, enabled: boolean)
       document.removeEventListener("focusout", blur);
       document.removeEventListener("selectionchange", update);
       document.removeEventListener("pointerup", update);
+      document.removeEventListener("click", update);
     };
   }, [editor, enabled]);
   return enabled && target;

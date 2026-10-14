@@ -10,7 +10,6 @@ import { MarkdownDownloadButton } from "./markdown-download";
 import { WritingTitleContext, WritingIntroductionContext } from "./writing-title";
 import { useScrollFade } from "./use-scroll-fade";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { usePhoneWritingViewport } from "./use-phone-writing-viewport";
 import { useWritingCanvasSpace } from "./use-writing-canvas-space";
 import "../../styles/writing-editor.css";
 
@@ -80,7 +79,6 @@ export function WritingEditor({
   ...props
 }: WritingEditorProps) {
   const root = useRef<HTMLElement>(null);
-  usePhoneWritingViewport(root);
   useWritingCanvasSpace(root, canvas);
   useLayoutEffect(() => {
     const element = root.current;

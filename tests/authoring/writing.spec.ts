@@ -85,7 +85,7 @@ for (const [command, selector] of [
   ["Divider", "hr"],
 ] as const) {
   test(`inserting a final ${command} keeps the following line writable`, async ({ page }, info) => {
-    await setup(page, info.project.name.startsWith("production"), "Before the block.");
+    const { read } = await setup(page, info.project.name.startsWith("production"), "Before the block.");
     const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
     await editor.locator("p").click();
     await page.keyboard.press("ControlOrMeta+End");
@@ -118,12 +118,34 @@ for (const [command, selector] of [
       await expect(code).toHaveText("Inserted code.");
       await code.press("ArrowDown");
     }
+    if (command === "Table") {
+      const cells = editor.locator("table tbody [contenteditable=true]");
+      await expect(cells).toHaveCount(9);
+      await expect(cells.first()).toBeFocused();
+      await page.keyboard.type("Inserted cell.");
+      await expect(cells.first()).toHaveText("Inserted cell.");
+      await expect(line).toBeEmpty();
+      await line.click();
+      await expect(editor).toBeFocused();
+      await expect.poll(() => line.evaluate(node => {
+        const selection = window.getSelection();
+        return !!selection?.isCollapsed && node.contains(selection.anchorNode);
+      })).toBe(true);
+    }
     await page.keyboard.type("After insertion.");
     await expect(line).toHaveText("After insertion.");
     await waitForDraftSaved(page);
+    expect((await read()).content[0].body).toContain("After insertion.");
+    if (command === "Table") expect((await read()).content[0].body).toContain("Inserted cell.");
     await page.reload();
     await expect(editor.locator(selector)).toBeVisible();
     await expect(editor.locator(":scope > p").last()).toHaveText("After insertion.");
+    if (command === "Table") {
+      await expect(editor.locator("table")).toHaveCount(1);
+      await expect(editor.locator("table tbody [contenteditable=true]")).toHaveCount(9);
+      await expect(editor.locator("table tbody [contenteditable=true]").first()).toHaveText("Inserted cell.");
+      await expect(editor.locator(":scope > p")).toHaveCount(2);
+    }
   });
 }
 
@@ -1185,7 +1207,7 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await expect(menu).toHaveCount(0);
   await expect(editor).toBeFocused();
   await expectMarkdown(page, "/h3");
-  if (await page.locator(".editor-frame").getAttribute("data-cards") !== "true") {
+  if (await page.locator(".editor-frame").getAttribute("data-mobile") !== "true") {
     await expect(commands).toBeHidden();
     return;
   }
@@ -1193,9 +1215,9 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await expect(commands).toBeEnabled();
   await commands.focus();
   await page.keyboard.press("Enter");
-  await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();
+  await expect(menu.getByRole("menuitem", { name: "Bold", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  const focusedItem = menu.getByRole("menuitem", { name: "Heading 1", exact: true });
+  const focusedItem = menu.getByRole("menuitem", { name: "Italic", exact: true });
   await expect(focusedItem).toBeFocused();
   // A native selection acknowledgement can arrive after keyboard menu focus.
   // It must synchronize prose selection without taking focus from this item.
@@ -1206,8 +1228,7 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await expect(focusedItem).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  if (await page.locator(".editor-frame").getAttribute("data-dock") === "true") await expect(editor).toBeFocused();
-  else await expect(commands).toBeFocused();
+  await expect(editor).toBeFocused();
 });
 
 test("Heading 1–4 commands and selected-text Normal Text preserve authored content", async ({ page }, info) => {

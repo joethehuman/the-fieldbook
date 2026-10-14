@@ -435,6 +435,41 @@ test("failed learning-group save shows one concise inline error", async ({
   });
 });
 
+async function openInlineFileChooser(
+  page: Page,
+  writing: Locator,
+  media: "image" | "video",
+) {
+  await writing.locator(":scope > p").last().click();
+  await writing.locator(":scope > p").last().selectText();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => writing.locator(":scope > p").last().evaluate((line) => {
+    const surface = line.parentElement!;
+    const scroller = line.closest<HTMLElement>(".writing-scroll-area")!;
+    const bounds = line.getBoundingClientRect();
+    const port = scroller.getBoundingClientRect();
+    const canvas = line.closest(".main-content")!.getBoundingClientRect();
+    const selection = window.getSelection();
+    const anchor = selection?.anchorNode;
+    const atLine = !!anchor && (line.contains(anchor)
+      || anchor === surface && surface.childNodes[selection!.anchorOffset] === line);
+    return {
+      empty: line.textContent === "",
+      focused: document.activeElement === surface,
+      caret: !!selection?.isCollapsed && atLine,
+      visible: bounds.top >= Math.max(0, port.top + scroller.clientTop, canvas.top)
+        && bounds.bottom <= Math.min(window.innerHeight, port.top + scroller.clientTop + scroller.clientHeight, canvas.bottom),
+    };
+  })).toEqual({ empty: true, focused: true, caret: true, visible: true });
+  await page.keyboard.press("/");
+  await page.getByRole("menuitem", { name: media === "image" ? "Image" : "Upload video", exact: true }).click();
+  const chooser = page.getByRole("dialog", { name: `Insert ${media}`, exact: true });
+  const pending = page.waitForEvent("filechooser");
+  await chooser.getByRole("button", { name: `Choose ${media}`, exact: true }).click();
+  return pending;
+}
+
 for (const failure of [false, true])
   test(`pending inline upload blocks save and navigation; failure=${failure}`, async ({
     page,
@@ -449,8 +484,10 @@ for (const failure of [false, true])
       .getByRole("textbox", { name: "Doc content", exact: true })
       .fill("Keep the original body");
     await waitForDraftSaved(page);
+    const fileChooser = await openInlineFileChooser(page, page.getByRole("textbox", { name: "Doc content", exact: true }), "image");
+    await waitForDraftSaved(page);
     const savesBeforeUpload = control.saves;
-    await page.locator('.writing-editor input[type="file"]').setInputFiles({
+    await fileChooser.setFiles({
       name: "example.png",
       mimeType: "image/png",
       buffer: Buffer.from("synthetic"),
@@ -568,12 +605,10 @@ for (const media of ["inline-video", "card-art"] as const)
     };
     if (media === "card-art") {
       await openContentSettings(page);
+      await page.getByLabel("Upload card artwork", { exact: true }).setInputFiles(file);
+    } else {
+      await (await openInlineFileChooser(page, page.getByRole("textbox", { name: "Lesson content", exact: true }), "video")).setFiles(file);
     }
-    const input =
-      media === "card-art"
-        ? page.getByLabel("Upload card artwork", { exact: true })
-        : page.locator('.writing-editor input[type="file"]').first();
-    await input.setInputFiles(file);
     await expect.poll(() => control.uploaded).toBe(true);
     const actions = page.getByRole("button", { name: "Lesson actions", exact: true });
     if (await actions.isVisible()) await expect(actions).toBeDisabled();
@@ -667,6 +702,8 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   });
   await openCourseOutline(page);
   await page.getByRole("button", { name: "Add lesson" }).click();
+  await expect(page.locator(".writing-document-heading .eyebrow")).toHaveText("Lesson 2 of 2");
+  await expect(page.getByLabel("Lesson title", { exact: true })).toHaveValue("");
   await page.getByLabel("Lesson title").fill("Second lesson");
   await expect(page.getByLabel("Lesson title", { exact: true })).toHaveValue("Second lesson");
   const writing = page.getByRole("textbox", { name: "Lesson content" });
@@ -933,10 +970,30 @@ test("non-text block menus sit in the left writing gutter", async ({ page }, inf
   await page.screenshot({ path: info.outputPath("block-gutter.png") });
 });
 
+async function recordSlashOwners(writing: Locator) {
+  // Observe the marker without adding a wait between slash and the next key.
+  await writing.evaluate((root) => {
+    const observed = root as HTMLElement & { commandLineOwners?: string[] };
+    observed.commandLineOwners = [];
+    new MutationObserver((changes) => {
+      for (const { target } of changes) {
+        if (!(target instanceof HTMLElement) || !root.contains(target) || !target.matches(".writing-command-line")) continue;
+        observed.commandLineOwners!.push(target.parentElement === root ? "prose" : target.closest("td, th") ? "table" : "other");
+      }
+    }).observe(root, { subtree: true, attributes: true, attributeFilter: ["class"] });
+  });
+  return async () => {
+    const owners = await writing.evaluate((root) => (root as HTMLElement & { commandLineOwners?: string[] }).commandLineOwners || []);
+    expect(owners.length).toBeGreaterThan(0);
+    expect([...new Set(owners)]).toEqual(["prose"]);
+  };
+}
+
 test("slash Table inserts at the selected line and unmatched searches can return to writing", async ({
   page,
 }, info) => {
-  await setup(page, info.project.name.startsWith("production"), "course", true, false, "Before\n\nAfter");
+  const production = info.project.name.startsWith("production");
+  const { state } = await setup(page, production, "course", true, false, "Before\n\nAfter");
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.locator("p").first().click();
   await page.keyboard.press("End");
@@ -962,7 +1019,8 @@ test("slash Table inserts at the selected line and unmatched searches can return
     );
   expect(beforeTable).toBe("Before");
   await expectMarkdown(page, /Before[\s\S]*\|[\s\S]*After/);
-  await writing.locator("p").last().click();
+  const expectProseSlashOwner = await recordSlashOwners(writing);
+  await writing.locator(":scope > p").last().click();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.press("/");
@@ -973,17 +1031,79 @@ test("slash Table inserts at the selected line and unmatched searches can return
   await expect(writing.locator(".writing-command-line")).toHaveCount(0);
   await expect(writing).toBeFocused();
   await page.keyboard.type(" continues");
-  await writing.locator("p", { hasText: "After" }).click();
+  await expect(writing.locator(":scope > p").last()).toHaveText("/unlikely-block-name continues");
+  await expectProseSlashOwner();
+  await writing.locator(":scope > p", { hasText: "After" }).click();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.press("/");
   await page.keyboard.type("another-unknown-block");
-  await writing.locator("p", { hasText: "Before" }).click();
+  await expect(writing.locator(":scope > p", { hasText: "/another-unknown-block" })).toHaveText("/another-unknown-block");
+  await writing.locator(":scope > p", { hasText: "Before" }).click();
   await expect(page.getByRole("menu", { name: /^Insert content/ })).toHaveCount(
     0,
   );
+  await expectProseSlashOwner();
   await expectMarkdown(page, /\/unlikely-block-name continues/);
+  await waitForDraftSaved(page);
+  if (production) {
+    await syncAuthoringProvider(page, state);
+    await page.reload();
+  } else {
+    // The demo fixture seeds on page load; reopen within its browser-local app.
+    await returnToContent(page);
+    await page.getByRole("link", { name: "Safety fixture", exact: true }).click();
+  }
+  await expect(writing.locator("table")).toHaveCount(1);
+  await expect(writing.locator(":scope > p")).toHaveText(["Before", "After", "/another-unknown-block", "/unlikely-block-name continues"]);
 });
+
+for (const { command, query } of [
+  { command: "Heading 2", query: "h2" },
+  { command: "Code block", query: "code" },
+  { command: "Divider", query: "divider" },
+] as const) {
+  test(`table-to-prose after Markdown download runs ${command} in the outer editor`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "course", true, false, "Before\n\nAfter");
+    const writing = page.getByRole("textbox", { name: "Lesson content" });
+    await writing.locator(":scope > p").first().click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("/");
+    await page.keyboard.type("table");
+    await page.keyboard.press("Enter");
+    await expect(writing.locator("table")).toBeVisible();
+    await expectMarkdown(page, /Before[\s\S]*\|[\s\S]*After/);
+    const expectProseSlashOwner = await recordSlashOwners(writing);
+    await writing.locator(":scope > p").last().click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("/");
+    await page.keyboard.type(query);
+    await page.keyboard.press("Enter");
+    if (command === "Heading 2") {
+      await page.keyboard.type("Owned heading");
+      await expect(writing.locator(":scope > h2")).toHaveText("Owned heading");
+    } else if (command === "Code block") {
+      const code = writing.locator(".writing-code-block .cm-content");
+      await expect(code).toBeFocused();
+      await page.keyboard.type("const owned = true;");
+      await expect(code).toHaveText("const owned = true;");
+    } else {
+      await expect(writing.locator("hr")).toHaveCount(1);
+    }
+    await expectProseSlashOwner();
+    await expect(writing.locator("table h2, table .writing-code-block, table hr")).toHaveCount(0);
+    await expect(writing.locator("table [contenteditable=true]")).toHaveText(Array(9).fill(""));
+    await expect(writing.locator(":scope > p").filter({ hasText: /^(Before|After)$/ })).toHaveText(["Before", "After"]);
+    await waitForDraftSaved(page);
+    await expectMarkdown(page, command === "Heading 2"
+      ? /Before[\s\S]*\|[\s\S]*After\n\n## Owned heading/
+      : command === "Code block"
+        ? /Before[\s\S]*\|[\s\S]*After\n\n```\nconst owned = true;\n```/
+        : /Before[\s\S]*\|[\s\S]*After\n\n(?:\*\*\*|---)/);
+  });
+}
 
 test("slash Table can be chosen with the pointer", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
@@ -1504,7 +1624,7 @@ test("large media resumes a lost chunk acknowledgement and inserts only verified
   const file = Buffer.alloc(54 * 1024 * 1024);
   const filePath = info.outputPath("large.png");
   await writeFile(filePath, file);
-  await page.locator('.writing-editor input[type="file"]').setInputFiles(filePath);
+  await (await openInlineFileChooser(page, editor, "image")).setFiles(filePath);
   await expect.poll(() => !!release).toBe(true);
   await expect(editor.getByRole("status")).toHaveText("Loading…");
   await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
@@ -1541,17 +1661,18 @@ for (const failure of ["storage limit", "expired permission", "verification"] as
     });
     await page.route("https://test.supabase.co/ui4-upload", (route) => route.fulfill({ status: failed && failure !== "verification" ? (failure === "storage limit" ? 413 : 403) : 200, json: { message: "private token details must never reach the UI" } }));
     const file = { name: "retry.png", mimeType: "image/png", buffer: Buffer.from("synthetic") };
-    await page.locator('.writing-editor input[type="file"]').setInputFiles(file);
+    await (await openInlineFileChooser(page, editor, "image")).setFiles(file);
     const alert = page.locator(".writing-editor").getByRole("alert");
     await expect(alert).toContainText(failure === "storage limit" ? "exceeds the upload size limit" : failure === "expired permission" ? "permission expired or was denied" : "upload couldn’t be verified");
     await expect(alert).not.toContainText("private token");
     await expect(editor).toHaveText("Keep this draft intact");
+    await expect(editor.locator("img:not([data-lexical-managed-linebreak])")).toHaveCount(0);
     expect(state.content[0].body).toBe("Keep this draft intact");
     expect(completed).toBe(failure === "verification" ? 1 : 0);
     await page.screenshot({ path: info.outputPath("upload-recovery.png"), fullPage: true });
     failed = false;
-    await page.locator('.writing-editor input[type="file"]').setInputFiles(file);
-    await expect(editor.locator("img")).toHaveAttribute("src", "/api/media/retry-ready.png");
+    await (await openInlineFileChooser(page, editor, "image")).setFiles(file);
+    await expect(editor.getByRole("img", { name: "retry.png", exact: true })).toHaveAttribute("src", "/api/media/retry-ready.png");
     await waitForDraftSaved(page);
     expect(state.content[0].body).toContain("Keep this draft intact");
     expect(state.content[0].body).toContain("/api/media/retry-ready.png");

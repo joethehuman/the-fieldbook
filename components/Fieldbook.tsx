@@ -268,6 +268,7 @@ export default function Fieldbook() {
     );
     acceptedUrl.current = window.location.href;
     document.getElementById("main-content")?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0, behavior: "instant" });
     return true;
   }
   async function navigateLibrary(next: LearningView) {
@@ -280,6 +281,7 @@ export default function Fieldbook() {
     window.history.pushState(null, "", `${window.location.pathname}#${courseViewPaths[next].slice(1)}`);
     acceptedUrl.current = window.location.href;
     document.getElementById("main-content")?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0, behavior: "instant" });
     return true;
   }
   async function persist(

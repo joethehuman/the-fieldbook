@@ -103,7 +103,8 @@
       "esbuild"
     ],
     "patchedDependencies": {
-      "lexical@0.48.0": "patches/lexical@0.48.0.patch"
+      "lexical@0.48.0": "patches/lexical@0.48.0.patch",
+      "@mdxeditor/editor@4.2.5": "patches/@mdxeditor__editor@4.2.5.patch"
     }
   },
   "packageManager": "pnpm@10.17.1",

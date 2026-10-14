@@ -107,6 +107,11 @@ export function WritingCodeEditor({
           editable.current.of([]),
           colors,
           drawSelection(),
+          // CodeMirror's normal reveal does not read document scroll padding.
+          // Give its own scroll algorithm the same toolbar clearance as Lexical.
+          EditorView.scrollMargins.of(view => view.dom.closest('.app[data-mobile-editor]')
+            ? { top: parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0 }
+            : null),
           EditorView.contentAttributes.of({
             "aria-label": "Code block",
             "aria-multiline": "true",

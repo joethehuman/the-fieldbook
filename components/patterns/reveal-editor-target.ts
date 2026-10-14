@@ -12,6 +12,34 @@ export function revealEditorTarget(target: HTMLElement, {
 }: { container?: HTMLElement | null; context?: HTMLElement; focus?: boolean; highlight?: boolean } = {}) {
   // Canvas title attention is explicit; ordinary clicks and keyboard focus stay quiet.
   if (focus && highlight && target.matches(".document-title")) target.dataset.revealFocus = "true";
+  if (target.closest('.app[data-mobile-editor]')) {
+    // Explicit navigation only. Everyday focus and keyboard movement belong
+    // to the browser and editor libraries, with no follow-up correction loop.
+    let anchor = context;
+    if (focus) {
+      if (target.isContentEditable) {
+        const first = Array.from(target.querySelectorAll<HTMLElement>("p, h1, h2, h3, h4, h5, h6, blockquote, li"))
+          .find(block => block.isContentEditable) || target;
+        const range = document.createRange();
+        range.selectNodeContents(first);
+        range.collapse(true);
+        const reveal = new CustomEvent("fieldbook:writing-reveal", { detail: range, cancelable: true });
+        target.dispatchEvent(reveal);
+        if (!reveal.defaultPrevented) {
+          target.focus();
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        }
+        anchor = first;
+      } else {
+        target.focus();
+        if (target instanceof HTMLTextAreaElement && target.matches('textarea[aria-label$=" Markdown"]')) target.setSelectionRange(0, 0);
+      }
+    }
+    anchor.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+    return () => {};
+  }
   const owner = target.closest<HTMLElement>(".main-content") || container;
   const bounded = !!target.closest('.editor[data-scroll-layout="workspace"], .editor-floating-body, [data-slot="dialog-content"]');
   // Stacked panels and the natural writing body belong to the page. A native
@@ -20,7 +48,7 @@ export function revealEditorTarget(target: HTMLElement, {
   if (!container || !owner) { if (focus) target.focus({ preventScroll: true }); return () => {}; }
   activeReveals.get(container)?.();
   if (focus) {
-    target.focus({ preventScroll: true });
+    target.dispatchEvent(new Event("fieldbook:writing-handoff", { bubbles: true }));
     if (target.isContentEditable) {
       // A caret at the editor root looks like the first line, but slash commands
       // need a selection inside a writing block. Skip non-editable decorations.
@@ -29,11 +57,18 @@ export function revealEditorTarget(target: HTMLElement, {
       const range = document.createRange();
       range.selectNodeContents(firstBlock || target);
       range.collapse(true);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-    } else if (target.matches('textarea[aria-label$=" Markdown"]') && target instanceof HTMLTextAreaElement) {
-      target.setSelectionRange(0, 0);
+      const reveal = new CustomEvent("fieldbook:writing-reveal", { detail: range, cancelable: true });
+      target.dispatchEvent(reveal);
+      if (!reveal.defaultPrevented) {
+        target.focus({ preventScroll: true });
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+    } else {
+      target.focus({ preventScroll: true });
+      if (target.matches('textarea[aria-label$=" Markdown"]') && target instanceof HTMLTextAreaElement)
+        target.setSelectionRange(0, 0);
     }
   }
   const writing = container.matches(".writing-scroll-area");
@@ -51,14 +86,16 @@ export function revealEditorTarget(target: HTMLElement, {
     cancelParent?.();
     container.removeEventListener("wheel", cancel);
     container.removeEventListener("touchstart", cancel);
-    container.removeEventListener("keydown", cancel);
+    container.removeEventListener("keydown", cancel, true);
+    container.removeEventListener("beforeinput", cancel, true);
     owner.removeEventListener("pointerdown", cancel);
     if (activeReveals.get(container) === cancel) activeReveals.delete(container);
   };
   activeReveals.set(container, cancel);
   container.addEventListener("wheel", cancel, { passive: true });
   container.addEventListener("touchstart", cancel, { passive: true });
-  container.addEventListener("keydown", cancel);
+  container.addEventListener("keydown", cancel, true);
+  container.addEventListener("beforeinput", cancel, true);
   owner.addEventListener("pointerdown", cancel, { passive: true });
 
   const geometry = () => {
@@ -78,7 +115,8 @@ export function revealEditorTarget(target: HTMLElement, {
     const navigation = parseFloat(style.getPropertyValue("--editor-navigation-height")) || 0;
     const heading = target.closest(".writing-surface, .course-quiz-canvas")?.querySelector<HTMLElement>(".writing-document-heading");
     const inHeading = !!heading?.contains(target);
-    const pinnedHeading = heading && !inHeading && !target.closest(".writing-course-heading") ? heading.getBoundingClientRect().height : 0;
+    const pinnedHeading = heading && getComputedStyle(heading).position === "sticky"
+      && !inHeading && !target.closest(".writing-course-heading") ? heading.getBoundingClientRect().height : 0;
     const inset = local ? canvasScroll ? navigation + pinnedHeading : inHeading ? toolbar : toolbar + pinnedHeading : wholeSurface && Number.isFinite(surfaceTop) ? surfaceTop
       : header + (inControls ? 0 : inCanvas || inPanel ? controls + navigation + (inToolbar ? 0 : toolbar + pinnedHeading) : 0);
     let top = viewport.top + container.clientTop + inset;

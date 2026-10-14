@@ -93,7 +93,7 @@
 .writing-editor .writing-content {
   width: 100%;
 }
-.editor-frame[data-dock="true"] .writing-content::highlight(fieldbook-writing-target) {
+.editor-frame[data-mobile] .writing-content::highlight(fieldbook-writing-target) {
   background: var(--selected);
   color: var(--selected-foreground);
 }
@@ -110,17 +110,26 @@
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
   overflow: hidden;
 }
-/* Wait for the touch chooser's opening lane before showing or focusing it. */
-:is(.writing-slash-menu, .writing-media-chooser)[data-palette-ready="false"] {
-  visibility: hidden;
-  pointer-events: none;
+:is(.writing-slash-menu, .writing-media-chooser)[data-mobile-palette="true"] {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(18rem, calc(100% - 16px));
+  max-height: min(24rem, var(--editor-mobile-overlay-height, 65svh));
+  pointer-events: auto;
 }
-:is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"][data-palette-ready="true"] {
+.writing-media-chooser[data-mobile-palette="true"] {
+  width: min(324px, calc(100% - 16px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+:is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] {
   animation: writing-touch-menu-enter 140ms ease-out;
 }
 @keyframes writing-touch-menu-enter { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  :is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"][data-palette-ready="true"] { animation: none; }
+  :is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] { animation: none; }
 }
 .writing-slash-options {
   display: grid;
@@ -211,6 +220,34 @@
   max-width: 100%;
   align-items: center;
   gap: var(--space-1);
+}
+/* A single compact row fits Back and five 44px targets at a 320px viewport. */
+.editor-mobile-toolbar :is(.editor-controls-surface, .writing-toolbar-controls, .writing-toolbar-group) {
+  flex-wrap: nowrap;
+  gap: 0;
+}
+.editor-mobile-navigation { flex: none; }
+.editor-mobile-navigation .detail-navigation-label { display: none; }
+.editor-mobile-navigation .detail-navigation-short-label { display: inline; }
+.editor-mobile-navigation [data-slot="button"] {
+  width: 56px;
+  min-width: 56px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.editor-mobile-navigation [data-slot="button"] svg { width: 16px; height: 16px; }
+.editor-mobile-toolbar :is(.editor-panel-toggle, .writing-toolbar-controls [data-slot="button"]) {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
 }
 @media (max-width: 767px) {
   .writing-command-label { display: none; }
@@ -536,6 +573,23 @@
 :is(.writing-media-block, .writing-code-block, .writing-table-block, [data-editor-block-type="image"]):is(:hover, :focus-within) > .writing-block-actions,
 .writing-block-actions:has([data-state="open"]) { opacity: 1; }
 .writing-code-block { position: relative; }
+.editor-frame[data-mobile] .writing-code-block .code-block-header { gap: 4px; padding-inline: 8px; }
+.editor-frame[data-mobile] .writing-code-block .code-block-language { flex: 1; min-width: 0; }
+.editor-frame[data-mobile] .writing-code-block .code-block-language > svg { display: none; }
+.editor-frame[data-mobile] .writing-code-block .code-language-picker { width: 100%; min-height: 44px; gap: 4px; }
+.editor-frame[data-mobile] .writing-code-block .code-language-picker > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editor-frame[data-mobile] .writing-code-block .code-block-header > [data-slot="button"] {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px;
+}
+@media (any-pointer: coarse) {
+  .writing-code-block .cm-editor {
+    font-size: max(16px, 1rem);
+  }
+}
 .writing-editor [data-editor-block-type="image"] { position: relative; padding: var(--space-2); border-radius: var(--radius); }
 .writing-editor .writing-content .writing-table-block { position: relative; padding: calc(var(--control-height) + var(--space-1)) var(--space-4) var(--space-4) calc(var(--control-height) + var(--space-1)); border-radius: 0; }
 .writing-table-edge-fade { position: absolute; pointer-events: none; }
@@ -609,9 +663,9 @@
   line-height: 2.25rem;
 }
 .editor[data-scroll-layout="page"] .writing-document-heading { top: var(--editor-navigation-height, 0px); }
-.editor-frame[data-dock="true"] .writing-document-heading { position: relative; top: auto; }
-.editor-frame[data-dock="true"] .writing-document-heading::after,
-.app:has(.topbar[data-content-scrolled="true"]) .editor-frame[data-dock="true"] .writing-document-heading::before { display: none; }
+.editor-frame[data-mobile] .writing-document-heading { position: relative; top: auto; }
+.editor-frame[data-mobile] .writing-document-heading::after,
+.app:has(.topbar[data-content-scrolled="true"]) .editor-frame[data-mobile] .writing-document-heading::before { display: none; }
 .editor .writing-document-heading::after {
   content: "";
   position: absolute;
@@ -637,15 +691,13 @@
 .editor .course-quiz-canvas > .writing-document-heading { top: var(--editor-navigation-height, 0px); }
 .editor[data-flowing-heading] .writing-document-heading { position: relative; top: auto; }
 .editor-frame-canvas[data-navigation-scrolled="true"] .course-quiz-canvas > .writing-document-heading::after { opacity: 1; }
-/* Compact writing actions join Outline and Details in one floating dock. */
-.editor-frame-controls[data-dock="true"] :is(.writing-toolbar-controls, .writing-toolbar-group) { gap: 0; }
 .editor .writing-editor .mdxeditor-toolbar { display: none; }
 .editor-frame :is(.writing-course-heading, .writing-document-heading, .writing-content, .writing-source, .course-quiz-content) { padding-inline: var(--editor-text-inset); }
 .editor-frame .writing-content { --writing-content-start: var(--editor-text-inset); }
 .editor-frame .writing-editor-notice { margin-inline: var(--editor-text-inset); }
 .editor-frame .writing-viewport { scrollbar-gutter: stable both-edges; }
 .editor-frame[data-cards="true"] .writing-content { padding-block-end: var(--space-6); }
-/* Border-box padding shares the blank room already present in a short canvas. */
+/* Desktop blank writing room remains inside its existing bounded canvas. */
 .editor .writing-root[data-writing-canvas-space="true"] .writing-document > .mdxeditor-root-contenteditable > .mdxeditor-contenteditable-wrapper > .writing-content[contenteditable] {
   padding-block-end: max(var(--space-6), var(--writing-canvas-space, 0px));
 }
@@ -656,13 +708,3 @@
 .editor .writing-toolbar-controls[data-canvas="true"]:not([data-mobile="true"]) { display: none; }
 .editor .writing-editor .mdxeditor-toolbar:has(.writing-toolbar-controls:not([data-mobile="true"])),
 .editor .writing-view-header:empty { display: none; }
-
-/* Cover the sticky inset after scrolling, without clipping the course-title attention ring. */
-.app:has(.topbar[data-content-scrolled="true"]) .editor-frame[data-cards="true"]:not(:has(.writing-course-heading [data-reveal-focus="true"]:focus)) .writing-document-heading::before {
-  content: "";
-  position: absolute;
-  inset: auto 0 100%;
-  height: var(--space-2);
-  background: var(--background);
-  pointer-events: none;
-}

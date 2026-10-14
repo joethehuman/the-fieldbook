@@ -86,17 +86,26 @@ test("touch heading and table commands restore a writable caret without browser 
   await expect.poll(() => nativeSelectionMatches(writer)).toBe(true);
   await commands(page, "Table");
   await expect(writer.locator("table")).toHaveCount(1);
+  const firstCell = writer.locator('table [contenteditable="true"]').first();
+  await page.keyboard.insertText("First cell");
+  await expect(firstCell).toBeFocused();
+  await expect(firstCell).toHaveText("First cell");
+  await expect.poll(() => nativeSelectionMatches(firstCell)).toBe(true);
+  await expect(writer.locator(":scope > p")).toHaveText(["After"]);
+  await writer.locator(":scope > p").last().tap({ position: { x: 1, y: 10 } });
   await page.keyboard.insertText("After table ");
   await expect(writer.locator(":scope > p")).toHaveText(["After table After"]);
   await expect.poll(() => nativeSelectionMatches(writer)).toBe(true);
   await waitForDraftSaved(page);
   const body = (await read()).content[0].body;
   expect(body).toMatch(/^## Before heading\n\n\|/);
+  expect(body).toContain("First cell");
   expect(body).toMatch(/\n\nAfter table After$/);
   expect(body).not.toMatch(/\n{3,}/);
   await page.reload();
   await expect(writer.locator("h2")).toHaveText("Before heading");
   await expect(writer.locator("table")).toHaveCount(1);
+  await expect(firstCell).toHaveText("First cell");
   await expect(writer.locator(":scope > p")).toHaveText(["After table After"]);
   expect(errors).toEqual([]);
 });
@@ -106,7 +115,8 @@ test("table cells reject block insertion and image-file paste while keeping lite
   const cell = writer.locator("table [contenteditable=true]").nth(2);
   await cell.tap();
   await page.keyboard.press("End");
-  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeDisabled();
+  const commands = page.getByRole("button", { name: /^Commands:/ });
+  await expect(commands).toBeEnabled();
   await cell.locator("p").evaluate((element) => {
     const text = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode()!;
     const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 4);
@@ -114,7 +124,16 @@ test("table cells reject block insertion and image-file paste while keeping lite
     document.dispatchEvent(new Event("selectionchange"));
   });
   await expect.poll(() => nativeSelectionMatches(cell)).toBe(true);
-  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeDisabled();
+  await expect(commands).toBeEnabled();
+  await commands.tap();
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu.locator(".writing-slash-options").getByRole("menuitem")).toHaveCount(5);
+  for (const name of ["Bold", "Italic", "Strikethrough", "Inline code", "Link"])
+    await expect(menu.getByRole("menuitem", { name, exact: true })).toBeVisible();
+  for (const name of ["Heading 2", "Table", "Code block", "Image", "Upload video"])
+    await expect(menu.getByRole("menuitem", { name, exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect.poll(() => nativeSelectionMatches(cell)).toBe(true);
   await expect(page.getByRole("dialog", { name: "Format selected text", exact: true })).toHaveCount(0);
   await page.keyboard.press("ArrowRight");
   await cell.locator("p").evaluate((element) => {
@@ -262,7 +281,7 @@ test("existing inline table images survive neighboring cell edits and reload", a
   await cell.tap();
   await expect(cell).toBeFocused();
   await expect.poll(() => nativeSelectionMatches(cell)).toBe(true);
-  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeEnabled();
   await cell.fill("Keep this text preserved");
   await writer.locator(":scope > p").last().tap();
   await waitForDraftSaved(page);
@@ -288,19 +307,64 @@ test("touch table insertion splits a callout without dropping its text or the ne
   await commands(page, "Table");
   await expect(writer.locator("table")).toHaveCount(1);
   await expect(writer.locator(":scope > blockquote")).toHaveText(["Before", "After"]);
+  const firstCell = writer.locator('table [contenteditable="true"]').first();
+  await page.keyboard.insertText("Callout table cell");
+  await expect(firstCell).toBeFocused();
+  await expect(firstCell).toHaveText("Callout table cell");
+  await expect.poll(() => nativeSelectionMatches(firstCell)).toBe(true);
+  await expect(writer.locator(":scope > blockquote")).toHaveText(["Before", "After"]);
+  await writer.locator(":scope > blockquote").last().locator("p").tap({ position: { x: 1, y: 10 } });
   await page.keyboard.insertText("Typing ");
   await expect(writer.locator(":scope > blockquote")).toHaveText(["Before", "Typing After"]);
   await expect.poll(() => nativeSelectionMatches(writer)).toBe(true);
   await waitForDraftSaved(page);
   const body = (await read()).content[0].body;
   expect(body).toMatch(/^> Before\n\n\|/);
+  expect(body).toContain("Callout table cell");
   expect(body).toContain("> Typing After");
   expect(body).not.toMatch(/\n{3,}/);
   await page.reload();
   await expect(writer.locator("table")).toHaveCount(1);
+  await expect(firstCell).toHaveText("Callout table cell");
   await expect(writer.locator(":scope > blockquote")).toHaveText(["Before", "Typing After"]);
   expect(errors).toEqual([]);
 });
+
+for (const profile of [{ name: "touch", touch: true }, { name: "desktop", touch: false }]) {
+  test.describe(`${profile.name} table insertion`, () => {
+    test.use({ hasTouch: profile.touch, isMobile: profile.touch, viewport: profile.touch ? { width: 390, height: 844 } : { width: 1440, height: 1000 } });
+    test("slash table insertion focuses the first cell and preserves adjacent prose and history", async ({ page }, info) => {
+      const { writer, read, errors } = await open(page, info.project.name.startsWith("production"), "Before\n\nAfter");
+      const after = writer.locator(":scope > p").last();
+      if (profile.touch) await after.tap({ position: { x: 1, y: 10 } });
+      else await after.click({ position: { x: 1, y: 10 } });
+      await page.keyboard.type("/table");
+      const tableCommand = page.getByRole("menuitem", { name: "Table", exact: true });
+      if (profile.touch) await tableCommand.tap(); else await tableCommand.click();
+      await page.keyboard.insertText("First cell");
+      const firstCell = writer.locator('table [contenteditable="true"]').first();
+      await expect(firstCell).toBeFocused();
+      await expect(firstCell).toHaveText("First cell");
+      await expect.poll(() => nativeSelectionMatches(firstCell)).toBe(true);
+      await expect(writer.locator(":scope > p")).toHaveText(["Before", "After"]);
+      await page.keyboard.press("ControlOrMeta+z");
+      await expect(firstCell).toHaveText("");
+      await expect(writer.locator("table")).toHaveCount(1);
+      await page.keyboard.press("ControlOrMeta+Shift+z");
+      await expect(firstCell).toHaveText("First cell");
+      if (profile.touch) await after.tap(); else await after.click();
+      await page.keyboard.press("End"); await page.keyboard.insertText(" continued");
+      await expect(after).toHaveText("After continued");
+      await waitForDraftSaved(page);
+      const body = (await read()).content[0].body;
+      expect(body).toMatch(/^Before\n\n\|/); expect(body).toContain("First cell"); expect(body).toMatch(/After continued$/);
+      await page.reload();
+      await expect(firstCell).toHaveText("First cell");
+      await expect(writer.locator(":scope > p")).toHaveText(["Before", "After continued"]);
+      expect(errors).toEqual([]);
+    });
+  });
+}
 
 for (const style of ["Bulleted list", "Numbered list"]) {
   test(`a code block consumes an empty ${style.toLowerCase()} command line and stays writable`, async ({ page }, info) => {

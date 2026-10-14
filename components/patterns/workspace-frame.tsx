@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode, type MouseEventHandler } from "react";
 import { useCompactLayout } from "./use-compact-layout";
 import { useSidebarMotion } from "./use-sidebar-motion";
-import { EditorAppDockContext, EditorAppHeaderContext } from "./editor-app-header";
+import { EditorAppHeaderContext } from "./editor-app-header";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "./brand-theme-sync";
 import { SkipLink } from "./skip-link";
@@ -41,7 +41,6 @@ export function WorkspaceFrame({
   onClickCapture?: MouseEventHandler<HTMLDivElement>;
 }) {
   const [editorHeader, setEditorHeader] = useState<HTMLDivElement | null>(null);
-  const [editorDock, setEditorDock] = useState<HTMLDivElement | null>(null);
   const compact = useCompactLayout();
   const app = useRef<HTMLDivElement>(null);
   useSidebarMotion(app, collapsed, compact);
@@ -53,7 +52,6 @@ export function WorkspaceFrame({
   }, [compact, menu, onDismiss]);
   return (
     <EditorAppHeaderContext.Provider value={editorHeader}>
-    <EditorAppDockContext.Provider value={editorDock}>
     <div
       ref={app}
       className={`app ${collapsed ? "sidebar-collapsed" : ""}${learner ? " learner-workspace" : ""}`}
@@ -88,8 +86,8 @@ export function WorkspaceFrame({
         onClick={onDismiss}
       />
       <div className="main-shell">
-        <AppBar pending={pending}>{header}<div className="app-editor-dock-cell" ref={setEditorDock} /><div className="app-editor-header" ref={setEditorHeader} /></AppBar>
-        {alert}
+        <AppBar pending={pending}>{header}<div className="app-editor-header" ref={setEditorHeader} /></AppBar>
+        <div className="workspace-alerts">{alert}</div>
         <main
           id="main-content"
           className={`main-content${admin ? " admin-content" : ""}`}
@@ -100,7 +98,6 @@ export function WorkspaceFrame({
       </div>
       {overlays}
     </div>
-    </EditorAppDockContext.Provider>
     </EditorAppHeaderContext.Provider>
   );
 }

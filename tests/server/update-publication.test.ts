@@ -26,6 +26,10 @@ test("publisher corrections preserve authoritative Update freshness; renewal is 
     updatedAt: "2026-01-02T00:00:00.000Z",
     feedAt: "2026-01-01T00:00:00.000Z",
   };
+  const settings = {
+    ...defaultSettings,
+    contentCategories: { course: [initial.category], brief: [initial.category] },
+  };
   let row: DocumentRecord = {
     id: initial.id,
     draft: initial,
@@ -36,7 +40,7 @@ test("publisher corrections preserve authoritative Update freshness; renewal is 
   };
   let writes = 0;
   Object.assign(store, {
-    readSettings: async () => ({ settings: defaultSettings }),
+    readSettings: async () => ({ settings }),
     findDocument: async () => row,
     saveDocument: async (write: any) => {
       assert.equal(write.expected, row.revision);

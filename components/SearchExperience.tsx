@@ -244,7 +244,7 @@ export function SearchExperience({
           onClick={() => {
             setQuery("");
             setView("search");
-            input.current?.focus();
+            input.current?.focus({ preventScroll: true });
             setOpen(true);
           }}
         >
