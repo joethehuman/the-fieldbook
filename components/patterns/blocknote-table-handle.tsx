@@ -22,6 +22,7 @@ function CompletedClickTrigger(props: ComponentProps<typeof NativeTrigger>) {
   return (
     <NativeTrigger
       {...props}
+      data-writing-table-grip={orientation}
       aria-label={orientation === "row" ? "Row actions" : "Column actions"}
       onPointerDown={(event) => {
         dragged.current = false;

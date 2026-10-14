@@ -500,6 +500,18 @@
   width: 1rem;
   height: 1rem;
 }
+/* Center only the glyph on the border, retaining native hitboxes and offsets.
+   The column button rotates 90 degrees, so its local x axis points down. */
+.bn-shadcn .bn-table-handle[data-writing-table-grip="row"] svg {
+  translate: calc(var(--control-height-sm) / 2 - 10px) 0;
+}
+.bn-shadcn .bn-table-handle[data-writing-table-grip="column"] svg {
+  translate: calc(var(--control-height-sm) / 2 - 12px) 0;
+}
+.bn-shadcn .bn-table-handle:is(:hover, :active, [aria-expanded="true"]) {
+  background: transparent;
+  color: var(--foreground);
+}
 /* Keep the native drag cursor on the bar; only the plus signals click-to-add. */
 .bn-shadcn .bn-extend-button svg[data-test="extendButton"] {
   cursor: pointer;
