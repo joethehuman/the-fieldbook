@@ -235,7 +235,7 @@ export default function WritingEditorEngine({
     extensions: [syntaxHighlighter],
     domAttributes: {
       editor: {
-        class: "markdown writing-content",
+        class: "writing-content",
         role: "textbox",
         "aria-label": label,
         "aria-multiline": "true",

@@ -79,6 +79,80 @@ async function setup(
   return { editor, read };
 }
 
+for (const level of [1, 2, 3]) {
+  test(`native collapsible heading ${level} keeps its empty and typed line stable`, async ({
+    page,
+  }, info) => {
+    const { editor, read } = await setup(
+      page,
+      info.project.name.startsWith("production"),
+      "doc",
+      "Last paragraph.",
+      true,
+    );
+    await editor.locator(".bn-trailing-block").click();
+    await page.keyboard.type(`/collapsible heading ${level}`);
+    await page
+      .getByRole("option", { name: new RegExp(`^Collapsible heading ${level} `) })
+      .click();
+    const heading = editor.locator(
+      '.bn-toggle-slot > [data-content-type="heading"]',
+    );
+    // Insertion animates the native paragraph-to-heading font size. Measure
+    // the settled heading, not an intermediate frame of that transition.
+    await waitForDraftSaved(page);
+    await heading.evaluate(async (element) => {
+      await document.fonts.ready;
+      await Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .map((animation) => animation.finished.catch(() => {})),
+      );
+    });
+    const measure = () =>
+      heading.evaluate((element) => {
+        const inline = element.querySelector(".bn-inline-content")!;
+        const content = getComputedStyle(element);
+        const text = getComputedStyle(inline);
+        return {
+          height: element.getBoundingClientRect().height,
+          inlineHeight: inline.getBoundingClientRect().height,
+          font: text.fontSize,
+          placeholderFont: getComputedStyle(element, "::after").fontSize,
+          lineHeight: text.lineHeight,
+          contentLineHeight: content.lineHeight,
+        };
+      });
+    const empty = await measure();
+    expect(empty.font).toBe(empty.placeholderFont);
+    expect(empty.lineHeight).toBe(empty.contentLineHeight);
+    await page.keyboard.type("a");
+    const typed = await measure();
+    expect(Math.abs(typed.height - empty.height)).toBeLessThan(1);
+    expect(Math.abs(typed.inlineHeight - empty.inlineHeight)).toBeLessThan(1);
+    await page.keyboard.press("Backspace");
+    expect(Math.abs((await measure()).height - empty.height)).toBeLessThan(1);
+    await page.keyboard.type("Optional detail");
+    const toggle = editor
+      .locator(".bn-toggle-frame")
+      .getByRole("button", { name: "Expand or collapse", exact: true });
+    await toggle.click();
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Child content.");
+    await expect(editor.getByText("Child content.", { exact: true })).toBeVisible();
+    await toggle.click();
+    await expect(editor.getByText("Child content.", { exact: true })).toBeHidden();
+    await waitForDraftSaved(page);
+    const saved = (await read()).bodyDocument!.blocks.find(
+      (block) => block.type === "heading",
+    )!;
+    expect(saved.props).toMatchObject({ level, isToggleable: true });
+    expect(saved.children).toHaveLength(1);
+    await page.reload();
+    await expect(heading).toHaveText("Optional detail");
+  });
+}
+
 for (const [ending, body] of Object.entries({
   paragraph: "Last paragraph.",
   table: "| Name | Value |\n| --- | --- |\n| Last | Cell |",

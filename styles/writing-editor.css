@@ -135,22 +135,13 @@
 .fieldbook-blocknote [data-content-type="paragraph"] {
   line-height: 1.7;
 }
-.fieldbook-blocknote [data-content-type="heading"] {
-  font-weight: var(--weight-heading);
-  letter-spacing: -0.025em;
-  padding-block-start: var(--space-4);
-}
-.fieldbook-blocknote [data-content-type="heading"][data-level="1"] {
-  font-size: 1.75rem;
-}
-.fieldbook-blocknote [data-content-type="heading"][data-level="2"] {
-  font-size: 1.45rem;
-}
-.fieldbook-blocknote [data-content-type="heading"][data-level="3"] {
-  font-size: 1.2rem;
-}
-.fieldbook-blocknote [data-content-type="heading"][data-level="4"] {
-  font-size: 1.05rem;
+/* BlockNote sets heading typography on the content wrapper. Its editable
+   heading and placeholder must inherit the same line metrics, rather than
+   the application page-heading or Markdown reader styles. */
+.fieldbook-blocknote .bn-inline-content:is(h1, h2, h3, h4, h5, h6) {
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
 }
 .fieldbook-blocknote .bn-block-group .bn-block-group {
   margin-left: 1.5rem;
