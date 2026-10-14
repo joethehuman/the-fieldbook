@@ -74,6 +74,8 @@ Pasting a web address over selected prose applies a link while preserving its wo
 
 The workspace owns normal page scrolling outside mobile editing; mobile editing uses the document scroller. Nested lists may scroll when bounded, but short screens and enlarged text must still reach every control. Do not solve a sizing problem with a global overflow lock. Tables and horizontal strips scroll within their own containers without trapping vertical page scroll.
 
+For native mobile viewport investigation, the browser-local demo supports `?editorGeometry=1` before its navigation hash. This adds a Share editor geometry trace control to the mobile toolbar. Reproduce the interaction, then share or download the JSON capture. It records viewport dimensions, focus kinds, block bounds, toolbar styles and script scroll requests, with a bounded in-memory buffer and no draft text, saved records, page URLs or credentials. Ordinary demo sessions and the installed app do not enable this capture. Geometry events do not render React state; the capture adds one layout read per animation frame while events occur.
+
 Expanded category item tables retain native vertical scroll chaining: page scrolling continues when the list fits or reaches either boundary. Keep horizontal containment and the bounded long-list viewport.
 
 Use semantic elements, accessible names, visible focus, and keyboard-operable controls. Check the states and layouts affected by the change, including empty, loading, error, disabled, selected, long-content, and enlarged-text states where relevant. Review desktop, tablet, and phone layouts when the change can affect them. Exercise affected interactions such as filtering, opening menus, and saving.

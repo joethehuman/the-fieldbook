@@ -7,6 +7,37 @@ import { waitForDraftSaved } from "./editor-helpers";
 test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 const id = "00000000-0000-4000-8000-000000000902";
 
+test("demo geometry capture is opt-in and exports geometry without draft text", async ({ page }, info) => {
+  test.skip(info.project.name.startsWith("production"), "Diagnostics belong only to the browser-local demo.");
+  const { writer, errors } = await open(page, false, "Private draft text must stay out of the trace.");
+  const control = page.getByRole("button", { name: "Share editor geometry trace", exact: true });
+  await expect(control).toHaveCount(0);
+  const height = await page.locator(".editor-mobile-toolbar").evaluate(element => element.getBoundingClientRect().height);
+  await page.goto(`/?editorGeometry=1#admin/content/${id}/edit`);
+  await expect(control).toBeVisible();
+  await expect.poll(() => page.locator(".editor-mobile-toolbar").evaluate(element => element.getBoundingClientRect().height)).toBe(height);
+  await insert(page, writer, "Code block");
+  await expect(writer.locator(".cm-content")).toBeFocused();
+  await page.keyboard.insertText("Unshared code contents");
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: () => false });
+    window.scrollBy(0, 20);
+  });
+  const downloaded = page.waitForEvent("download");
+  await control.click();
+  const download = await downloaded;
+  const { readFile } = await import("node:fs/promises");
+  const raw = await readFile((await download.path())!, "utf8");
+  const trace = JSON.parse(raw);
+  expect(trace.version).toBe(1);
+  expect(trace.rows.some((row: { reason: string }) => row.reason === "script:window.scrollBy")).toBe(true);
+  expect(trace.rows.some((row: { focus: string }) => row.focus === "code")).toBe(true);
+  expect(raw).not.toContain("Private draft text");
+  expect(raw).not.toContain("Unshared code contents");
+  expect(raw).not.toContain("_vercel_share");
+  expect(errors).toEqual([]);
+});
+
 async function open(page: Page, installed: boolean, body = "Before\n\nAfter") {
   let state = withPublishedSnapshots(freshWorkspace());
   const item = { ...state.content.find(item => item.kind === "doc")!, id,
