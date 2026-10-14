@@ -10,10 +10,12 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
     const editor = ref.current;
     const viewport = editor?.closest<HTMLElement>(".main-content");
     if (!editor || !viewport) return;
+    const app = editor.closest<HTMLElement>(".app");
     const compact = window.matchMedia(compactLayoutQuery);
     const touch = window.matchMedia(touchWritingQuery);
     let request = 0;
     let initialized = false;
+    let mobileMode: boolean | null = null;
     const observed = new Set<Element>();
     const observer = new ResizeObserver(schedule);
     function schedule() {
@@ -30,12 +32,12 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
         observed.add(element);
       }
     }
-    function applyLayout(layout: "workspace" | "page") {
+    function applyLayout(layout: "workspace" | "page", transferredOffset?: number) {
       if (!editor || !viewport) return;
       const writing = editor.querySelector<HTMLElement>(".writing-viewport") || editor.querySelector<HTMLElement>(".editor-frame-canvas");
       if (!initialized) viewport.scrollTop = 0;
-      if (editor.dataset.scrollLayout !== layout) {
-        const offset = initialized ? editor.dataset.scrollLayout === "workspace" ? writing?.scrollTop || 0 : viewport.scrollTop : 0;
+      if (editor.dataset.scrollLayout !== layout || transferredOffset !== undefined) {
+        const offset = transferredOffset ?? (initialized ? editor.dataset.scrollLayout === "workspace" ? writing?.scrollTop || 0 : viewport.scrollTop : 0);
         editor.dataset.scrollLayout = layout;
         if (layout === "workspace") {
           viewport.scrollTop = 0;
@@ -52,12 +54,33 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
       const content = editor.querySelector<HTMLElement>(".editor-content");
       const frame = editor.querySelector<HTMLElement>(".editor-frame");
       if (!content || !frame) return;
+      const mobile = compact.matches && touch.matches;
+      let transferredOffset: number | undefined;
+      if (mobileMode !== mobile) {
+        // Transfer the reading offset once when input capabilities/orientation
+        // select a different layout. Keyboard opening never changes this mode.
+        const writing = editor.querySelector<HTMLElement>(".writing-viewport") || editor.querySelector<HTMLElement>(".editor-frame-canvas");
+        const offset = mobileMode === true ? window.scrollY : mobileMode === false
+          ? editor.dataset.scrollLayout === "workspace" ? writing?.scrollTop || 0 : viewport.scrollTop : 0;
+        if (mobile) {
+          if (app) app.dataset.mobileEditor = "true";
+          editor.dataset.scrollLayout = "page";
+          viewport.scrollTop = 0;
+          if (writing) writing.scrollTop = 0;
+          window.scrollTo({ top: offset, behavior: "instant" });
+        } else {
+          if (app) delete app.dataset.mobileEditor;
+          if (mobileMode === true) transferredOffset = offset;
+        }
+        mobileMode = mobile;
+      }
       // Mobile keeps one document scroller through keyboard and title changes.
       // Only a capability/layout transition can return it to desktop sizing.
-      if (compact.matches && touch.matches) {
+      if (mobile) {
         observe(new Set<Element>());
         editor.removeAttribute("data-flowing-heading");
-        applyLayout("page");
+        editor.dataset.scrollLayout = "page";
+        initialized = true;
         return;
       }
       const chrome = [
@@ -82,7 +105,7 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
       editor.toggleAttribute("data-flowing-heading", headingHeight > viewport.clientHeight - reserved - 12 * rem);
       const layout = !compact.matches && frame.getBoundingClientRect().width >= 48 * rem
         && viewport.clientHeight - reserved >= 12 * rem ? "workspace" : "page";
-      applyLayout(layout);
+      applyLayout(layout, transferredOffset);
     }
     // Dynamic save notices and lazy/mode-specific toolbars also consume natural space.
     const mutations = new MutationObserver((records) => {
@@ -101,6 +124,7 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
       mutations.disconnect();
       compact.removeEventListener("change", schedule);
       touch.removeEventListener("change", schedule);
+      if (app) delete app.dataset.mobileEditor;
     };
   }, [ref]);
 }

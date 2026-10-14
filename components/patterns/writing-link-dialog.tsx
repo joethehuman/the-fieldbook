@@ -59,9 +59,15 @@ export function WritingLinkDialog() {
       surface.contains(selection.focusNode)
     )
       range.current = selection.getRangeAt(0).cloneRange();
+    const toolbar = compactControls
+      ? surface.closest(".editor-frame")?.querySelector<HTMLElement>(".editor-mobile-toolbar")
+      : null;
     virtualAnchor.current = {
-      contextElement: surface,
+      contextElement: toolbar || surface,
       getBoundingClientRect: () => {
+        // The saved mobile selection can be offscreen while its Commands menu
+        // owns focus. Anchor tools to their toolbar; Floating UI owns placement.
+        if (toolbar?.isConnected) return toolbar.getBoundingClientRect();
         const link = state.linkNodeKey
           ? editor?.getElementByKey(state.linkNodeKey)
           : null;
@@ -73,10 +79,11 @@ export function WritingLinkDialog() {
     };
     setCopyStatus("");
     setAnchorReady(true);
-  }, [editor, state.type, state.linkNodeKey]);
+  }, [editor, state.type, state.linkNodeKey, !!compactControls]);
 
   function dismiss() {
-    if (state.type === "edit") cancel();
+    // Save/Cancel can return native focus before React renders the new editor
+    // state. Outside dismissal closes the popup; it must not run Cancel again.
     publishState({ type: "inactive" });
   }
   const href =

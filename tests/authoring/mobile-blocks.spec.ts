@@ -106,7 +106,8 @@ test("table cells reject block insertion and image-file paste while keeping lite
   const cell = writer.locator("table [contenteditable=true]").nth(2);
   await cell.tap();
   await page.keyboard.press("End");
-  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeDisabled();
+  const commands = page.getByRole("button", { name: /^Commands:/ });
+  await expect(commands).toBeEnabled();
   await cell.locator("p").evaluate((element) => {
     const text = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode()!;
     const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 4);
@@ -114,7 +115,16 @@ test("table cells reject block insertion and image-file paste while keeping lite
     document.dispatchEvent(new Event("selectionchange"));
   });
   await expect.poll(() => nativeSelectionMatches(cell)).toBe(true);
-  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeDisabled();
+  await expect(commands).toBeEnabled();
+  await commands.tap();
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu.locator(".writing-slash-options").getByRole("menuitem")).toHaveCount(5);
+  for (const name of ["Bold", "Italic", "Strikethrough", "Inline code", "Link"])
+    await expect(menu.getByRole("menuitem", { name, exact: true })).toBeVisible();
+  for (const name of ["Heading 2", "Table", "Code block", "Image", "Upload video"])
+    await expect(menu.getByRole("menuitem", { name, exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect.poll(() => nativeSelectionMatches(cell)).toBe(true);
   await expect(page.getByRole("dialog", { name: "Format selected text", exact: true })).toHaveCount(0);
   await page.keyboard.press("ArrowRight");
   await cell.locator("p").evaluate((element) => {
@@ -262,7 +272,7 @@ test("existing inline table images survive neighboring cell edits and reload", a
   await cell.tap();
   await expect(cell).toBeFocused();
   await expect.poll(() => nativeSelectionMatches(cell)).toBe(true);
-  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeEnabled();
   await cell.fill("Keep this text preserved");
   await writer.locator(":scope > p").last().tap();
   await waitForDraftSaved(page);

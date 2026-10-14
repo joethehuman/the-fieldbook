@@ -1,19 +1,16 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createContext, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ListTree, SlidersHorizontal, X } from "lucide-react";
 import { MarkdownDownloadButton } from "./markdown-download";
 import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
-import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
-import { EditorAppDockContext, EditorAppOverlayContext } from "./editor-app-header";
-import { useMobileEditorViewport } from "./use-mobile-editor-viewport";
-import { useMobileEditorFocus } from "./use-mobile-editor-focus";
+import { blurWritingInput, captureWritingCursor, type WritingCursor } from "./writing-cursor";
+import { useEditorCardsLayout } from "./use-editor-cards-layout";
 
+export const EditorMobileOverlayContext = createContext<HTMLElement | null>(null);
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
 export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
 
@@ -62,24 +59,20 @@ export function EditorFrame({
   children: ReactNode;
 }) {
   const phone = useEditorCardsLayout();
-  const dock = useMobileWritingDock();
-  const dockHost = useContext(EditorAppDockContext);
   const frame = useRef<HTMLElement>(null);
   const controls = useRef<HTMLDivElement>(null);
   const [writingActionsHost, setWritingActionsHost] = useState<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
-  const overlayHost = useContext(EditorAppOverlayContext);
+  const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const hasNavigation = !!navigation;
   const [panels, setPanels] = useState({ outline: false, details: false });
   const panelState = useRef(panels);
   panelState.current = panels;
-  useMobileEditorViewport(frame);
-  useMobileEditorFocus(canvas);
   const lastWritingCursor = useRef<WritingCursor | null>(null);
   const panelReturn = useRef<WritingCursor | null>(null);
   const preparedPanel = useRef<"outline" | "details" | null>(null);
   function preparePanel(side: "outline" | "details") {
-    if (!dock) return;
+    if (!phone) return;
     if (!panelState.current.outline && !panelState.current.details) {
       const active = document.activeElement;
       const chooser = active instanceof Element && !!active.closest(".writing-slash-menu, .writing-media-chooser, .editor-frame-controls");
@@ -89,19 +82,18 @@ export function EditorFrame({
     }
     preparedPanel.current = side;
   }
-  function returnToWriting(toggle: HTMLButtonElement | null) {
-    const cursor = panelReturn.current;
+  function returnToToggle(toggle: HTMLButtonElement | null) {
     panelReturn.current = null;
-    if (!dock) toggle?.focus();
-    else if (!restoreWritingCursor(cursor)) toggle?.focus({ preventScroll: true });
-    else cursor?.surface.dispatchEvent(new Event("fieldbook:writing-resume", { bubbles: true }));
+    // Closing a panel returns to its button. A later writing tap chooses
+    // the caret and opens the keyboard through the browser's normal path.
+    toggle?.focus({ preventScroll: true });
   }
   function togglePanel(side: "outline" | "details") {
     defaultsApplied.current = true;
     const closing = panelState.current[side];
     if (!closing && preparedPanel.current !== side) preparePanel(side);
     preparedPanel.current = null;
-    if (!closing && dock) {
+    if (!closing && phone) {
       const cursor = panelReturn.current;
       if (cursor?.kind === "prose" && cursor.surface.isConnected && cursor.surface.textContent === cursor.value
         && cursor.start.isConnected && cursor.end.isConnected) {
@@ -117,10 +109,10 @@ export function EditorFrame({
     setPanels((current) => side === "outline"
       ? { outline: !current.outline, details: wide.current ? current.details : false }
       : { outline: wide.current ? current.outline : false, details: !current.details });
-    if (closing && dock) returnToWriting(side === "outline" ? outlineToggle.current : detailsToggle.current);
+    if (closing && phone) returnToToggle(side === "outline" ? outlineToggle.current : detailsToggle.current);
   }
   useLayoutEffect(() => {
-    if (dock) {
+    if (phone) {
       frame.current?.style.setProperty("--editor-navigation-height", "0px");
       return;
     }
@@ -140,79 +132,47 @@ export function EditorFrame({
       owner?.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
     };
-  }, [hasNavigation, dock]);
+  }, [hasNavigation, phone]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const element = controls.current;
     const writing = canvas.current;
-    const owner = frame.current?.closest<HTMLElement>(".main-content");
-    if (!dock || !element || !writing || !owner) return;
-    let releaseRequest = 0;
-    let lastCaret: { node: Node; offset: number; top: number } | null = null;
-    const rememberCaret = () => {
-      const selection = window.getSelection();
-      const line = readWritingCaretLine(writing, true);
-      lastCaret = selection?.focusNode && writing.contains(selection.focusNode) && line
-        ? { node: selection.focusNode, offset: selection.focusOffset, top: line.top } : null;
-    };
+    if (!phone || !element || !writing) return;
+    // Save only the insertion bookmark before a toolbar takes focus. No
+    // caret measurements or scrolling run on focus/selection/viewport events.
     const remember = () => {
       const cursor = captureWritingCursor(writing);
-      const focused = document.activeElement;
       if (cursor) lastWritingCursor.current = cursor;
-      else if (focused instanceof HTMLElement && (focused.isContentEditable || focused.matches("input, textarea"))
-        && !focused.closest(".writing-media-chooser, .writing-slash-menu")) lastWritingCursor.current = null;
-      rememberCaret();
-    };
-    const rememberKeyboard = (event: KeyboardEvent) => { if (event.key === "Tab") remember(); };
-    const released = () => {
-      cancelAnimationFrame(releaseRequest);
-      releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; });
     };
     element.addEventListener("pointerdown", remember, true);
     writing.addEventListener("fieldbook:writing-handoff", remember);
-    owner.addEventListener("scroll", rememberCaret, { passive: true });
-    document.addEventListener("selectionchange", rememberCaret);
-    document.addEventListener("keydown", rememberKeyboard, true);
-    document.addEventListener("focusin", remember);
-    document.addEventListener("pointerup", released);
     return () => {
-      cancelAnimationFrame(releaseRequest);
       element.removeEventListener("pointerdown", remember, true);
       writing.removeEventListener("fieldbook:writing-handoff", remember);
-      owner.removeEventListener("scroll", rememberCaret);
-      document.removeEventListener("selectionchange", rememberCaret);
-      document.removeEventListener("keydown", rememberKeyboard, true);
-      document.removeEventListener("focusin", remember);
-      document.removeEventListener("pointerup", released);
-      // Changing input capabilities is explicit layout navigation. Retain the
-      // painted writing row once the desktop scroll owner has settled.
-      const caret = lastCaret;
-      if (caret && frame.current?.dataset.dock !== "true") requestAnimationFrame(() => {
-        const selection = window.getSelection();
-        const focused = document.activeElement;
-        if (!frame.current?.isConnected || frame.current.dataset.dock === "true"
-          || selection?.focusNode !== caret.node || selection.focusOffset !== caret.offset
-          || !(focused instanceof HTMLElement) || !focused.isContentEditable || !writing.contains(focused)) return;
-        const line = readWritingCaretLine(writing, true);
-        const editor = frame.current.closest<HTMLElement>(".editor");
-        const scroller = editor?.dataset.scrollLayout === "workspace"
-          ? editor.querySelector<HTMLElement>(".writing-viewport") || writing : owner;
-        if (line && Math.abs(line.top - caret.top) >= 1) scroller.scrollBy({ top: line.top - caret.top, behavior: "instant" });
-      });
     };
-  }, [dock, dockHost]);
+  }, [phone]);
   useEffect(() => {
-    if (!dock || !panels.outline && !panels.details) return;
+    if (!phone || !panels.outline && !panels.details) return;
+    const dismiss = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || target.closest('.editor-mobile-toolbar, [data-radix-popper-content-wrapper], [data-slot="dialog-content"]')) return;
+      setPanels({ outline: false, details: false });
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, [phone, panels.outline, panels.details]);
+  useEffect(() => {
+    if (!phone || !panels.outline && !panels.details) return;
     const cancel = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
       event.preventDefault(); event.stopPropagation();
       setPanels({ outline: false, details: false });
-      returnToWriting(panels.outline ? outlineToggle.current : detailsToggle.current);
+      returnToToggle(panels.outline ? outlineToggle.current : detailsToggle.current);
     };
     // Let fields and portaled pickers consume Escape before closing the panel.
     document.addEventListener("keydown", cancel);
     return () => document.removeEventListener("keydown", cancel);
-  }, [dock, panels.outline, panels.details]);
+  }, [phone, panels.outline, panels.details]);
   const wide = useRef(false);
   const narrow = useRef(false);
   const outlineToggle = useRef<HTMLButtonElement>(null);
@@ -220,7 +180,7 @@ export function EditorFrame({
   const outlineId = useId();
   const detailsId = useId();
   const dismissPanels = useCallback(() => setPanels({ outline: false, details: false }), []);
-  const compactControls = useMemo(() => dock ? { panelsOpen: panels.outline || panels.details, dismissPanels } : null, [dock, panels.outline, panels.details, dismissPanels]);
+  const compactControls = useMemo(() => phone ? { panelsOpen: panels.outline || panels.details, dismissPanels } : null, [phone, panels.outline, panels.details, dismissPanels]);
   const defaultsApplied = useRef(false);
   const previousClearance = useRef({ outline: false, details: false });
   const hasOutline = !!outline;
@@ -230,6 +190,12 @@ export function EditorFrame({
     const target = frame.current;
     const surface = canvas.current;
     if (!target || !surface) return;
+    if (phone) {
+      wide.current = false;
+      narrow.current = true;
+      setPanels({ outline: false, details: false });
+      return;
+    }
     let active = true;
     let request = 0;
     let waitingForLayout = false;
@@ -358,27 +324,27 @@ export function EditorFrame({
     </div>
   </EditorDetailsGroup>;
   const panelControls = (
-      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} data-dock={dock || undefined} data-dock-position={dock ? "top" : undefined} role={dock ? "group" : undefined} aria-label={dock ? "Editor controls" : undefined}>
+      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} role={phone ? "group" : undefined} aria-label={phone ? "Editor controls" : undefined}>
       <div className="editor-controls-surface">
         {outline && (
-          <Button ref={outlineToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${dock ? "relative w-[30px] h-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative size-11 rounded-full" : "absolute size-11 rounded-full"}`} data-side="outline"
+          <Button ref={outlineToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${phone ? "relative p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute size-11 rounded-full"}`} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
-            onPointerDown={() => { if (dock) preparePanel("outline"); }}
+            onPointerDown={() => { if (phone) preparePanel("outline"); }}
             onPointerCancel={() => { preparedPanel.current = null; }}
-            onMouseDown={(event) => { if (dock) event.preventDefault(); }}
+            onMouseDown={(event) => { if (phone) event.preventDefault(); }}
             onClick={() => togglePanel("outline")}>
             {panels.outline ? <X aria-hidden="true" /> : <ListTree aria-hidden="true" />}
           </Button>
         )}
         {phone && <div className="editor-writing-actions-host" ref={setWritingActionsHost} />}
-        <Button ref={detailsToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${dock ? "relative w-[30px] h-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative size-11 rounded-full" : "absolute size-11 rounded-full"}`} data-side="details"
+        <Button ref={detailsToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${phone ? "relative p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute size-11 rounded-full"}`} data-side="details"
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
-          onPointerDown={() => { if (dock) preparePanel("details"); }}
+          onPointerDown={() => { if (phone) preparePanel("details"); }}
           onPointerCancel={() => { preparedPanel.current = null; }}
-          onMouseDown={(event) => { if (dock) event.preventDefault(); }}
+          onMouseDown={(event) => { if (phone) event.preventDefault(); }}
           onClick={() => togglePanel("details")}>
           {panels.details ? <X aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}
           {requirementsCount > 0 && <span className="editor-requirements-badge" aria-hidden="true">{requirementsCount}</span>}
@@ -394,7 +360,7 @@ export function EditorFrame({
               if (disabled || event.key !== "Escape" || event.defaultPrevented) return;
               event.preventDefault();
               setPanels((current) => ({ ...current, outline: false }));
-              returnToWriting(outlineToggle.current);
+              returnToToggle(outlineToggle.current);
             }}>
             <h2 className="editor-floating-heading">Outline</h2>
             <ScrollRegion id={outlineId} className="editor-floating-body">{outline}</ScrollRegion>
@@ -407,7 +373,7 @@ export function EditorFrame({
               if (disabled || event.key !== "Escape" || event.defaultPrevented) return;
               event.preventDefault();
               setPanels((current) => ({ ...current, details: false }));
-              returnToWriting(detailsToggle.current);
+              returnToToggle(detailsToggle.current);
             }}>
             <h2 className="editor-floating-heading">Details</h2>
             <ScrollRegion id={detailsId} className="editor-floating-body">{details}{recoverySection}{deleteAction}</ScrollRegion>
@@ -417,15 +383,22 @@ export function EditorFrame({
   return (
     <EditorCompactControlsContext.Provider value={compactControls}>
     <EditorWritingActionsContext.Provider value={writingActionsHost}>
-    <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-dock={dock || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
+    <EditorMobileOverlayContext.Provider value={overlayHost}>
+    <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-mobile={phone || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
       {!phone && panelControls}
-      {dock && dockHost && createPortal(panelControls, dockHost)}
+      {phone && <div className="editor-mobile-toolbar">
+        {navigation && <div className="editor-mobile-navigation">{navigation}</div>}
+        {panelControls}
+        <div ref={setOverlayHost} className="editor-mobile-overlays">
+          <div className="editor-mobile-panels">{panelSurfaces}</div>
+        </div>
+      </div>}
       <div className="editor-frame-body">
         {!phone && panelSurfaces}
-        <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!dock && (navigation || phone) && <div className="editor-canvas-navigation">{!phone && navigation}{phone && panelControls}</div>}{children}</div>
+        <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!phone && navigation && <div className="editor-canvas-navigation">{navigation}</div>}{children}</div>
       </div>
-      {phone && overlayHost && createPortal(<div className="editor-mobile-panels" data-dock={dock || undefined}>{panelSurfaces}</div>, overlayHost)}
     </section>
+    </EditorMobileOverlayContext.Provider>
     </EditorWritingActionsContext.Provider>
     </EditorCompactControlsContext.Provider>
   );

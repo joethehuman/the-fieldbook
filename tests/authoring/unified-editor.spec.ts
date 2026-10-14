@@ -223,7 +223,8 @@ test("Details downloads the latest Markdown without remounting or changing histo
   await writer.fill("Latest draft — café.");
   await title.fill("Lesson: café / draft");
   const exported = await downloadMarkdown(page);
-  expect(exported).toEqual({ name: "Lesson- café - draft.md", body: "Latest draft — café." });
+  // WebKit on macOS may decompose accents in downloaded filenames.
+  expect({ ...exported, name: exported.name.normalize("NFC") }).toEqual({ name: "Lesson- café - draft.md", body: "Latest draft — café." });
   expect(await writer.evaluate((node, first) => node === first, original)).toBe(true);
   await writer.press("ControlOrMeta+z");
   await expect(writer).toHaveText("Original body.");

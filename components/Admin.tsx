@@ -3019,6 +3019,7 @@ export function Editor({
           items={[
             {
               label: "Back to content",
+              shortLabel: "Back",
               onSelect: async () => {
                 if (await guard.current()) onCancel();
               },

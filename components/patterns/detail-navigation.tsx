@@ -10,7 +10,7 @@ export function DetailNavigation({
   flush = false,
   compact = false,
 }: {
-  items: { label: string; onSelect: () => void | Promise<void> }[];
+  items: { label: string; shortLabel?: string; onSelect: () => void | Promise<void> }[];
   current?: ReactNode;
   disabled?: boolean;
   flush?: boolean;
@@ -33,13 +33,14 @@ export function DetailNavigation({
               size="sm"
               className={`min-w-0 text-left disabled:bg-transparent disabled:border-transparent${flush && index === 0 ? " -ms-2.5" : " max-w-full"}`}
               disabled={disabled}
-              aria-label={compact && index === 0 ? item.label : undefined}
+              aria-label={item.shortLabel || compact && index === 0 ? item.label : undefined}
               onClick={item.onSelect}
             >
               {index === 0 && (
                 <ArrowLeft className="size-4" aria-hidden="true" />
               )}
               <span className="detail-navigation-label [overflow-wrap:anywhere]">{item.label}</span>
+              {item.shortLabel && <span className="detail-navigation-short-label hidden" aria-hidden="true">{item.shortLabel}</span>}
             </Button>
           </li>
         ))}

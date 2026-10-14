@@ -23,7 +23,7 @@
     ["table-cell", "td [contenteditable], th [contenteditable]"],
     ["prose", ".writing-content[contenteditable]"],
     ["quiz", ".course-quiz-canvas input, .course-quiz-canvas textarea"],
-    ["dock", ".editor-frame-controls[data-dock='true']"],
+    ["toolbar", ".editor-mobile-toolbar"],
     ["save", ".editor-save-status"],
     ["header", ".topbar"],
     ["canvas", ".main-content"],
@@ -171,13 +171,13 @@
   function snapshot(reason) {
     const view = viewport();
     const header = document.querySelector(".topbar");
-    const dock = document.querySelector(".editor-frame-controls[data-dock='true']");
+    const toolbar = document.querySelector(".editor-mobile-toolbar");
     const save = document.querySelector(".editor-save-status");
     const active = element(document.activeElement);
     const ancestors = [];
     for (let current = active; current && ancestors.length < 18; current = current.parentElement) ancestors.push(box(current));
-    const hitTargets = [...new Set([header, dock, save, ...(header?.querySelectorAll("button") || [])])].filter(Boolean).slice(0, 18);
-    record("frame", { reason, viewport: view, owners: { root: box(document.documentElement), body: box(document.body), app: box(document.querySelector(".app")), shell: box(document.querySelector(".main-shell")), canvas: box(document.querySelector(".main-content")), header: box(header), dock: box(dock), save: box(save) }, hitTargets: hitTargets.map(target => hit(target, view)), selection: selection(), activeAncestors: ancestors });
+    const hitTargets = [...new Set([header, toolbar, save, ...(toolbar?.querySelectorAll("button") || []), ...(header?.querySelectorAll("button") || [])])].filter(Boolean).slice(0, 18);
+    record("frame", { reason, viewport: view, owners: { root: box(document.documentElement), body: box(document.body), app: box(document.querySelector(".app")), shell: box(document.querySelector(".main-shell")), canvas: box(document.querySelector(".main-content")), header: box(header), toolbar: box(toolbar), save: box(save) }, hitTargets: hitTargets.map(target => hit(target, view)), selection: selection(), activeAncestors: ancestors });
   }
   function tick() {
     frame = 0;

@@ -38,8 +38,8 @@ export function useSavedWritingHighlight(ref: RefObject<HTMLElement | null>, ena
       const active = document.activeElement;
       const prose = active instanceof HTMLElement && active.isContentEditable && root.contains(active);
       const touchSelection = active === document.body;
-      const dock = active instanceof HTMLButtonElement && !!active.closest('.editor-frame-controls[data-dock="true"]');
-      if (!prose && !touchSelection && !dock) return false;
+      const toolbar = active instanceof HTMLButtonElement && !!active.closest('.editor-mobile-toolbar');
+      if (!prose && !touchSelection && !toolbar) return false;
       range = selection.getRangeAt(0).cloneRange();
     }
     if (range.collapsed || !root.contains(range.startContainer) || !root.contains(range.endContainer)) return false;
@@ -61,10 +61,8 @@ export function useSavedWritingHighlight(ref: RefObject<HTMLElement | null>, ena
       capture(range);
     };
     root.addEventListener("fieldbook:writing-handoff", handoff);
-    root.addEventListener("fieldbook:writing-resume", clear);
     return () => {
       root.removeEventListener("fieldbook:writing-handoff", handoff);
-      root.removeEventListener("fieldbook:writing-resume", clear);
       clear();
     };
   }, [ref, enabled, capture, clear]);

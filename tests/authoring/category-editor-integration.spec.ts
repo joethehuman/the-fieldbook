@@ -169,22 +169,21 @@ for (const profile of [
           expect(body(published)).toBe(originalPublishedBody);
         }
         if (profile.touch) {
-          await writer.focus();
-          await page.evaluate(() => {
-            const viewport = window.visualViewport!;
-            Object.defineProperty(viewport, "height", {
-              configurable: true,
-              get: () => 440,
-            });
-            viewport.dispatchEvent(new Event("resize"));
+          await writer.locator("p").first().tap();
+          // Resize the rendered browser while retaining portrait eligibility;
+          // this checks layout, not an emulated OS keyboard transition.
+          await page.setViewportSize({
+            width: profile.width,
+            height: Math.max(profile.width + 1, profile.height - 240),
           });
-          await expect(page.locator(".main-shell")).toHaveAttribute(
-            "data-editor-keyboard",
-            "true",
-          );
-          await expect(
-            page.locator('.editor-frame-controls[data-dock="true"]'),
-          ).toBeInViewport();
+          await expect(page.locator(".app")).toHaveAttribute("data-mobile-editor", "true");
+          const toolbar = page.locator(".editor-mobile-toolbar");
+          await expect(toolbar).toHaveCSS("position", "sticky");
+          await expect(toolbar).toBeInViewport({ ratio: 1 });
+          await expect.poll(() => toolbar.evaluate(element => {
+            const bounds = element.getBoundingClientRect();
+            return bounds.top >= 0 && bounds.bottom <= innerHeight;
+          })).toBe(true);
         } else {
           await expect(
             page.getByRole("button", { name: "Back to content", exact: true }),
@@ -201,16 +200,8 @@ for (const profile of [
         await expect(
           page.getByRole("heading", { name: "Categories", exact: true }),
         ).toBeVisible();
-        await expect(page.locator(".main-shell")).not.toHaveAttribute(
-          "data-editor-keyboard",
-        );
-        expect(
-          await page
-            .locator(".main-shell")
-            .evaluate((element) =>
-              element.style.getPropertyValue("--editor-viewport-height"),
-            ),
-        ).toBe("");
+        await expect(page.locator(".app")).not.toHaveAttribute("data-mobile-editor", "true");
+        await expect(page.locator(".editor-mobile-toolbar")).toHaveCount(0);
         if (kind === "brief")
           await page.getByRole("tab", { name: "Updates", exact: true }).click();
         await page

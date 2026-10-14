@@ -1185,7 +1185,7 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await expect(menu).toHaveCount(0);
   await expect(editor).toBeFocused();
   await expectMarkdown(page, "/h3");
-  if (await page.locator(".editor-frame").getAttribute("data-cards") !== "true") {
+  if (await page.locator(".editor-frame").getAttribute("data-mobile") !== "true") {
     await expect(commands).toBeHidden();
     return;
   }
@@ -1193,9 +1193,9 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await expect(commands).toBeEnabled();
   await commands.focus();
   await page.keyboard.press("Enter");
-  await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();
+  await expect(menu.getByRole("menuitem", { name: "Bold", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  const focusedItem = menu.getByRole("menuitem", { name: "Heading 1", exact: true });
+  const focusedItem = menu.getByRole("menuitem", { name: "Italic", exact: true });
   await expect(focusedItem).toBeFocused();
   // A native selection acknowledgement can arrive after keyboard menu focus.
   // It must synchronize prose selection without taking focus from this item.
@@ -1206,8 +1206,7 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await expect(focusedItem).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  if (await page.locator(".editor-frame").getAttribute("data-dock") === "true") await expect(editor).toBeFocused();
-  else await expect(commands).toBeFocused();
+  await expect(editor).toBeFocused();
 });
 
 test("Heading 1–4 commands and selected-text Normal Text preserve authored content", async ({ page }, info) => {

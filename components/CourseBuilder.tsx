@@ -123,6 +123,11 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         setSelected(navigation.step);
         surface?.focus({ preventScroll: true });
       };
+      if (surface?.closest('.app[data-mobile-editor]')) {
+        surface.scrollIntoView({ block: "start", behavior: "instant" });
+        finish();
+        return;
+      }
       if (surface?.closest('.editor[data-scroll-layout="workspace"]')) {
         const canvas = surface.closest<HTMLElement>(".editor-frame-canvas");
         if (canvas) canvas.scrollTop = 0;

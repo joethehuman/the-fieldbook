@@ -93,7 +93,7 @@ export function DialogContent({
         onCloseAutoFocus?.(event);
         if (!event.defaultPrevented && returnFocus.current?.isConnected) {
           event.preventDefault();
-          returnFocus.current.focus({ preventScroll: !!returnFocus.current.closest('.app[data-mobile-editor-boundary]') });
+          returnFocus.current.focus();
         }
       }}
     />
