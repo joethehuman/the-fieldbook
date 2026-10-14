@@ -177,8 +177,14 @@ test("structured tables, code and video can be edited and exported without a sec
     true,
   );
   const cell = editor.getByRole("cell", { name: "Customer", exact: true });
-  await cell.click();
-  await cell.fill("Customer value");
+  await cell.locator("p").dblclick({ position: { x: 8, y: 14 } });
+  await expect
+    .poll(() => page.evaluate(() => window.getSelection()?.toString()))
+    .toBe("Customer");
+  await page.keyboard.type("Customer value");
+  await expect(
+    editor.getByRole("cell", { name: "Customer value", exact: true }),
+  ).toBeVisible();
   await waitForDraftSaved(page);
   expect((await read()).body).toContain("Customer value");
   const exported = await downloadMarkdown(page);
