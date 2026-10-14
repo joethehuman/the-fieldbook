@@ -2912,7 +2912,12 @@ test.describe("native mobile editing", () => {
   async function expectToolbar(page: Page) {
     const toolbar = page.locator(".editor-mobile-toolbar");
     await expect(toolbar).toBeVisible();
-    await expect(page.locator(".editor-mobile-toolbar-slot")).toHaveCSS("position", "sticky");
+    await expect(page.locator(".editor-mobile-toolbar-slot")).toHaveCSS("position", "relative");
+    await expect.poll(() => page.locator(".editor-mobile-toolbar-slot").evaluate(slot => {
+      const surface = slot.querySelector(".editor-mobile-toolbar")!;
+      return Math.abs(slot.getBoundingClientRect().height - surface.getBoundingClientRect().height) <= 1
+        && getComputedStyle(surface).position === (surface.hasAttribute("data-pinned") ? "fixed" : "relative");
+    })).toBe(true);
     await expect(toolbar.getByRole("button", { name: "Back to content", exact: true })).toBeVisible();
     await expect.poll(() => toolbar.evaluate(element => {
       const box = element.getBoundingClientRect();
@@ -2977,6 +2982,14 @@ test.describe("native mobile editing", () => {
 
   for (const pan of [76, 50]) {
     test(`viewport pan ${pan}px keeps the toolbar and Commands in the visible area`, async ({ page }, info) => {
+      // The transform below models WebKit's visual-relative client rectangles.
+      // Fixed surfaces additionally need its nonzero visual viewport offset.
+      // Replay that same coordinate model in Chromium as well as desktop WebKit.
+      await page.addInitScript(() => {
+        const supports = CSS.supports.bind(CSS);
+        CSS.supports = (property: string, value?: string) => property === "-webkit-backdrop-filter" && value === "none"
+          ? true : value === undefined ? supports(property) : supports(property, value);
+      });
       const { writer } = await fixture(page, info.project.name.startsWith("production"), { kind: "doc", empty: true });
       await writer.tap();
       await expect(page.getByRole("button", { name: /^Commands:/ })).toBeEnabled();

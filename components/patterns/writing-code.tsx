@@ -36,6 +36,7 @@ import { WritingBlockActions, blockActions } from "./writing-block-actions";
 import { useCodeHighlight } from "./use-code-highlight";
 import { useWritingInteraction } from "./writing-interaction";
 import { createDesktopWritingScroll } from "./desktop-writing-scroll";
+import { revealMobileWritingInsertion } from "./mobile-writing-insertion";
 
 // The reader and CodeMirror use the same color classes and theme variables.
 const colors = syntaxHighlighting(
@@ -179,7 +180,25 @@ export function WritingCodeEditor({
     };
   }, [parentEditor, nodeKey]);
   useEffect(() => {
-    focusEmitter.subscribe(() => view.current?.focus());
+    let cancelReveal = () => {};
+    focusEmitter.subscribe(() => {
+      const editor = view.current;
+      if (!editor) return;
+      cancelReveal();
+      editor.focus();
+      // Focus intentionally preserves scroll. Insertion explicitly requests
+      // CodeMirror's own reveal and repeats it only for opening-keyboard bounds.
+      const reveal = () => editor.dispatch({ effects: EditorView.scrollIntoView(editor.state.selection.main) });
+      reveal();
+      cancelReveal = revealMobileWritingInsertion(editor.contentDOM, {
+        readCaret: () => {
+          const rect = editor.coordsAtPos(editor.state.selection.main.head);
+          return rect ? { top: rect.top, bottom: rect.bottom, height: rect.bottom - rect.top } : null;
+        },
+        reveal,
+      });
+    });
+    return () => { cancelReveal(); focusEmitter.subscribe(() => {}); };
   }, [focusEmitter]);
 
   useEffect(() => {
