@@ -167,6 +167,8 @@ export function createWritingSchema(document: BlockDocument) {
       underline: defaultStyleSpecs.underline,
       strike: defaultStyleSpecs.strike,
       code: defaultStyleSpecs.code,
+      textColor: defaultStyleSpecs.textColor,
+      backgroundColor: defaultStyleSpecs.backgroundColor,
     },
   });
   return { schema, registerLanguages };

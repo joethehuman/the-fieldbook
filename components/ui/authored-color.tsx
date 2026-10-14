@@ -15,7 +15,7 @@ function color(value: string | undefined, kind: "text" | "background") {
   if (!value || value === "default") return undefined;
   if (palette.has(value)) return `var(--authored-${value}-${kind})`;
   // Pasted literal colors are content, never executable CSS or arbitrary URLs.
-  return /^(#[a-f\d]{3,8}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%]+\)|transparent|black|white)$/i.test(
+  return /^(#[a-f\d]{3,8}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%]+\)|[a-z]+)$/i.test(
     value,
   )
     ? value

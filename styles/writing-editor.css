@@ -421,7 +421,7 @@
 }
 @media (any-pointer: coarse) {
   .bn-shadcn [data-slot="input"],
-  .fieldbook-blocknote .writing-code-language {
+  .bn-shadcn.fieldbook-blocknote .writing-code-language {
     min-height: 44px;
     font-size: 1rem;
   }
