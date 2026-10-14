@@ -2,6 +2,7 @@
 
 import { WritingImageDialog, WritingImageToolbar } from "./writing-image";
 import { WritingCodeEditor } from "./writing-code";
+import { writingDesktopScrollPlugin } from "./writing-desktop-scroll";
 import { writingTableControlsPlugin } from "./writing-table-controls";
 import { $createWritingVideoNode, writingVideoPlugin } from "./writing-video";
 import { WritingMediaLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
@@ -1179,6 +1180,7 @@ export default function WritingEditorEngine({
   }
   const plugins = useMemo(() => [
     writingViewPanelPlugin(),
+    writingDesktopScrollPlugin({ canvas }),
     writingTrailingLinePlugin(),
     writingVideoPlugin(),
     writingUploadPlugin(),

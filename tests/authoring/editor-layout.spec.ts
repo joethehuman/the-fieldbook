@@ -1496,6 +1496,168 @@ test("desktop trailing canvas stays useful while typing and clicking back into t
   await page.screenshot({ path: info.outputPath("desktop-typing-in-trailing-canvas.png") });
 });
 
+test.describe("desktop writing comfort", () => {
+  test.use({ hasTouch: false, isMobile: false });
+
+  async function caret(page: Page) {
+    await page.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
+    return page.locator(".editor").evaluate(editor => {
+      const selection = window.getSelection()!;
+      const range = selection.getRangeAt(0);
+      const line = range.getBoundingClientRect();
+      const owner = editor.getAttribute("data-scroll-layout") === "workspace"
+        ? editor.querySelector(".writing-viewport")! : editor.closest(".main-content")!;
+      const bounds = owner.getBoundingClientRect();
+      const title = editor.querySelector(".writing-document-heading")!.getBoundingClientRect();
+      const code = editor.querySelector(".cm-content");
+      const painting = code?.closest(".cm-editor")?.querySelector(".cm-cursor")?.getBoundingClientRect();
+      const rect = code?.contains(selection.focusNode) && painting?.height ? painting : line;
+      return { gap: bounds.bottom - rect.bottom, topGap: rect.top - Math.max(bounds.top, title.bottom), scrollTop: owner.scrollTop, collapsed: selection.isCollapsed };
+    });
+  }
+
+  for (const kind of ["doc", "brief", "course"] as const) for (const width of [1600, 600]) {
+    test(`${kind} ${width}px: uninterrupted typing leaves breathing room automatically`, async ({ page }, info) => {
+      await page.setViewportSize({ width, height: 900 });
+      const result = await open(page, info.project.name.startsWith("production"), kind, 2, item => {
+        item.body = "Paragraph 1.";
+        if (kind === "course") item.lessons[0].body = item.body;
+      });
+      const writer = page.locator('.writing-content[contenteditable="true"]').first();
+      const mounted = await writer.elementHandle();
+      await writer.locator(":scope > p").first().click();
+      await page.keyboard.press("End");
+      for (let index = 0; index < 24; index++) {
+        await page.keyboard.press("Enter");
+        await page.keyboard.type(`Writing row ${index + 1}.`);
+      }
+      const position = await caret(page);
+      expect(position.gap).toBeGreaterThanOrEqual(68);
+      expect(position.gap).toBeLessThanOrEqual(100);
+      expect(position.collapsed).toBe(true);
+      expect(position.scrollTop).toBeGreaterThan(0);
+      await expect(writer).toBeFocused();
+      await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-mobile", "true");
+      // Soft wrapping must use the caret's rendered line, not its whole block.
+      await page.keyboard.type(" Continue writing a longer sentence that wraps onto another line while keeping the same paragraph and all earlier writing intact.".repeat(5));
+      expect((await caret(page)).gap).toBeGreaterThanOrEqual(68);
+      await page.keyboard.press("ArrowUp");
+      expect((await caret(page)).gap).toBeGreaterThanOrEqual(68);
+      await page.keyboard.press("ControlOrMeta+z");
+      await page.keyboard.press("ControlOrMeta+Shift+z");
+      expect((await caret(page)).gap).toBeGreaterThanOrEqual(68);
+      expect(await mounted!.evaluate(node => node.isConnected)).toBe(true);
+      await waitForDraftSaved(page);
+      const saved = (await result.read()).content[0];
+      const body = kind === "course" ? saved.lessons[0].body : saved.body;
+      expect(body).toContain("Paragraph 1.");
+      expect(body).toContain("Writing row 24.");
+      expect(body.trim().split(/\n{2,}/)).toHaveLength(25);
+      await page.screenshot({ caret: "initial", path: info.outputPath(`${kind}-desktop-comfort-${width}.png`) });
+    });
+  }
+
+  test("Return, paste, and layout changes keep the desktop caret reachable", async ({ page }, info) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await open(page, info.project.name.startsWith("production"), "doc");
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    await writer.locator("p").last().click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" Desktop editing.");
+    await page.keyboard.press("Enter");
+    await page.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
+    const emptyGap = await writer.locator(":scope > p").last().evaluate(line => {
+      const editor = line.closest(".editor")!;
+      return editor.querySelector(".writing-viewport")!.getBoundingClientRect().bottom - line.getBoundingClientRect().bottom;
+    });
+    expect(emptyGap).toBeGreaterThanOrEqual(68);
+    await writer.evaluate(node => {
+      const data = new DataTransfer(); data.setData("text/plain", "Pasted writing.\n\nAnother pasted paragraph.");
+      node.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+    });
+    await expect(writer).toContainText("Another pasted paragraph.");
+    expect((await caret(page)).gap).toBeGreaterThanOrEqual(68);
+    for (const width of [600, 1600]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", width === 600 ? "page" : "workspace");
+      await page.keyboard.type(" Continued after resize.");
+      const position = await caret(page);
+      expect(position.gap).toBeGreaterThanOrEqual(68);
+      expect(position.topGap).toBeGreaterThanOrEqual(0);
+      await expect(writer).toBeFocused();
+    }
+  });
+
+  test("manual scroll, pointer selection, and menu focus retain control", async ({ page }, info) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await open(page, info.project.name.startsWith("production"), "doc");
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    await writer.locator("p").last().click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" Typing at the end.");
+    expect((await caret(page)).gap).toBeGreaterThanOrEqual(68);
+    const canvas = page.locator(".writing-viewport");
+    await canvas.evaluate(owner => { owner.scrollTop -= 220; });
+    const manual = await canvas.evaluate(owner => owner.scrollTop);
+    await page.waitForTimeout(100);
+    expect(await canvas.evaluate(owner => owner.scrollTop)).toBe(manual);
+    await writer.locator("p").nth(20).click();
+    const clicked = await canvas.evaluate(owner => owner.scrollTop);
+    await page.waitForTimeout(100);
+    expect(await canvas.evaluate(owner => owner.scrollTop)).toBe(clicked);
+    await page.keyboard.press("Shift+ArrowLeft");
+    expect((await caret(page)).collapsed).toBe(false);
+    const selected = await canvas.evaluate(owner => owner.scrollTop);
+    await page.waitForTimeout(100);
+    expect(await canvas.evaluate(owner => owner.scrollTop)).toBe(selected);
+    const details = page.getByRole("button", { name: "Details", exact: true });
+    await details.focus();
+    await details.press("Enter");
+    await expect(details).toBeFocused();
+    await page.waitForTimeout(100);
+    await expect(details).toBeFocused();
+  });
+
+  test("enlarged typography retains a visible caret in a short desktop window", async ({ page }, info) => {
+    await page.setViewportSize({ width: 600, height: 500 });
+    await open(page, info.project.name.startsWith("production"), "doc");
+    await page.evaluate(() => { document.documentElement.style.fontSize = "32px"; });
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    await writer.locator("p").last().click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" Enlarged writing.");
+    const position = await caret(page);
+    expect(position.gap).toBeGreaterThanOrEqual(0);
+    expect(position.topGap).toBeGreaterThanOrEqual(0);
+    await expect(writer).toBeFocused();
+  });
+
+  test("table cells and bounded code blocks keep their own caret and scrolling", async ({ page }, info) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await open(page, info.project.name.startsWith("production"), "doc", 2, item => {
+      item.body += "\n\n| Topic | Detail |\n| --- | --- |\n| Paragraph 1. Cell | Other |\n\n```js\n" + Array.from({ length: 40 }, (_, i) => `const value${i} = ${i};`).join("\n") + "\n```\n\nFinal paragraph.";
+    });
+    const cell = page.locator('.writing-table-block [contenteditable="true"]').first();
+    await cell.click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" Continued cell.");
+    expect((await caret(page)).gap).toBeGreaterThanOrEqual(68);
+    await expect(cell).toBeFocused();
+    const code = page.getByRole("textbox", { name: "Code block", exact: true });
+    await code.click();
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("const continued = true;");
+    expect((await caret(page)).gap).toBeGreaterThanOrEqual(68);
+    await expect(code).toBeFocused();
+    expect(await page.locator(".cm-scroller").evaluate(owner => owner.scrollTop)).toBeGreaterThan(0);
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.type("Continued prose.");
+    await expect(page.locator('.writing-content > p').last()).toContainText("Continued prose.");
+    expect((await caret(page)).gap).toBeGreaterThanOrEqual(68);
+  });
+});
+
 test("resizing retains the writing position when the scroll owner changes", async ({ page }, info) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await open(page, info.project.name.startsWith("production"), "course");
@@ -2718,6 +2880,34 @@ test.describe("native mobile editing", () => {
     await expect(page.locator(".app")).toHaveAttribute("data-mobile-editor", "true");
     return { ...result, writer: page.getByRole("textbox", { name: kind === "course" ? "Lesson content" : "Doc content", exact: true }) };
   }
+
+  test("desktop comfort stays inactive during touch-only document typing", async ({ page }, info) => {
+    const { writer } = await fixture(page, info.project.name.startsWith("production"), { kind: "doc", empty: true });
+    await writer.tap();
+    for (let index = 0; index < 24; index++) {
+      if (index) await page.keyboard.press("Enter");
+      await page.keyboard.type(`Native writing row ${index + 1}.`);
+    }
+    await settle(page);
+    const position = await writer.evaluate(node => {
+      const range = window.getSelection()!.getRangeAt(0).getBoundingClientRect();
+      return {
+        gap: innerHeight - range.bottom,
+        pageScroll: scrollY,
+        mainScroll: node.closest(".main-content")!.scrollTop,
+        canvasScroll: node.closest(".writing-viewport")!.scrollTop,
+        desktopSpace: node.closest(".writing-root")!.hasAttribute("data-writing-canvas-space"),
+      };
+    });
+    expect(position.pageScroll).toBeGreaterThan(0);
+    expect(position.mainScroll).toBe(0);
+    expect(position.canvasScroll).toBe(0);
+    expect(position.desktopSpace).toBe(false);
+    expect(position.gap).toBeGreaterThanOrEqual(0);
+    expect(position.gap).toBeLessThan(55);
+    await expect(writer).toBeFocused();
+    await expectToolbar(page);
+  });
 
   async function expectToolbar(page: Page) {
     const toolbar = page.locator(".editor-mobile-toolbar");
