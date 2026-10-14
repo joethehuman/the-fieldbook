@@ -538,6 +538,91 @@ test("checklists and collapsible blocks persist and export all nested text", asy
   await expect(editor).toContainText("More details");
   expect((await downloadMarkdown(page)).body).toContain("Nested explanation");
 });
+test("code clicks edit text while the separate language picker preserves native code behavior", async ({
+  page,
+}, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const { editor, read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    "Intro.\n\n```text\nconst value = 1;\n```",
+    true,
+  );
+  const code = editor.locator('[data-content-type="codeBlock"]');
+  const source = code.locator("pre code");
+  const picker = code.getByRole("combobox", { name: "Code language" });
+  const geometry = await code.evaluate((element) => {
+    const header = element
+      .querySelector(".writing-code-header")!
+      .getBoundingClientRect();
+    const pre = element.querySelector("pre")!.getBoundingClientRect();
+    const style = getComputedStyle(element.querySelector("pre code")!);
+    return {
+      headerBottom: header.bottom,
+      codeTop: pre.top,
+      color: style.color,
+      background: getComputedStyle(element).backgroundColor,
+    };
+  });
+  expect(geometry.headerBottom).toBeLessThanOrEqual(geometry.codeTop);
+  expect(geometry.color).not.toBe("rgb(255, 255, 255)");
+  expect(geometry.background).not.toBe("rgb(22, 22, 22)");
+  await source.click({ position: { x: 3, y: 8 } });
+  for (const _ of "const value = 1;") await page.keyboard.press("ArrowRight");
+  await page.keyboard.type(" // edited");
+  await expect(source).toContainText("const value = 1; // edited");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type('print("done")');
+  await expect(source).toContainText('print("done")');
+  await source.dblclick();
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+
+  await picker.click();
+  await expect(
+    page.getByRole("option", { name: "Plain Text", exact: true }),
+  ).toBeFocused();
+  // Native typeahead brings a long-list item into view before pointer selection.
+  await page.keyboard.press("p");
+  await page.keyboard.press("y");
+  await expect(
+    page.getByRole("option", { name: "Python", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("option", { name: "Python", exact: true }).click();
+  await expect(picker).toContainText("Python");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(source).toContainText('print("done")');
+  await source.click({ position: { x: 3, y: 8 } });
+  await expect
+    .poll(() => page.evaluate(() => window.getSelection()?.isCollapsed))
+    .toBe(true);
+  await page.keyboard.type("X");
+  await waitForDraftSaved(page);
+  await expect
+    .poll(async () => (await read()).body.replace("X", ""))
+    .toContain('```python\nconst value = 1; // edited\n  print("done")\n```');
+  await expect(source.locator(".shiki").first()).toBeVisible();
+  const palette = await source
+    .locator(".shiki")
+    .first()
+    .evaluate((token) => {
+      const style = getComputedStyle(token);
+      return {
+        color: style.color,
+        light: style.getPropertyValue("--shiki-light").trim(),
+      };
+    });
+  expect(palette.light).not.toBe("");
+  expect(palette.color).not.toBe("rgb(255, 255, 255)");
+  await page.reload();
+  await expect(picker).toContainText("Python");
+  await expect(source).toContainText('print("done")');
+  expect((await downloadMarkdown(page)).body).toContain("```python\n");
+  expect(errors).toEqual([]);
+});
+
 test("unrecognized code language labels remain editable and export unchanged", async ({
   page,
 }, info) => {

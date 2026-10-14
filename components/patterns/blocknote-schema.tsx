@@ -5,7 +5,6 @@ import {
   defaultBlockSpecs,
   defaultStyleSpecs,
   createHeadingBlockSpec,
-  createCodeBlockSpec,
 } from "@blocknote/core";
 import {
   createReactBlockSpec,
@@ -18,6 +17,7 @@ import { Video } from "lucide-react";
 import type { ComponentProps } from "react";
 import { videoSource } from "@/lib/video";
 import type { BlockDocument, WritingBlock } from "@/lib/block-document";
+import { createWritingCodeBlock } from "./blocknote-code-block";
 
 export const writingDictionary = {
   ...en,
@@ -129,21 +129,13 @@ export function createWritingSchema(document: BlockDocument) {
     document.blocks.forEach(visit);
   }
   registerLanguages(document);
-  const codeBlock = createCodeBlockSpec({
+  const codeBlock = createWritingCodeBlock({
     ...codeBlockOptions,
     defaultLanguage: "text",
     supportedLanguages: languages,
   });
   codeBlock.implementation.meta!.highlight = (block) =>
     highlighting.get(block.props.language.toLowerCase()) || "text";
-  const renderCode = codeBlock.implementation.render!;
-  codeBlock.implementation.render = function (block, editor) {
-    const rendered = renderCode.call(this, block, editor);
-    const picker = rendered.dom.querySelector("select");
-    picker?.setAttribute("aria-label", "Code language");
-    picker?.classList.add("writing-code-language");
-    return rendered;
-  };
   const schema = BlockNoteSchema.create({
     blockSpecs: {
       paragraph,

@@ -163,10 +163,54 @@
   border-left: 3px solid var(--border);
   padding-inline-start: var(--space-4);
 }
-.fieldbook-blocknote [data-content-type="codeBlock"] {
+.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] {
+  flex-direction: column;
+  padding: 0;
   background: var(--muted);
+  color: var(--foreground);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+.fieldbook-blocknote [data-content-type="codeBlock"] > .writing-code-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+}
+.fieldbook-blocknote [data-content-type="codeBlock"] > .writing-code-content {
+  --bn-suggestion-surface: var(--muted);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  min-height: 4.5rem;
+  max-height: 24rem;
+  border: 0;
+  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+  background: transparent;
+  color: var(--foreground);
+  caret-color: var(--foreground);
+  overflow: auto;
+  overscroll-behavior: contain;
+  font-size: 0.8125rem;
+  line-height: 1.75;
+}
+.fieldbook-blocknote .writing-code-content code {
+  display: block;
+  min-height: 1.75em;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  white-space: pre;
+  overflow-wrap: normal;
+  font-family:
+    var(--font-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: inherit;
+}
+/* BlockNote's bundled Shiki themes supply both palettes; use the light palette. */
+.fieldbook-blocknote .writing-code-content .shiki {
+  color: var(--shiki-light, var(--foreground));
 }
 .fieldbook-blocknote [data-content-type="table"] {
   max-width: 100%;
@@ -572,15 +616,24 @@
   }
 }
 .fieldbook-blocknote .writing-code-language {
-  min-height: 32px;
-  margin: var(--space-2);
+  width: auto;
+  min-height: var(--control-height-sm);
+  margin: 0;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--control-radius);
-  background: var(--background);
+  background: transparent;
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   font-size: var(--type-label);
+}
+.fieldbook-blocknote .writing-code-language:hover:not(:disabled) {
+  background: var(--accent);
+}
+.bn-shadcn .writing-code-language-menu {
+  width: 15rem;
+  min-width: 15rem;
+  max-height: min(22rem, var(--available-height));
 }
 .fieldbook-blocknote .writing-code-language:focus-visible {
   outline: 2px solid var(--ring);
