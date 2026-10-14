@@ -35,6 +35,7 @@ import { CodeBlockHeader } from "./code-block";
 import { WritingBlockActions, blockActions } from "./writing-block-actions";
 import { useCodeHighlight } from "./use-code-highlight";
 import { useWritingInteraction } from "./writing-interaction";
+import { createDesktopWritingScroll } from "./desktop-writing-scroll";
 
 // The reader and CodeMirror use the same color classes and theme variables.
 const colors = syntaxHighlighting(
@@ -78,6 +79,7 @@ export function WritingCodeEditor({
 
   useEffect(() => {
     if (!host.current) return;
+    let desktopScroll: ReturnType<typeof createDesktopWritingScroll> = null;
     function leave(direction: "before" | "after", editor: EditorView) {
       const cursor = editor.state.selection.main;
       const edge = direction === "before" ? 0 : editor.state.doc.length;
@@ -156,12 +158,22 @@ export function WritingCodeEditor({
               )
             )
               current.current.setCode(update.state.doc.toString());
+            if (update.transactions.some(transaction => !transaction.annotation(Transaction.remote)
+              && (transaction.docChanged || transaction.isUserEvent("select") && !transaction.isUserEvent("select.pointer"))))
+              desktopScroll?.schedule();
           }),
         ],
       }),
     });
     view.current = editor;
+    desktopScroll = createDesktopWritingScroll(editor.contentDOM, () => {
+      const selection = editor.state.selection.main;
+      if (!editor.hasFocus || editor.composing || !selection.empty) return null;
+      const rect = editor.coordsAtPos(selection.head);
+      return rect ? { top: rect.top, bottom: rect.bottom, height: rect.bottom - rect.top } : null;
+    });
     return () => {
+      desktopScroll?.destroy();
       editor.destroy();
       view.current = null;
     };
