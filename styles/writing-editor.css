@@ -129,9 +129,6 @@
   );
   outline: none;
 }
-.fieldbook-blocknote .bn-block-content {
-  padding: 3px 0;
-}
 .fieldbook-blocknote [data-content-type="paragraph"] {
   line-height: 1.7;
 }
