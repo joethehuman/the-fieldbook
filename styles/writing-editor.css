@@ -486,6 +486,25 @@
 .bn-container.bn-shadcn .bn-side-menu .bn-button:active {
   background: var(--muted-hover);
 }
+/* A square grip keeps the rotated column handle the same size as the row handle. */
+.bn-shadcn .bn-table-handle {
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  min-width: var(--control-height-sm);
+  min-height: var(--control-height-sm);
+  padding: var(--space-2);
+  border-radius: var(--control-radius);
+  color: var(--muted-foreground);
+}
+.bn-shadcn .bn-table-handle svg {
+  width: 1rem;
+  height: 1rem;
+}
+/* Keep the native drag cursor on the bar; only the plus signals click-to-add. */
+.bn-shadcn .bn-extend-button svg[data-test="extendButton"] {
+  cursor: pointer;
+  pointer-events: auto;
+}
 .bn-shadcn :is(button, input):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
