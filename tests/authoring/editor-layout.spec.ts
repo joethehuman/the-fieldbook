@@ -4734,8 +4734,9 @@ test("modeled shrinking viewport reports do not acquire ordinary caret scrolling
   await open(page, info.project.name.startsWith("production"), "course");
   const writer = page.getByRole("textbox", { name: "Lesson content", exact: true });
   await writer.locator("p").first().tap();
-  // This is later viewport-only activity, outside the bounded focus permission.
-  await page.waitForTimeout(2200);
+  // Intentional scrolling ends the focus opening handoff. Elapsed time alone
+  // must not decide whether a later rendered contraction can reveal the caret.
+  await page.locator(".main-content").dispatchEvent("touchmove");
   await installCommandViewport(page, { height: 812, offsetTop: 0, clientHeight: 812 });
   type ShrinkProbe = { calls: number; anchor: Node | null; anchorOffset: number; focus: Node | null; focusOffset: number; surface: Element | null };
   await writer.evaluate(element => {
@@ -5179,13 +5180,32 @@ for (const kind of ["doc", "brief", "course"] as const) {
 test.describe("coordinated mobile focus", () => {
   test.use({ hasTouch: true, isMobile: true });
 
-  async function expectHeaderDock(page: Page) {
-    const header = (await page.locator(".topbar").boundingBox())!;
+  async function expectHeaderDock(page: Page, { outline = true } = {}) {
     const dock = page.getByRole("group", { name: "Editor controls", exact: true });
-    const box = (await dock.boundingBox())!;
-    expect(header.y).toBeCloseTo(0, 0);
-    expect(box.y).toBeGreaterThanOrEqual(header.y);
-    expect(box.y + box.height).toBeLessThanOrEqual(header.y + header.height);
+    const outlineButton = dock.getByRole("button", { name: "Outline", exact: true });
+    if (outline) await expect(outlineButton).toBeVisible();
+    else await expect(outlineButton).toHaveCount(0);
+    await expect(dock.getByRole("button", { name: "Details", exact: true })).toBeVisible();
+    await expect.poll(() => dock.evaluate(element => {
+      const header = element.closest(".app")!.querySelector(".topbar")!.getBoundingClientRect();
+      const canvas = document.querySelector(".main-content")!.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      const viewport = window.visualViewport!;
+      const buttons = Array.from(element.querySelectorAll("button"));
+      const controls = buttons.map(button => {
+        const rect = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return { contained: rect.width > 0 && rect.height > 0 && rect.left >= box.left
+          && rect.right <= box.right && rect.top >= box.top && rect.bottom <= box.bottom,
+          // Disabled commands intentionally do not receive pointer events.
+          reachable: button.disabled || button.contains(hit) };
+      });
+      return { origin: Math.abs(header.top - viewport.offsetTop) < 1,
+        contained: box.top >= header.top && box.bottom <= header.bottom,
+        canvasBelow: canvas.top >= header.bottom - 1,
+        painted: header.bottom <= viewport.offsetTop + viewport.height && box.width > 0,
+        hitTargets: controls.length >= 2 && controls.every(control => control.contained && control.reachable) };
+    })).toEqual({ origin: true, contained: true, canvasBelow: true, painted: true, hitTargets: true });
     await expect(dock).toBeInViewport({ ratio: 1 });
   }
   async function settle(page: Page) {
@@ -5196,7 +5216,7 @@ test.describe("coordinated mobile focus", () => {
     const source = kind === "source";
     const result = await open(page, installed, "course", 1, item => {
       item.body = "Paragraph 1.";
-      const code = kind === "long code" ? Array.from({ length: 80 }, (_, i) => `const value${i + 1} = ${i + 1};`).join("\n") : "const value = 1;\nconsole.log(value);";
+      const code = kind === "empty code" ? "" : kind === "long code" ? Array.from({ length: 80 }, (_, i) => `const value${i + 1} = ${i + 1};`).join("\n") : "const value = 1;\nconsole.log(value);";
       const body = Array.from({ length: 12 }, (_, i) => `Paragraph ${i + 1}. Preserve every useful word in the canvas.`).join("\n\n")
         + `\n\n\`\`\`js\n${code}\n\`\`\`\n\n| Topic | Detail |\n| --- | --- |\n| First | A useful detail. |\n\nLast paragraph for focus.`;
       item.lessons = [{ id: "one", title: "First lesson", body: source ? "Paragraph 1.\n\n<UnsupportedWidget>Keep exact source.</UnsupportedWidget>" : body }];
@@ -5210,23 +5230,53 @@ test.describe("coordinated mobile focus", () => {
     }
     await settle(page);
     await page.locator(".main-content").evaluate(owner => {
-      const tracked = owner as HTMLElement & { focusCalls: { top: number; behavior?: string }[] };
+      const tracked = owner as HTMLElement & { focusCalls: { top: number; before: number; after: number; behavior?: string; method: string; canvasBottom: number }[] };
       tracked.focusCalls = [];
-      const scrollTo = owner.scrollTo.bind(owner);
-      owner.scrollTo = (first?: ScrollToOptions | number, second?: number) => {
-        tracked.focusCalls.push({ top: typeof first === "number" ? second ?? 0 : first?.top ?? owner.scrollTop, behavior: typeof first === "object" ? first.behavior : undefined });
-        if (typeof first === "number") scrollTo(first, second ?? 0); else scrollTo(first);
-      };
+      for (const method of ["scrollTo", "scrollBy"] as const) {
+        const original = owner[method].bind(owner);
+        owner[method] = (first?: ScrollToOptions | number, second?: number) => {
+          const before = owner.scrollTop;
+          const offset = typeof first === "number" ? second ?? 0 : first?.top ?? 0;
+          if (typeof first === "number") original(first, second ?? 0); else original(first);
+          tracked.focusCalls.push({ top: method === "scrollBy" ? before + offset : offset,
+            before, after: owner.scrollTop, method,
+            behavior: typeof first === "object" ? first.behavior : undefined,
+            canvasBottom: owner.getBoundingClientRect().bottom });
+        };
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTop")!;
+      Object.defineProperty(owner, "scrollTop", { configurable: true,
+        get() { return descriptor.get!.call(owner) as number; },
+        set(value: number) {
+          const before = descriptor.get!.call(owner) as number;
+          descriptor.set!.call(owner, value);
+          const after = descriptor.get!.call(owner) as number;
+          if (after !== before) tracked.focusCalls.push({ top: value, before, after,
+            behavior: "instant", method: "scrollTop", canvasBottom: owner.getBoundingClientRect().bottom });
+        },
+      });
     });
     return result;
   }
   async function calls(page: Page) {
-    return page.locator(".main-content").evaluate(owner => (owner as HTMLElement & { focusCalls: { top: number; behavior?: string }[] }).focusCalls);
+    return page.locator(".main-content").evaluate(owner => (owner as HTMLElement & { focusCalls: { top: number; before: number; after: number; behavior?: string; method: string; canvasBottom: number }[] }).focusCalls);
+  }
+  async function clearCalls(page: Page) {
+    await page.locator(".main-content").evaluate(owner => { (owner as HTMLElement & { focusCalls: unknown[] }).focusCalls = []; });
+  }
+  async function instantCalls(page: Page) {
+    const trace = await calls(page);
+    for (const call of trace) {
+      expect(call.behavior, JSON.stringify(trace)).toBe("instant");
+      expect(call.after, JSON.stringify(trace)).toBeCloseTo(call.top, 0);
+    }
+    return trace;
   }
   async function lower(target: Locator) {
     await target.evaluate(node => {
       const owner = node.closest<HTMLElement>(".main-content")!;
       owner.scrollTop += node.getBoundingClientRect().top - 500;
+      (owner as HTMLElement & { focusCalls: unknown[] }).focusCalls = [];
     });
   }
   async function position(target: Locator) {
@@ -5270,10 +5320,32 @@ test.describe("coordinated mobile focus", () => {
     // target against the previous canvas bounds while that frame is pending.
     await expect.poll(() => page.locator(".main-content").evaluate(node => node.getBoundingClientRect().bottom)).toBeCloseTo(height, 0);
   }
-  async function opening(page: Page, heights = [740, 650, 540, 430, 350]) {
+  async function opening(page: Page, heights = [740, 650, 540, 430, 350], target?: Locator) {
     for (const height of heights) {
+      const before = target ? await position(target) : null;
+      const count = (await calls(page)).length;
       await renderHeight(page, height);
+      if (target) await visible(target);
+      await settle(page);
       await expectHeaderDock(page);
+      if (before) {
+        const after = await position(target!);
+        const trace = (await instantCalls(page)).slice(count);
+        if (height >= before.canvasBottom) {
+          expect(trace).toHaveLength(0);
+        } else {
+          // A completed canvas contraction can move only the clipped edge, in
+          // one immediate step. It cannot animate back toward an earlier size.
+          const expected = Math.max(0, before.bottom - (height - 8));
+          expect(after.scroll - before.scroll, JSON.stringify({ before, after, trace })).toBeCloseTo(expected, 0);
+          expect(trace.length).toBeLessThanOrEqual(1);
+          if (expected > 1) expect(trace).toHaveLength(1);
+          for (const call of trace) {
+            expect(call.after).toBeGreaterThanOrEqual(call.before);
+            expect(call.canvasBottom).toBeCloseTo(height, 0);
+          }
+        }
+      }
     }
   }
 
@@ -5289,79 +5361,161 @@ test.describe("coordinated mobile focus", () => {
       const before = await position(target);
       expect(before.focused).toBe(true);
       expect(await calls(page)).toHaveLength(0);
-      await opening(page);
+      await opening(page, undefined, target);
       await visible(target); await settle(page);
       const after = await position(target);
-      expect(await calls(page)).toHaveLength(1);
-      expect((await calls(page))[0].behavior).toBe("smooth");
+      expect((await instantCalls(page)).length).toBeGreaterThan(0);
       expect([after.start, after.end, after.value]).toEqual([before.start, before.end, before.value]);
       // Minimum reveal stops at the lower visible edge, not canvas top +24.
       expect(after.bottom).toBeGreaterThan(after.canvasBottom - 32);
       expect(after.scroll).toBeGreaterThan(before.scroll);
       await expect(page.locator(".course-quiz-focus-space")).toHaveCount(0);
       if (name === "Question" || name === "code") await page.screenshot({ path: info.outputPath(`focus-${name}-350.png`) });
-      await page.setViewportSize({ width: 375, height: 490 }); await settle(page);
-      expect(await calls(page)).toHaveLength(1);
+      const count = (await calls(page)).length;
+      await renderHeight(page, 490); await settle(page);
+      expect(await calls(page)).toHaveLength(count);
+      // An expanding scrollport can lower its maximum native scroll position.
+      // That range clamp is not an application reveal or reverse animation.
+      const maximum = await page.locator(".main-content").evaluate(owner => owner.scrollHeight - owner.clientHeight);
+      expect((await position(target)).scroll).toBeCloseTo(Math.min(after.scroll, maximum), 0);
     });
   }
 
-  test("delayed and reversing opening reports share one focus transaction", async ({ page }, info) => {
+  test("delayed and reversing opening reveals only completed contractions without a time lease", async ({ page }, info) => {
     await fixture(page, info.project.name.startsWith("production"));
     const field = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
     await lower(field); await field.tap();
     const initial = await position(field);
     // Model a delayed first geometry report; this is not an emulated OS keyboard.
-    await page.waitForTimeout(240);
+    await page.waitForTimeout(2200);
     expect((await position(field)).scroll).toBe(initial.scroll);
     expect(await calls(page)).toHaveLength(0);
-    await opening(page, [740, 490, 350, 420, 390]);
+    await opening(page, [740, 490, 350, 420, 390], field);
     await visible(field); await settle(page);
-    expect(await calls(page)).toHaveLength(1);
     const corrected = await position(field);
-    expect(corrected.bottom).toBeCloseTo(382, 0);
-    // A later pulse still belongs to the original intent, even after one reveal.
-    await opening(page, [350, 250]); await visible(field); await settle(page);
-    expect(await calls(page)).toHaveLength(2);
+    expect(corrected.bottom).toBeCloseTo(342, 0);
+    // Expansion does not move the field down. A later contraction reads the
+    // live target even after a pause longer than the removed focus lease.
+    await page.waitForTimeout(2200);
+    await opening(page, [350, 250], field); await visible(field); await settle(page);
     expect((await position(field)).scroll).toBeGreaterThan(corrected.scroll);
     expect((await position(field)).bottom).toBeCloseTo(242, 0);
   });
 
-  for (const path of ["visible between pulses", "clipped between pulses", "interrupted between pulses", "expired between pulses"]) {
-    test(`${path}: sparse height reports retain only the original focus permission`, async ({ page }, info) => {
+  test("focus, input and viewport panning do not acquire an outer scroll controller", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"));
+    const field = page.getByRole("textbox", { name: "Question", exact: true });
+    await lower(field); await field.tap(); await settle(page);
+    const before = await position(field);
+    await page.keyboard.insertText(" Native input."); await settle(page);
+    await page.locator(".main-content").dispatchEvent("scroll");
+    await page.evaluate(() => {
+      window.visualViewport!.dispatchEvent(new Event("scroll"));
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new Event("resize"));
+    });
+    await settle(page);
+    expect(await calls(page)).toHaveLength(0);
+    expect((await position(field)).scroll).toBeCloseTo(before.scroll, 0);
+    await expectHeaderDock(page);
+    // Ordinary input preserved focus for a later real canvas contraction.
+    await opening(page, [650, 490, 350], field);
+    expect((await instantCalls(page)).length).toBeGreaterThan(0);
+  });
+
+  test("a contraction during one pointer gesture waits for its committed selection", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"), "prose");
+    const first = page.locator(".writing-content > p").first();
+    const last = page.locator(".writing-content > p").last();
+    await first.tap(); await lower(last);
+    // Model one native event sequence; no second tap or resize may rescue a
+    // dropped contraction after the first pointer down.
+    await last.dispatchEvent("pointerdown", { pointerId: 1, pointerType: "touch", isPrimary: true, button: 0, bubbles: true });
+    await last.evaluate(node => {
+      const text = document.createTreeWalker(node, NodeFilter.SHOW_TEXT).nextNode()!;
+      window.getSelection()!.setBaseAndExtent(text, 6, text, 6);
+    });
+    const before = await position(last);
+    await renderHeight(page, 350); await settle(page);
+    expect(await calls(page)).toHaveLength(0);
+    await last.dispatchEvent("pointerup", { pointerId: 1, pointerType: "touch", isPrimary: true, button: 0, bubbles: true });
+    await last.dispatchEvent("click", { button: 0, bubbles: true });
+    await visible(last); await settle(page);
+    expect(await last.evaluate(node => node.contains(window.getSelection()?.focusNode || null))).toBe(true);
+    expect((await instantCalls(page)).length).toBe(1);
+    const after = await position(last);
+    expect([after.start, after.end, after.value]).toEqual([before.start, before.end, before.value]);
+    await expectHeaderDock(page);
+  });
+
+  test("reopening an already focused field consumes a contraction before pointer click", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"));
+    const field = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
+    await lower(field); await field.tap(); await settle(page);
+    const before = await position(field);
+    await field.dispatchEvent("pointerdown", { pointerId: 2, pointerType: "touch", isPrimary: true, button: 0, bubbles: true });
+    await renderHeight(page, 350); await settle(page);
+    await expect(field).toBeFocused();
+    expect(await calls(page)).toHaveLength(0);
+    await field.dispatchEvent("pointerup", { pointerId: 2, pointerType: "touch", isPrimary: true, button: 0, bubbles: true });
+    await field.dispatchEvent("click", { button: 0, bubbles: true });
+    await visible(field); await settle(page);
+    expect((await instantCalls(page)).length).toBe(1);
+    const after = await position(field);
+    expect([after.start, after.end, after.value]).toEqual([before.start, before.end, before.value]);
+    await expectHeaderDock(page);
+  });
+
+  for (const name of ["course title", "lesson title"]) {
+    test(`${name}: keyboard contraction keeps titles in the canvas and header hit targets fixed`, async ({ page }, info) => {
+      await fixture(page, info.project.name.startsWith("production"), "prose");
+      const field = name === "course title" ? page.locator("#editor-title") : page.getByRole("textbox", { name: "Lesson title", exact: true });
+      await field.tap(); await settle(page);
+      expect(await calls(page)).toHaveLength(0);
+      expect(await field.evaluate(node => Boolean(node.closest(".main-content")))).toBe(true);
+      await opening(page, [650, 430, 350], field);
+      await page.keyboard.press("Enter");
+      await page.keyboard.insertText(" Immediate writing.");
+      await expect(page.getByRole("textbox", { name: "Lesson content", exact: true })).toBeFocused();
+      await expect(page.getByRole("textbox", { name: "Lesson content", exact: true })).toContainText(" Immediate writing.");
+      await expectHeaderDock(page);
+    });
+  }
+
+  for (const path of ["visible between pulses", "clipped between pulses", "interrupted between pulses", "delayed between pulses"]) {
+    test(`${path}: sparse contractions follow focus until user interruption`, async ({ page }, info) => {
       await fixture(page, info.project.name.startsWith("production"));
       const field = page.getByRole("textbox", { name: path === "visible between pulses" ? "Answer 1 for question 1" : "Explanation (optional)", exact: true });
       await field.evaluate((node, top) => {
         const owner = node.closest<HTMLElement>(".main-content")!;
         owner.scrollTop += node.getBoundingClientRect().top - top;
       }, path === "visible between pulses" ? 400 : 500);
+      await clearCalls(page);
       await field.tap();
       const initial = await position(field);
       await renderHeight(page, 490);
       if (path !== "visible between pulses") await visible(field);
       await page.waitForTimeout(200);
       const first = await position(field);
-      let count = (await calls(page)).length;
+      const count = (await calls(page)).length;
       expect(count).toBe(path === "visible between pulses" ? 0 : 1);
       if (path === "interrupted between pulses") {
         await page.locator(".main-content").dispatchEvent("touchmove");
-        // Cancellation may abort an unfinished native animation at its current
-        // position. Subsequent geometry must add no corrective movement.
-        count = (await calls(page)).length;
       }
-      if (path === "expired between pulses") await page.waitForTimeout(2200);
+      if (path === "delayed between pulses") await page.waitForTimeout(2200);
       await renderHeight(page, 350);
-      if (path.startsWith("visible") || path.startsWith("clipped")) {
+      if (path !== "interrupted between pulses") {
         await visible(field); await settle(page);
         const last = await position(field);
         expect(await calls(page)).toHaveLength(count + 1);
         expect(last.scroll).toBeGreaterThan(first.scroll);
         expect([last.start, last.end, last.value]).toEqual([initial.start, initial.end, initial.value]);
         expect(last.bottom).toBeCloseTo(342, 0);
-        const destinations = (await calls(page)).filter(call => call.behavior === "smooth").map(call => call.top);
+        const destinations = (await instantCalls(page)).map(call => call.top);
         expect(destinations).toEqual([...destinations].sort((a, b) => a - b));
       } else {
-        await page.waitForTimeout(260);
-        // Geometry after explicit interruption or expiry cannot start another reveal.
+        await settle(page);
+        // Geometry after an explicit manual gesture cannot restart a reveal.
         expect(await calls(page)).toHaveLength(count);
       }
       await expectHeaderDock(page);
@@ -5387,16 +5541,120 @@ test.describe("coordinated mobile focus", () => {
     await page.locator(".main-content").evaluate(node => {
       (node as HTMLElement & { focusCalls: unknown[] }).focusCalls = [];
     });
-    await opening(page); await visible(code); await settle(page);
+    await opening(page, undefined, code); await visible(code); await settle(page);
     const after = await position(code);
     expect([after.start, after.end, after.value]).toEqual([before.start, before.end, before.value]);
     expect(await port.evaluate(node => node.scrollTop)).toBeCloseTo(internal, 0);
     const portBox = (await port.boundingBox())!;
     expect(after.top).toBeGreaterThanOrEqual(portBox.y);
     expect(after.bottom).toBeLessThanOrEqual(portBox.y + portBox.height);
-    expect((await calls(page)).filter(call => call.behavior === "smooth")).toHaveLength(1);
+    expect((await instantCalls(page)).length).toBeGreaterThan(0);
     await expectHeaderDock(page);
     await page.screenshot({ path: info.outputPath("focus-long-code-350.png") });
+  });
+
+  test("code contraction reads rendered focus without flushing CodeMirror selection or scrolling", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"), "code");
+    const code = page.getByRole("textbox", { name: "Code block", exact: true });
+    await lower(code); await code.tap(); await settle(page);
+    const before = await position(code);
+    type CodeReadProbe = { outsideMeasure: string[]; domReads: number; synchronousFlushes: number };
+    await code.evaluate(node => {
+      type View = { domAtPos: (pos: number, side?: number) => unknown; coordsAtPos: (pos: number, side?: number) => unknown;
+        readMeasured: () => void; measure: (...args: unknown[]) => void };
+      // Follow the installed findFromDOM representation. cmView is the older
+      // dependency's equivalent; neither lookup invokes a layout read.
+      const content = node as HTMLElement & { cmTile?: { root: { view: View } }; cmView?: { rootView: { view: View } } };
+      const view = content.cmTile?.root.view || content.cmView?.rootView.view;
+      if (!view) throw new Error("CodeMirror view is unavailable for the geometry ownership probe");
+      const trace: CodeReadProbe = { outsideMeasure: [], domReads: 0, synchronousFlushes: 0 };
+      (window as unknown as { codeReadProbe: CodeReadProbe }).codeReadProbe = trace;
+      let measuring = 0, reading = 0;
+      const measure = view.measure.bind(view);
+      view.measure = (...args) => {
+        if (!measuring && reading) trace.synchronousFlushes++;
+        measuring++;
+        try { return measure(...args); } finally { measuring--; }
+      };
+      const coords = view.coordsAtPos.bind(view);
+      view.coordsAtPos = (...args) => {
+        if (!measuring) trace.outsideMeasure.push("coordsAtPos");
+        reading++;
+        try { return coords(...args); } finally { reading--; }
+      };
+      const read = view.readMeasured.bind(view);
+      view.readMeasured = () => {
+        if (!measuring) trace.outsideMeasure.push("readMeasured");
+        reading++;
+        try { return read(); } finally { reading--; }
+      };
+      const dom = view.domAtPos.bind(view);
+      view.domAtPos = (...args) => { if (!measuring) trace.domReads++; return dom(...args); };
+    });
+    await opening(page, [650, 490, 350], code);
+    const trace = await page.evaluate(() => (window as unknown as { codeReadProbe: CodeReadProbe }).codeReadProbe);
+    expect(trace.domReads).toBeGreaterThan(0);
+    expect(trace.outsideMeasure, JSON.stringify(trace)).toEqual([]);
+    expect(trace.synchronousFlushes).toBe(0);
+    const after = await position(code);
+    expect([after.start, after.end, after.value]).toEqual([before.start, before.end, before.value]);
+  });
+
+  test("an empty low code block keeps its painted caret visible through keyboard contraction", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"), "empty code");
+    const code = page.getByRole("textbox", { name: "Code block", exact: true });
+    await expect(code.locator(".cm-line")).toHaveCount(1);
+    await expect(code).toHaveText("");
+    await lower(code); await code.tap(); await settle(page);
+    async function emptyCaret() {
+      return code.evaluate(node => {
+        type View = { state: { doc: { length: number }; selection: { main: { head: number; empty: boolean } } };
+          visibleRanges: { from: number; to: number }[];
+          domAtPos: (pos: number) => { node: Node; offset: number } };
+        const content = node as HTMLElement & { cmTile?: { root: { view: View } }; cmView?: { rootView: { view: View } } };
+        const view = content.cmTile?.root.view || content.cmView?.rootView.view;
+        if (!view) throw new Error("Missing empty code view");
+        const line = node.querySelector(".cm-line")!.getBoundingClientRect();
+        const cursor = node.closest(".cm-editor")!.querySelector(".cm-cursor")?.getBoundingClientRect();
+        // Use CodeMirror's already-painted caret, or its native empty line.
+        // The whole contenteditable rectangle can hide an empty-position bug.
+        const caret = cursor && cursor.height > 0 ? cursor : line;
+        const owner = node.closest<HTMLElement>(".main-content")!;
+        const canvas = owner.getBoundingClientRect();
+        const native = window.getSelection();
+        const dom = view.domAtPos(0);
+        return { focused: document.activeElement === node, nativeInside: Boolean(native?.isCollapsed && node.contains(native.focusNode)),
+          modelLength: view.state.doc.length, modelHead: view.state.selection.main.head,
+          modelEmpty: view.state.selection.main.empty, caretTop: caret.top, caretBottom: caret.bottom,
+          canvasTop: canvas.top, canvasBottom: canvas.bottom, source: cursor && cursor.height > 0 ? "painted cursor" : "empty line",
+          visible: caret.height > 0 && caret.top >= canvas.top + 7 && caret.bottom <= canvas.bottom - 7,
+          domNode: dom.node.nodeName, domOffset: dom.offset, domParent: dom.node.parentElement?.className,
+          domClass: dom.node instanceof Element ? dom.node.className : null, visibleRanges: view.visibleRanges,
+          scroll: owner.scrollTop };
+      });
+    }
+    expect(await calls(page)).toHaveLength(0);
+    await expect.poll(emptyCaret).toMatchObject({ focused: true, nativeInside: true, modelLength: 0, modelHead: 0, modelEmpty: true, visible: true });
+    for (const height of [650, 490, 350, 250]) {
+      const before = await emptyCaret();
+      const count = (await calls(page)).length;
+      await renderHeight(page, height);
+      try {
+        await expect.poll(emptyCaret).toMatchObject({ focused: true, nativeInside: true, modelLength: 0, modelHead: 0, modelEmpty: true, visible: true });
+      } catch (error) {
+        await info.attach(`empty-code-${height}`, { body: JSON.stringify({ before, after: await emptyCaret(), calls: await calls(page) }), contentType: "application/json" });
+        throw error;
+      }
+      await settle(page); await expectHeaderDock(page);
+      const after = await emptyCaret();
+      expect(after.scroll).toBeGreaterThanOrEqual(before.scroll);
+      const trace = (await instantCalls(page)).slice(count);
+      expect(trace.length).toBeLessThanOrEqual(1);
+      for (const call of trace) expect(call.canvasBottom).toBeCloseTo(height, 0);
+    }
+    expect((await calls(page)).length).toBeGreaterThan(0);
+    await page.keyboard.insertText("const visible = true;");
+    await expect(code).toHaveText("const visible = true;");
   });
 
   test("reduced motion reveals a clipped field without smooth animation", async ({ page }, info) => {
@@ -5417,34 +5675,39 @@ test.describe("coordinated mobile focus", () => {
     const paragraph = page.locator(".writing-content > p").last();
     await lower(paragraph); await paragraph.tap();
     const before = await position(paragraph);
-    await page.setViewportSize({ width: 375, height: 650 });
+    await renderHeight(page, 650);
+    const count = (await calls(page)).length;
     await page.keyboard.insertText(" Initial input.");
-    await opening(page, [540, 430, 350]);
+    await settle(page);
+    expect(await calls(page)).toHaveLength(count);
+    await opening(page, [540, 430, 350], paragraph);
     await visible(paragraph);
     const after = await position(paragraph);
     expect(after.start).toBe(before.start! + " Initial input.".length);
     await waitForDraftSaved(page);
     expect((await result.read()).content[0].lessons[0].body).toContain(" Initial input.");
-    expect((await calls(page)).length).toBeLessThanOrEqual(1);
+    await instantCalls(page);
   });
 
   test("typing during opening reads the live Quiz field and saves every edit", async ({ page }, info) => {
     const result = await fixture(page, info.project.name.startsWith("production"));
     const field = page.getByRole("textbox", { name: "Question", exact: true });
-    await field.tap(); await field.press("End");
+    await lower(field); await field.tap();
     const initial = await position(field);
-    await page.setViewportSize({ width: 375, height: 650 });
+    await renderHeight(page, 650);
+    const count = (await calls(page)).length;
     await page.keyboard.insertText(" edited during opening");
-    await opening(page, [540, 430, 350]);
+    await settle(page);
+    expect(await calls(page)).toHaveLength(count);
+    await opening(page, [540, 430, 350], field);
     await visible(field);
     await waitForDraftSaved(page);
     expect((await result.read()).content[0].questions[0].prompt).toContain(" edited during opening");
     expect((await position(field)).start).toBe(initial.start! + " edited during opening".length);
-    // Native field editing may already reveal it; avoid a duplicate movement.
-    expect((await calls(page)).length).toBeLessThanOrEqual(1);
+    await instantCalls(page);
   });
 
-  for (const reason of ["manual gesture", "keyboard selection", "blur", "rotation", "expiry"]) {
+  for (const reason of ["manual gesture", "keyboard selection", "select all", "blur", "rotation", "full recovery"]) {
     test(`${reason}: canceled focus cannot revive on later resize`, async ({ page }, info) => {
       await fixture(page, info.project.name.startsWith("production"));
       const field = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
@@ -5454,15 +5717,17 @@ test.describe("coordinated mobile focus", () => {
       expect(before.bottom).toBeLessThanOrEqual(before.canvasBottom - 8);
       if (reason === "manual gesture") await page.locator(".main-content").dispatchEvent("touchmove");
       else if (reason === "keyboard selection") await field.press("Shift+ArrowLeft");
+      else if (reason === "select all") await field.press("ControlOrMeta+a");
       else if (reason === "blur") await field.evaluate(node => (node as HTMLElement).blur());
       else if (reason === "rotation") {
         await page.setViewportSize({ width: 667, height: 375 }); await settle(page);
         await page.setViewportSize({ width: 375, height: 812 }); await settle(page);
       } else {
-        // Hardware-keyboard focus can have no resize; permission must expire.
-        await page.waitForTimeout(2200);
+        await opening(page, [650, 350], field);
+        await renderHeight(page, 812); await settle(page);
+        await clearCalls(page);
       }
-      await opening(page); await page.waitForTimeout(240);
+      await opening(page); await settle(page);
       expect(await calls(page)).toHaveLength(0);
     });
   }
@@ -5475,7 +5740,7 @@ test.describe("coordinated mobile focus", () => {
     const field = page.getByRole("textbox", { name: "Explanation (optional)", exact: true });
     // Model OS Next's native focus transition, not its platform UI.
     await field.evaluate(node => (node as HTMLElement).focus({ preventScroll: true }));
-    await opening(page); await visible(field); await settle(page);
+    await opening(page, undefined, field); await visible(field); await settle(page);
     const count = (await calls(page)).length;
     await field.evaluate(node => (node as HTMLTextAreaElement).setSelectionRange(4, 18, "backward"));
     const before = await position(field);
@@ -5485,17 +5750,46 @@ test.describe("coordinated mobile focus", () => {
     await settle(page);
     const returned = await position(field);
     expect([returned.start, returned.end]).toEqual([before.start, before.end]);
-    expect((await calls(page)).filter(call => call.behavior === "smooth")).toHaveLength(count);
+    expect(await calls(page)).toHaveLength(count);
     // A restored range does not grant permission to follow a new user selection.
     await field.press("Shift+ArrowRight");
     const selected = await position(field);
-    await page.setViewportSize({ width: 375, height: 250 }); await page.waitForTimeout(200);
-    expect((await calls(page)).filter(call => call.behavior === "smooth")).toHaveLength(count);
+    await renderHeight(page, 250); await settle(page);
+    expect(await calls(page)).toHaveLength(count);
     expect([(await position(field)).start, (await position(field)).end]).toEqual([selected.start, selected.end]);
     await page.setViewportSize({ width: 375, height: 812 });
     await page.getByRole("button", { name: "Outline", exact: true }).tap();
     await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: /First lesson/ }).tap();
     await expect(page.locator(".course-quiz-canvas")).toHaveCount(0);
+    await expectHeaderDock(page);
+  });
+
+  test("a changed native prose range ends a popup return before a later contraction", async ({ page }, info) => {
+    await fixture(page, info.project.name.startsWith("production"), "prose");
+    const paragraph = page.locator(".writing-content > p").last();
+    await lower(paragraph); await paragraph.tap();
+    await opening(page, [650, 490, 350], paragraph);
+    const before = await position(paragraph);
+    await page.getByRole("button", { name: "Details", exact: true }).tap();
+    await page.keyboard.press("Tab"); await page.keyboard.press("Escape");
+    await expect(page.getByRole("textbox", { name: "Lesson content", exact: true })).toBeFocused();
+    await visible(paragraph); await settle(page);
+    const returned = await position(paragraph);
+    expect([returned.start, returned.end]).toEqual([before.start, before.end]);
+    const count = (await calls(page)).length;
+    await paragraph.evaluate(node => {
+      const text = document.createTreeWalker(node, NodeFilter.SHOW_TEXT).nextNode()!;
+      const selection = window.getSelection()!;
+      selection.setBaseAndExtent(text, 0, text, 2);
+    });
+    await settle(page);
+    const changed = await position(paragraph);
+    expect(changed.start).not.toBe(returned.start);
+    await renderHeight(page, 250); await settle(page);
+    expect(await calls(page)).toHaveLength(count);
+    const final = await position(paragraph);
+    expect([final.start, final.end]).toEqual([changed.start, changed.end]);
+    expect(await paragraph.evaluate(() => window.getSelection()?.toString())).toBe("La");
     await expectHeaderDock(page);
   });
 
@@ -5513,7 +5807,7 @@ test.describe("coordinated mobile focus", () => {
     }).toBe(true);
     await expect(field).toBeFocused(); await expect(field).toHaveValue(before);
     expect(await field.evaluate(node => (node as HTMLTextAreaElement).selectionStart)).toBe(0);
-    expect((await calls(page)).filter(call => call.behavior === "smooth").length).toBeLessThanOrEqual(1);
+    await instantCalls(page);
   });
 
   test("touch code stays at readable focus size and retains code editing and Markdown", async ({ page }, info) => {
@@ -5529,7 +5823,7 @@ test.describe("coordinated mobile focus", () => {
     await code.press("ControlOrMeta+z"); await expect(code).toHaveText(original);
     await code.press("ControlOrMeta+Shift+z"); await expect(code).toHaveText(original + " // edited");
     await page.setViewportSize({ width: 375, height: 350 });
-    await expectHeaderDock(page);
+    await expectHeaderDock(page, { outline: false });
     const { body } = await downloadMarkdown(page);
     expect(body).toContain("```js\n" + original + " // edited\n```");
     await page.evaluate(() => { document.documentElement.style.fontSize = "20px"; });
@@ -5560,7 +5854,7 @@ test.describe("coordinated mobile focus", () => {
       return prose.textContent === "Paragraph 1. Keep neighboring prose."
         && Boolean(prose.compareDocumentPosition(node.querySelector(".writing-code-block")!) & Node.DOCUMENT_POSITION_FOLLOWING);
     })).toBe(true);
-    await expectHeaderDock(page);
+    await expectHeaderDock(page, { outline: false });
     expect((await downloadMarkdown(page)).body).toMatch(/Paragraph 1\. Keep neighboring prose\.\n\n```[^\n]*\nconst inserted = true;\n```/);
   });
 });

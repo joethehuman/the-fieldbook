@@ -35,6 +35,7 @@ import { CodeBlockHeader } from "./code-block";
 import { WritingBlockActions, blockActions } from "./writing-block-actions";
 import { useCodeHighlight } from "./use-code-highlight";
 import { useWritingInteraction } from "./writing-interaction";
+import { registerEditingFocusReader } from "./editing-focus-geometry";
 
 // The reader and CodeMirror use the same color classes and theme variables.
 const colors = syntaxHighlighting(
@@ -156,7 +157,35 @@ export function WritingCodeEditor({
       }),
     });
     view.current = editor;
+    const removeFocusReader = registerEditingFocusReader(editor.contentDOM, () => {
+      const head = editor.state.selection.main.head;
+      // An empty document has a rendered line but no nonempty visible ranges.
+      if (editor.state.doc.length && !editor.visibleRanges.some(range => head >= range.from && head <= range.to)) return null;
+      // coordsAtPos flushes CodeMirror's pending measure, including selection and
+      // ancestor scrolling. Read only its already-rendered model position here.
+      // CodeMirror retains ownership of virtualization and internal scrolling.
+      const { node, offset } = editor.domAtPos(head);
+      if (!editor.contentDOM.contains(node)) return null;
+      const range = document.createRange();
+      range.setStart(node, offset); range.collapse(true);
+      let box = Array.from(range.getClientRects()).find(rect => rect.height > 0);
+      if (!box && node instanceof Text && node.length) {
+        const start = Math.min(offset, node.length - 1);
+        range.setStart(node, start); range.setEnd(node, start + 1);
+        box = Array.from(range.getClientRects()).find(rect => rect.height > 0);
+      }
+      if (!box) {
+        const line = (node instanceof Element ? node : node.parentElement)?.closest(".cm-line");
+        if (line && !line.textContent) box = line.getBoundingClientRect();
+      }
+      if (!box) return null;
+      const port = editor.scrollDOM.getBoundingClientRect();
+      const top = Math.max(box.top, port.top + editor.scrollDOM.clientTop);
+      const bottom = Math.min(box.bottom, port.top + editor.scrollDOM.clientTop + editor.scrollDOM.clientHeight);
+      return bottom > top ? { top, bottom } : null;
+    });
     return () => {
+      removeFocusReader();
       editor.destroy();
       view.current = null;
     };
