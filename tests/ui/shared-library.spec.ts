@@ -247,12 +247,18 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   await expect(policyText).toBeFocused();
   await page.keyboard.press("ControlOrMeta+z");
   await expect(policyText).toHaveText("");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(policyText.locator(":scope > h1")).toHaveCount(0);
+  await expect(policyText.locator(":scope > p")).toHaveCount(1);
   await commands.focus();
   await page.keyboard.press("Enter");
   await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(commands).toBeFocused();
+  // The first edit initializes the optional privacy settings object even after Undo.
+  await page.getByRole("button", { name: "Discard changes", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Save settings", exact: true })).toBeDisabled();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("settings-privacy.png"),
