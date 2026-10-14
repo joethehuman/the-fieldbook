@@ -49,7 +49,7 @@ export type ProfileRecord = {
   active: boolean;
   groups: string[];
   added_at?: string | null;
-  auth_user_id?: string | null;
+  registered: boolean;
   team_id?: string | null;
   onboarding_start?: string | null;
   group_joined_at?: Record<string, string>;
@@ -110,6 +110,8 @@ export type DraftIndexRecord = Partial<
 > & {
   version?: number | string;
   duration?: number | string;
+  /** Actual published rule; null or missing retains the legacy passing default. */
+  publishedRequirePassing?: boolean | null;
 } & Pick<
     DocumentRecord,
     "id" | "revision" | "published_revision" | "updated_at"
@@ -181,7 +183,9 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
   listDraftIndex(): Promise<DraftIndexRecord[]>;
   listDraftCourses(): Promise<DocumentRecord[]>;
   listPublishedAssignmentContent(): Promise<PublishedAssignmentRecord[]>;
-  listPublishedReaderIndex(ids?: readonly string[]): Promise<ReaderIndexRecord[]>;
+  listPublishedReaderIndex(
+    ids?: readonly string[],
+  ): Promise<ReaderIndexRecord[]>;
   listPublishedCourseIndex(): Promise<CourseIndexRecord[]>;
   findReadyMedia(ids: string[]): Promise<{ id: string; mime: string }[]>;
   findCurriculumArtwork(ids: string[]): Promise<{ id: string; mime: string }[]>;

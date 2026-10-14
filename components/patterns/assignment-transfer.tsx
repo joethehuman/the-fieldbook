@@ -23,7 +23,6 @@ export type AssignmentTransferOption = {
   label: string;
   type?: "course" | "curriculum" | "update" | "team" | "group";
   description?: string;
-  searchText?: string;
   assignmentCount?: number;
   includedItems?: { id: string; label: string }[];
 };
@@ -156,9 +155,7 @@ export function AssignmentTransfer({
             .filter(Boolean);
           const matches = all.filter((option) =>
             terms.every((term) =>
-              `${option.label} ${option.description || ""} ${option.searchText || ""}`
-                .toLowerCase()
-                .includes(term),
+              option.label.toLowerCase().includes(term),
             ),
           );
           const sections = (

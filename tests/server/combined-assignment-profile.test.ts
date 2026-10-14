@@ -18,7 +18,7 @@ const row: ProfileRecord = {
   email: "person@example.test",
   role: "learner",
   active: true,
-  auth_user_id: "login",
+  registered: true,
   groups: [],
   team_id: null,
   effective_group_joined_at: { stale: "2026-01-01" },
@@ -50,7 +50,7 @@ test("authorized computed learning context survives profile mapping without gran
 test("legacy episode projections still filter ended obligations and preserve pending-person identity", () => {
   const user = profile({
     ...row,
-    auth_user_id: null,
+    registered: false,
     assignment_context: undefined,
     learning_assignments: [
       assignment,

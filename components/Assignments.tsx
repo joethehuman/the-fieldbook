@@ -210,7 +210,7 @@ export function Assignments({
     .filter(
       (c) =>
         (!scope.courseId || c.id === scope.courseId) &&
-        c.title.toLowerCase().includes(query.toLowerCase()),
+        c.title.toLowerCase().includes(query.trim().toLowerCase()),
     )
     .map((c) => {
       const sources = assignmentRules(c).filter((a) =>

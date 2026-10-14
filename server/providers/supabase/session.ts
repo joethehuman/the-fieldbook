@@ -2,7 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "../../env";
-import { isAbsentSession } from "../../errors";
+import { isAbsentSession, isInactiveIdentity } from "./auth-errors";
 
 /** Refresh only; Fieldbook's actor services separately verify identity and permissions. */
 export async function refreshIdentitySession(
@@ -27,6 +27,16 @@ export async function refreshIdentitySession(
   });
   try {
     const { error } = await client.auth.getSession();
+    if (error && isInactiveIdentity(error)) {
+      const denied = new NextResponse("This account is inactive.", {
+        status: 403,
+        headers: { "Cache-Control": "private, no-store" },
+      });
+      // Preserve any expired-session cookie removal performed by the provider.
+      for (const cookie of response.cookies.getAll())
+        denied.cookies.set(cookie);
+      return denied;
+    }
     if (error && !isAbsentSession(error)) throw error;
   } catch {
     return new NextResponse(

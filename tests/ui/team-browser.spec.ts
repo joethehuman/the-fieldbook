@@ -281,8 +281,8 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
     exact: true,
   });
   await search.fill("Operations");
-  // Search also matches the deliberately long manager name on two teams.
-  await expect(browser.locator("[data-hierarchy-id]")).toHaveCount(3);
+  // Manager descriptions do not add unrelated teams to name search results.
+  await expect(browser.locator("[data-hierarchy-id]")).toHaveCount(1);
   await search.fill("");
   await expect(browser.locator('[data-slot="hierarchy-column"]')).toHaveCount(
     12,
@@ -515,7 +515,7 @@ test("saved parent owns its child and connector across sibling switches and relo
   await expect(createdEdge).toHaveCount(0);
 });
 
-test("path search and flat bulk selection share the same matches; browsing a result reveals its branch", async ({
+test("name search and flat bulk selection share the same matches; browsing a result reveals its branch", async ({
   page,
 }, info) => {
   test.skip(info.project.name === "phone", "Phone uses the paginated directory; record navigation and saved changes have separate coverage.");

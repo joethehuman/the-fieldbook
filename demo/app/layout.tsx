@@ -1,3 +1,4 @@
+import { IdentityPresentation } from "../../components/IdentityPresentation";
 import { TooltipProvider } from "../../components/ui/tooltip";
 import { ToastProvider } from "../../components/ui/toast";
 import { InteractionDialogProvider } from "../../components/ui/interaction-dialog";
@@ -45,13 +46,30 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: demoSessionScript }} />
       </head>
       <body>
-        <DesktopSidebarProvider>
-          <TooltipProvider>
-            <ToastProvider>
-              <InteractionDialogProvider>{children}</InteractionDialogProvider>
-            </ToastProvider>
-          </TooltipProvider>
-        </DesktopSidebarProvider>
+        <IdentityPresentation
+          value={{
+            options: [],
+            signInLabel: "Sign in with Google",
+            progressDescription:
+              "Sign in with Google to save course progress across devices and browsers.",
+            accessDeniedDescription: "Choose a demo profile to continue.",
+            registration: {
+              emailLabel: "Email label",
+              description: "Add a fictional person to the demo.",
+              pendingDescription: "This is a fictional demo account.",
+            },
+          }}
+        >
+          <DesktopSidebarProvider>
+            <TooltipProvider>
+              <ToastProvider>
+                <InteractionDialogProvider>
+                  {children}
+                </InteractionDialogProvider>
+              </ToastProvider>
+            </TooltipProvider>
+          </DesktopSidebarProvider>
+        </IdentityPresentation>
         <Telemetry />
       </body>
     </html>

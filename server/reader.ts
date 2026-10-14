@@ -36,6 +36,7 @@ import { publishedReaderTag } from "./reader-cache";
 import type { Workspace } from "@/lib/store";
 import { updatesForUser } from "@/lib/learning-groups";
 import { reportTeamIds } from "@/lib/types";
+import { searchSuggestions } from "@/lib/search-suggestions";
 
 export type ReaderItem = Pick<
   Content,
@@ -258,6 +259,51 @@ function courseSummary(row: CourseRow): Content {
       options: [],
     })),
   };
+}
+export async function readerSearchSuggestions(user: User | null) {
+  const config = await canRead(user);
+  if (user && !user.active)
+    throw new HttpError(403, "This account is inactive.");
+  const [rows, courseRows, progress] = await Promise.all([
+    publishedIndex(dataStore().cacheNamespace(), config.governance_revision),
+    publishedCourseIndex(
+      dataStore().cacheNamespace(),
+      config.governance_revision,
+    ),
+    user ? dataStore().listUserProgress(user.id) : Promise.resolve([]),
+  ]);
+  const content: Content[] = [
+    ...courseRows
+      .filter((row) => row.kind === "course" && row.status === "published")
+      .map((row) => courseSummary(row as unknown as CourseRow)),
+    ...rows
+      .filter((row) => row.kind !== "course" && row.status === "published")
+      .map((row) => ({
+        ...row,
+        body: "",
+        version: 1,
+        duration: 0,
+        lessons: [],
+        questions: [],
+      })),
+  ];
+  const projected = user
+    ? { content, user, groups: config.groups || [] }
+    : guestRecommendations({
+        content,
+        settings: config.settings,
+        groups: config.groups || [],
+        curricula: config.curricula || [],
+      });
+  return searchSuggestions({
+    content: projected.content,
+    user: projected.user,
+    groups: projected.groups,
+    teams: user ? config.teams || [] : [],
+    progress,
+    docCategoryOrder: config.settings.docCategoryOrder,
+    docSections: config.settings.docSections,
+  });
 }
 export const readerCourses = cache(async () => {
   const { user, config } = await readerAccess("/courses");

@@ -228,6 +228,15 @@ export const settingsSchema = z
           name: text(80).trim().min(1),
           parentId: text(1500).optional(),
           docOrder: z.array(text(80).min(1)).max(5000).optional(),
+          itemOrder: z
+            .array(
+              z.discriminatedUnion("kind", [
+                z.object({ kind: z.literal("doc"), id: text(80).min(1) }),
+                z.object({ kind: z.literal("section"), id: text(1500).min(1) }),
+              ]),
+            )
+            .max(5500)
+            .optional(),
           legacyCategory: text(80).optional(),
           legacyFolder: text(300).optional(),
         }),

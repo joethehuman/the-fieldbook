@@ -69,7 +69,9 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
   await input.blur();
   await searchInput(page);
   await expect(result).toBeVisible();
-  await page.mouse.click(4, 4);
+  if (info.project.name === "phone")
+    await panel.getByRole("button", { name: "Close search", exact: true }).click();
+  else await page.mouse.click(4, 4);
   await expect(panel).toHaveCount(0);
   await searchInput(page);
   await expect(result).toBeVisible();
@@ -150,7 +152,7 @@ test("search preserves an unsaved editor and guards result navigation", async ({
   }, data);
   await page.goto("/#admin");
   await page.locator('table[data-layout="contentSelection"] tbody tr').first().getByRole("link").click();
-  const title = page.getByRole("textbox", { name: "Title", exact: true });
+  const title = page.getByRole("textbox", { name: "Title", exact: true, includeHidden: true });
   // Successful autosave allows navigation. Hold a real failed save to exercise
   // the unsaved-work guard while search remains available over the editor.
   await page.evaluate(() => {
@@ -174,6 +176,13 @@ test("search preserves an unsaved editor and guards result navigation", async ({
   await expect(title).toHaveValue("Unsaved work survives search");
   await expect(page).toHaveURL(/#admin/);
   await searchInput(page);
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await page.getByRole("navigation", { name: "Browse content" }).getByRole("link", { name: "Docs", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(title).toHaveValue("Unsaved work survives search");
+  await searchInput(page);
+  await input.fill("Published destination");
   await expect(result).toBeVisible();
   await result.click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
@@ -345,12 +354,15 @@ test("Search returns to the first results and chat uses an embedded multiline co
     const fieldBox = (await field.boundingBox())!;
     expect(fieldBox.y + fieldBox.height).toBe(emptyComposerBottom);
   }
-  await reset.hover();
-  await expect
-    .poll(() =>
-      reset.evaluate((element) => getComputedStyle(element).backgroundColor),
-    )
-    .not.toBe("rgba(0, 0, 0, 0)");
+  if (await page.evaluate(() => matchMedia("(hover: hover)").matches)) {
+    await reset.hover();
+    await expect
+      .poll(() => reset.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .not.toBe("rgba(0, 0, 0, 0)");
+  } else {
+    await reset.tap();
+    await expect(chat.getByRole("log")).toBeEmpty();
+  }
   await page.screenshot({ path: info.outputPath("ask-ai-steady-chat.png") });
   if (info.project.name === "tablet") {
     await page.setViewportSize({ width: 1180, height: 740 });
@@ -387,13 +399,8 @@ test("Search returns to the first results and chat uses an embedded multiline co
   expect(aiRequests).toEqual([]);
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(input).toHaveValue("");
-  if (await openSearch.isVisible()) {
-    await expect(
-      panel.getByRole("tab", { name: "Search", exact: true }),
-    ).toHaveAttribute("aria-selected", "true");
-  } else {
-    await expect(panel).toHaveCount(0);
-  }
+  await expect(panel.getByRole("tab", { name: "Search", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(panel.getByRole("navigation", { name: "Browse content" })).toBeVisible();
   await expect(chat).toHaveCount(0);
   expect(
     await page.evaluate(

@@ -205,7 +205,7 @@ test("feedback export follows all filters, chronological sorting and readable fa
     ["c", "b", "a"],
   );
   assert.deepEqual(
-    feedbackRows(data, "course", "course-1", "up", "Zoë").map((r) => r.id),
+    feedbackRows(data, "course", "course-1", "up", " ZOË ").map((r) => r.id),
     ["a"],
   );
   const report = feedbackCsv(feedbackRows(data));

@@ -138,7 +138,7 @@ export default function Curricula({
     .filter(
       (curriculum) =>
         (status === "all" || curriculum.status === status) &&
-        `${curriculum.name} ${curriculum.description}`
+        curriculum.name
           .toLowerCase()
           .includes(search),
     )

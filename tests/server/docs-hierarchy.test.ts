@@ -42,6 +42,11 @@ test("server schema rejects cycles, third levels, duplicate siblings and invalid
   assert.equal(parse([{ ...section, docOrder: [id] }]), true);
   assert.equal(parse([{ ...section, docOrder: [id, id] }]), false);
   assert.equal(parse([{ ...section, docOrder: [""] }]), false);
+  assert.equal(parse([{ ...section, itemOrder: [{ kind: "doc", id }] }]), true);
+  assert.equal(parse([{ ...section, itemOrder: [{ kind: "section", id: "legacy:Start:Install" }] }]), true);
+  assert.equal(parse([{ ...section, itemOrder: [{ kind: "doc", id }, { kind: "doc", id }] }]), false);
+  assert.equal(parse([{ ...section, itemOrder: [{ kind: "folder", id }] }]), false);
+  assert.equal(parse([{ ...section, itemOrder: [{ kind: "doc", id: "x".repeat(81) }] }]), false);
   assert.equal(
     parse([section, { id: "child", name: "Install", parentId: "child" }]),
     false,
@@ -235,13 +240,14 @@ test("admin settings guard draft and published placement; content write validate
       settings: {
         ...systemSettings,
         docCategoryOrder: [],
-        docSections: [{ ...section, name: "Begin", docOrder: [id] }],
+        docSections: [{ ...section, name: "Begin", docOrder: [id], itemOrder: [{ kind: "doc", id }] }],
       },
       expected: 1,
     });
     assert.equal(writes, 1);
     assert.equal(settings.docSections[0].name, "Begin");
     assert.deepEqual(settings.docSections[0].docOrder, [id]);
+    assert.deepEqual(settings.docSections[0].itemOrder, [{ kind: "doc", id }]);
     await assert.rejects(
       () =>
         saveSettings(

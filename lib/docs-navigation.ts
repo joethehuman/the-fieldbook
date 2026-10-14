@@ -1,11 +1,17 @@
 import type { Content } from "./types";
 
+export type DocNavigationItem = { kind: "doc" | "section"; id: string };
+export const navigationItemKey = (item: DocNavigationItem) =>
+  `${item.kind}:${item.id}`;
+
 export type DocSection = {
   id: string;
   name: string;
   parentId?: string;
   /** Navigation order only; document draft and publication snapshots stay intact. */
   docOrder?: string[];
+  /** Mixed sibling order; absent settings retain the original Docs-first order. */
+  itemOrder?: DocNavigationItem[];
   // Retain the original path for old draft and published snapshots.
   legacyCategory?: string;
   legacyFolder?: string;
@@ -19,6 +25,7 @@ export type DocBranch = {
   name: string;
   docs: DocLink[];
   folders: DocBranch[];
+  itemOrder?: DocNavigationItem[];
 };
 
 const legacyId = (category: string, folder = "") =>
@@ -111,6 +118,21 @@ export function validateDocSections(sections: DocSection[]): void {
       throw new Error("Docs sections need unique, stable IDs.");
     ids.add(section.id);
     if (
+      section.itemOrder &&
+      (section.itemOrder.length > 5500 ||
+        new Set(section.itemOrder.map(navigationItemKey)).size !==
+          section.itemOrder.length ||
+        section.itemOrder.some(
+          (item) =>
+            !["doc", "section"].includes(item.kind) ||
+            !item.id ||
+            item.id.length > (item.kind === "doc" ? 80 : 1500),
+        ))
+    )
+      throw new Error(
+        "Navigation order needs unique document or subsection IDs (up to 5,500 per section).",
+      );
+    if (
       section.docOrder &&
       (section.docOrder.length > 5000 ||
         new Set(section.docOrder).size !== section.docOrder.length ||
@@ -188,11 +210,21 @@ export function moveDocSection(
     throw new Error(
       "Move this section’s subsections elsewhere before changing its level.",
     );
-  const next = sections.map((section) =>
-    section.id === id
-      ? { ...section, parentId: parentId || undefined }
-      : section,
-  );
+  const next = sections.map((section) => {
+    if (section.id === id)
+      return { ...section, parentId: parentId || undefined };
+    if (!section.itemOrder) return section;
+    const remaining = section.itemOrder.filter(
+      (item) => item.kind !== "section" || item.id !== id,
+    );
+    return {
+      ...section,
+      itemOrder:
+        section.id === parentId
+          ? [...remaining, { kind: "section" as const, id }]
+          : remaining,
+    };
+  });
   validateDocSections(next);
   const moved = next.find((section) => section.id === id)!;
   return [...next.filter((section) => section.id !== id), moved];
@@ -249,6 +281,91 @@ export function orderedSectionDocs(
     });
 }
 
+export function orderedSectionItems(
+  docs: DocLink[],
+  sections: DocSection[],
+  sectionId: string,
+): DocNavigationItem[] {
+  const items: DocNavigationItem[] = [
+    ...orderedSectionDocs(docs, sections, sectionId).map((doc) => ({
+      kind: "doc" as const,
+      id: doc.id,
+    })),
+    ...sections
+      .filter((section) => section.parentId === sectionId)
+      .map((section) => ({ kind: "section" as const, id: section.id })),
+  ];
+  const order =
+    sections.find((section) => section.id === sectionId)?.itemOrder || [];
+  const positions = new Map(
+    order.map((item, index) => [navigationItemKey(item), index]),
+  );
+  return items.sort(
+    (a, b) =>
+      (positions.get(navigationItemKey(a)) ?? order.length) -
+      (positions.get(navigationItemKey(b)) ?? order.length),
+  );
+}
+
+function setSectionItemOrder(
+  sections: DocSection[],
+  sectionId: string,
+  itemOrder: DocNavigationItem[],
+): DocSection[] {
+  const childPositions = new Map(
+    itemOrder
+      .filter((item) => item.kind === "section")
+      .map((item, index) => [item.id, index]),
+  );
+  const children = sections
+    .filter((section) => section.parentId === sectionId)
+    .sort(
+      (a, b) =>
+        (childPositions.get(a.id) ?? childPositions.size) -
+        (childPositions.get(b.id) ?? childPositions.size),
+    );
+  let childIndex = 0;
+  const next = sections.map((section) =>
+    section.id === sectionId
+      ? {
+          ...section,
+          itemOrder,
+          docOrder: itemOrder
+            .filter((item) => item.kind === "doc")
+            .map((item) => item.id),
+        }
+      : section.parentId === sectionId
+        ? children[childIndex++]
+        : section,
+  );
+  validateDocSections(next);
+  return next;
+}
+
+export function reorderSectionItem(
+  sections: DocSection[],
+  docs: DocLink[],
+  sectionId: string,
+  item: DocNavigationItem,
+  targetIndex: number,
+): DocSection[] {
+  const items = orderedSectionItems(docs, sections, sectionId);
+  const from = items.findIndex(
+    (candidate) => navigationItemKey(candidate) === navigationItemKey(item),
+  );
+  if (
+    from < 0 ||
+    !Number.isInteger(targetIndex) ||
+    targetIndex < 0 ||
+    targetIndex >= items.length ||
+    from === targetIndex
+  )
+    return sections;
+  items.splice(from, 1);
+  items.splice(targetIndex, 0, item);
+  return setSectionItemOrder(sections, sectionId, items);
+}
+
 export function reorderDocInSection(
   sections: DocSection[],
   docs: DocLink[],
@@ -270,6 +387,16 @@ export function reorderDocInSection(
     return sections;
   ordered.splice(from, 1);
   ordered.splice(targetIndex, 0, id);
+  if (sections.find((section) => section.id === sectionId)?.itemOrder) {
+    let index = 0;
+    return setSectionItemOrder(
+      sections,
+      sectionId,
+      orderedSectionItems(docs, sections, sectionId).map((item) =>
+        item.kind === "doc" ? { kind: "doc", id: ordered[index++] } : item,
+      ),
+    );
+  }
   const next = sections.map((section) =>
     section.id === sectionId ? { ...section, docOrder: ordered } : section,
   );
@@ -290,14 +417,53 @@ export function moveDocumentsInNavigation(
   const moving = new Set(ids);
   if (!ids.length || ids.some((id) => !docs.some((doc) => doc.id === id)))
     throw new Error("A document is unavailable. Reload before moving it.");
-  const sources = new Set(docs.filter((doc) => moving.has(doc.id)).map((doc) => sectionForDoc(doc, sections)?.id));
-  const target = orderedSectionDocs(docs, sections, destination).map((doc) => doc.id).filter((id) => !moving.has(id));
-  target.splice(Math.max(0, Math.min(targetIndex ?? target.length, target.length)), 0, ...ids);
-  const next = sections.map((section) => section.id === destination
-    ? { ...section, docOrder: target }
-    : sources.has(section.id)
-      ? { ...section, docOrder: orderedSectionDocs(docs, sections, section.id).map((doc) => doc.id).filter((id) => !moving.has(id)) }
-      : section);
+  const sources = new Set(
+    docs
+      .filter((doc) => moving.has(doc.id))
+      .map((doc) => sectionForDoc(doc, sections)?.id),
+  );
+  const target = orderedSectionDocs(docs, sections, destination)
+    .map((doc) => doc.id)
+    .filter((id) => !moving.has(id));
+  target.splice(
+    Math.max(0, Math.min(targetIndex ?? target.length, target.length)),
+    0,
+    ...ids,
+  );
+  const next = sections.map((section) => {
+    if (section.id !== destination && !sources.has(section.id)) return section;
+    const docOrder =
+      section.id === destination
+        ? target
+        : orderedSectionDocs(docs, sections, section.id)
+            .map((doc) => doc.id)
+            .filter((id) => !moving.has(id));
+    if (!section.itemOrder) return { ...section, docOrder };
+    const itemOrder = orderedSectionItems(docs, sections, section.id).filter(
+      (item) => item.kind !== "doc" || !moving.has(item.id),
+    );
+    if (section.id === destination) {
+      const followingDoc = target[target.indexOf(ids[0]) + ids.length];
+      const index =
+        targetIndex === undefined || !followingDoc
+          ? itemOrder.length
+          : itemOrder.findIndex(
+              (item) => item.kind === "doc" && item.id === followingDoc,
+            );
+      itemOrder.splice(
+        index < 0 ? itemOrder.length : index,
+        0,
+        ...ids.map((id) => ({ kind: "doc" as const, id })),
+      );
+    }
+    return {
+      ...section,
+      itemOrder,
+      docOrder: itemOrder
+        .filter((item) => item.kind === "doc")
+        .map((item) => item.id),
+    };
+  });
   validateDocSections(next);
   return next;
 }
@@ -310,7 +476,18 @@ export function deleteDocSection(
     throw new Error("Move this section’s items elsewhere before deleting it.");
   if (docs.some((doc) => sectionForDoc(doc, sections)?.id === id))
     throw new Error("Move this section’s items elsewhere before deleting it.");
-  return sections.filter((section) => section.id !== id);
+  return sections
+    .filter((section) => section.id !== id)
+    .map((section) =>
+      section.itemOrder
+        ? {
+            ...section,
+            itemOrder: section.itemOrder.filter(
+              (item) => item.kind !== "section" || item.id !== id,
+            ),
+          }
+        : section,
+    );
 }
 export function sectionPath(
   section: DocSection,
@@ -383,6 +560,7 @@ export function docSections(
     folders: sections
       .filter((item) => item.parentId === section.id)
       .map(branch),
+    itemOrder: orderedSectionItems(published, sections, section.id),
   });
   return sections
     .filter((section) => !section.parentId)
@@ -393,15 +571,43 @@ export function docSections(
         section.folders.some((child) => child.docs.length),
     );
 }
+export function orderedBranchItems(
+  branch: DocBranch,
+): ({ kind: "doc"; doc: DocLink } | { kind: "section"; section: DocBranch })[] {
+  const docs = new Map(branch.docs.map((doc) => [doc.id, doc]));
+  const folders = new Map(branch.folders.map((folder) => [folder.id, folder]));
+  const order = branch.itemOrder || [
+    ...branch.docs.map((doc) => ({ kind: "doc" as const, id: doc.id })),
+    ...branch.folders.map((folder) => ({
+      kind: "section" as const,
+      id: folder.id,
+    })),
+  ];
+  return order.flatMap(
+    (
+      item,
+    ): (
+      { kind: "doc"; doc: DocLink } | { kind: "section"; section: DocBranch }
+    )[] => {
+      if (item.kind === "doc") {
+        const doc = docs.get(item.id);
+        return doc ? [{ kind: "doc", doc }] : [];
+      }
+      const section = folders.get(item.id);
+      return section ? [{ kind: "section", section }] : [];
+    },
+  );
+}
+
 export function orderedDocs(
   docs: DocLink[],
   saved: string[] = [],
   configured: DocSection[] = [],
 ): DocLink[] {
-  const flatten = (branch: DocBranch): DocLink[] => [
-    ...branch.docs,
-    ...branch.folders.flatMap(flatten),
-  ];
+  const flatten = (branch: DocBranch): DocLink[] =>
+    orderedBranchItems(branch).flatMap((item) =>
+      item.kind === "doc" ? [item.doc] : flatten(item.section),
+    );
   return docSections(docs, saved, configured).flatMap(flatten);
 }
 export function orderedDocCategories(

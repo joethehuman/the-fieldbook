@@ -29,6 +29,7 @@
     "test:roster": "playwright test -c playwright.roster.config.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.67",
     "@ai-sdk/react": "4.0.129",
     "@codemirror/commands": "6.11.1",
     "@codemirror/language": "6.12.4",
@@ -88,6 +89,8 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "js-yaml": "4.3.2",
+    "pg": "8.23.1",
     "postcss": "^8.5.0",
     "prettier": "^3.6.2",
     "serve": "^14.2.4",

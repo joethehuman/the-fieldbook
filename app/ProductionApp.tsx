@@ -6,6 +6,7 @@ import type { AdminDestination } from "@/lib/admin-destination";
 import type { Workspace } from "@/lib/store";
 import type { User } from "@/lib/types";
 import type { ReaderShellContext } from "@/lib/reader-types";
+import type { AiRouter } from "@/lib/ai";
 export default function ProductionApp({
   initialAdmin,
 }: {
@@ -14,6 +15,7 @@ export default function ProductionApp({
     user: User;
     shell: ReaderShellContext;
     destination: AdminDestination;
+    aiRouter: AiRouter | null;
   };
 }) {
   const runtime = useMemo(

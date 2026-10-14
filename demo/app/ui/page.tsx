@@ -373,7 +373,9 @@ export default function ComponentCatalog() {
           respect reduced motion.
         </p>
         <SearchPanelExample />
-        <SearchExperience id="catalog-ask-ai" content={seedContent} aiMode="demo" onOpen={() => {}} />
+        <div className="workspace-chrome">
+          <SearchExperience id="catalog-ask-ai" content={seedContent} aiMode="demo" onOpen={() => {}} />
+        </div>
         <AskAiSettingsExample />
         <SearchResultSkeleton />
         <SearchResultCard
@@ -825,7 +827,7 @@ export default function ComponentCatalog() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <section className="grid gap-8" aria-label="Reading presentation">
+      <section className="learner-workspace grid gap-8 rounded-xl border border-border p-5" aria-label="Reading presentation">
         <SectionHeader title={<h2>Reading presentation</h2>} />
         <SplitPanel>
           <DocumentTree

@@ -1,4 +1,5 @@
 "use client";
+import { useIdentityPresentation } from "../IdentityPresentation";
 import { compactLayoutQuery } from "./use-compact-layout";
 
 import {
@@ -81,6 +82,7 @@ export function AccountMenu({
   onFeedbackOpen?: () => void;
   onFeedbackClose?: () => void;
 }) {
+  const login = useIdentityPresentation();
   const trigger = useRef<HTMLButtonElement>(null);
   const pointerInteraction = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -151,7 +153,8 @@ export function AccountMenu({
               // Keyboard dismissal retains Radix's normal focus restoration.
               if (pointerInteraction.current) {
                 event.preventDefault();
-                if (document.activeElement === trigger.current) trigger.current?.blur();
+                if (document.activeElement === trigger.current)
+                  trigger.current?.blur();
               }
             }}
           >
@@ -164,8 +167,7 @@ export function AccountMenu({
               )}
               {guest && (
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Sign in with Google to save course progress across devices and
-                  browsers.
+                  {login.progressDescription}
                 </p>
               )}
             </div>
@@ -275,7 +277,7 @@ export function AccountMenu({
             )}
             {onSignIn && (
               <DropdownMenuItem onSelect={onSignIn}>
-                Sign in with Google{" "}
+                {login.signInLabel}{" "}
                 <LogIn className="ml-auto size-4" aria-hidden="true" />
               </DropdownMenuItem>
             )}

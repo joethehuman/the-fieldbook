@@ -20,6 +20,10 @@ export type SearchResult = Omit<SourcePassage, "text" | "matchedTerms"> & {
   highlights: string[];
 };
 export type SearchResponse = { results: SearchResult[]; hasMore: boolean };
+export type SearchDestination = Pick<
+  SearchResult,
+  "contentId" | "kind" | "href" | "lessonId"
+>;
 export type SearchProvider = (
   query: string,
   filter: SearchFilter,

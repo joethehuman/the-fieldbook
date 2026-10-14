@@ -4,7 +4,6 @@ import {
   assignmentAudiences,
   assignLearningToAudiences,
 } from "./assignment-audiences";
-import { sourcePassages } from "./search";
 
 export type LearningAssignmentTarget =
   | { kind: "items"; items: LearningItem[]; mode: "add" | "remove" | "manage" }
@@ -204,7 +203,6 @@ type LearningSelectionOption = {
   description?: string;
   category?: string;
   updatedAt?: string;
-  searchText?: string;
   assignmentCount?: number;
   includedItems?: { id: string; label: string }[];
 };
@@ -248,18 +246,6 @@ export function learningSelectionOptions(
       item.status === "published" ||
       (target.mode !== "add" && direct.has(`course:${item.id}`)),
   );
-  const searchable = new Map(
-    content.map((item) => [
-      item.id,
-      sourcePassages(item)
-        .map((passage) =>
-          [passage.title, passage.lessonTitle, passage.text]
-            .filter(Boolean)
-            .join(" "),
-        )
-        .join(" "),
-    ]),
-  );
   const options: LearningSelectionOption[] = [
     ...content
       .filter((item) => item.kind === "course")
@@ -270,7 +256,6 @@ export function learningSelectionOptions(
         description: item.summary,
         category: item.category,
         updatedAt: item.updatedAt,
-        searchText: searchable.get(item.id),
       })),
     ...(data.curricula || [])
       .filter(
@@ -288,9 +273,6 @@ export function learningSelectionOptions(
             content.find((c) => c.id === id)?.title || "Unavailable course",
         })),
         description: item.description,
-        searchText: item.courseIds
-          .map((id) => searchable.get(id) || "")
-          .join(" "),
       })),
   ];
   const known = new Set(options.map((option) => option.id));

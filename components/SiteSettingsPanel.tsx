@@ -39,6 +39,7 @@ import type { Workspace } from "@/lib/store";
 export type SettingsSection =
   "identity" | "links" | "docs" | "courses" | "access" | "privacy" | "mcp" | "ai";
 export default function SiteSettingsPanel({
+  aiRouter,
   data,
   onChange,
   production,
@@ -49,6 +50,7 @@ export default function SiteSettingsPanel({
   onSaveDocsNavigation,
   onReviewDeadlines,
 }: {
+  aiRouter?: import("@/lib/ai").AiRouter | null;
   onSaveDocsNavigation?: SaveDocsNavigation;
   onReviewDeadlines?: (token?: string) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
   data: Workspace;
@@ -157,7 +159,7 @@ export default function SiteSettingsPanel({
       dirty={dirty}
       busy={busy}
       blockedReason={section === "ai" && !!settings.askAi?.enabled && !settings.askAi.model
-        ? "Choose a primary model to save."
+        ? aiRouter?.routerSelection ? "Use the configured router to save." : "Choose a primary model to save."
         : undefined}
     >
       {busy ? "Saving…" : "Save settings"}
@@ -171,7 +173,9 @@ export default function SiteSettingsPanel({
         if (busy || !dirty) return;
         setDocsMessageAttempt(value => value + 1);
         if (section === "ai" && settings.askAi?.enabled && !settings.askAi.model) {
-          setNotice("Choose a primary model to enable Ask AI.");
+          setNotice(aiRouter?.routerSelection
+            ? "Use the configured router to enable Ask AI."
+            : "Choose a primary model to enable Ask AI.");
           return;
         }
         if (section === "links") {
@@ -356,7 +360,6 @@ export default function SiteSettingsPanel({
             guidance="Changes to installation details and appearance save together."
             actions={saveAction}
             belowActions={discardAction}
-            sticky={dirty || busy}
           />
         </>
       )}
@@ -669,7 +672,6 @@ export default function SiteSettingsPanel({
           <PrivacySettingsPanel
             actions={saveAction}
             belowActions={discardAction}
-            sticky={dirty || busy}
             settings={settings}
             onChange={setSettings}
             busy={busy}
@@ -691,7 +693,8 @@ export default function SiteSettingsPanel({
       )}
       {section === "mcp" && <McpSettings production={production} contributor={contributor} />}
       {section === "ai" && !contributor && <AskAiSettingsPanel
-        production={production} busy={busy} actions={saveAction} belowActions={discardAction} sticky={dirty || busy}
+        initialRouter={aiRouter}
+        production={production} busy={busy} actions={saveAction} belowActions={discardAction}
         value={settings.askAi ?? defaultAskAiSettings}
         onChange={(askAi) => setSettings({ ...settings, askAi })}
       />}

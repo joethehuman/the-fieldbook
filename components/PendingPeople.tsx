@@ -1,4 +1,5 @@
 "use client";
+import { useIdentityPresentation } from "./IdentityPresentation";
 import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "./ui/button";
@@ -29,6 +30,7 @@ export function PendingPeople({
   onChange: (data: Workspace) => void | Promise<void>;
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
+  const login = useIdentityPresentation();
   const [editing, setEditing] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -113,8 +115,7 @@ export function PendingPeople({
           <DialogContent size="workflow">
             <DialogTitle>Pre-register user</DialogTitle>
             <DialogDescription>
-              Add someone before they sign in. Their verified Google email
-              activates this roster entry. No email is sent.
+              {login.registration.description}
             </DialogDescription>
             <form
               className="flex min-h-0 flex-1 flex-col gap-4"
@@ -123,12 +124,19 @@ export function PendingPeople({
               <DialogBody>
                 <ScrollRegion className="h-full p-1">
                   <FieldGroup disabled={busy}>
-                    {error && <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>}
+                    {error && (
+                      <Alert
+                        variant="destructive"
+                        onDismiss={() => setError("")}
+                      >
+                        {error}
+                      </Alert>
+                    )}
                     <PersonFields
                       person={editing}
                       data={data}
                       onChange={setEditing}
-                      emailLabel="Google email"
+                      emailLabel={login.registration.emailLabel}
                     />
                   </FieldGroup>
                 </ScrollRegion>

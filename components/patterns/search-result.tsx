@@ -59,6 +59,7 @@ export function SearchResultCard({
       {clientNavigation ? (
         <IntentLink
           href={href || result.href}
+          data-fieldbook-local-navigation={onOpen ? "true" : undefined}
           onClick={
             onOpen
               ? (event) => {

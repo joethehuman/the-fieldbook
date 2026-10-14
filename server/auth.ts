@@ -20,7 +20,7 @@ export function profile(row: ProfileRecord): User {
     email: row.email,
     role: row.role,
     active: row.active,
-    registered: row.auth_user_id !== null,
+    registered: row.registered,
     addedAt: row.added_at || undefined,
     learningAssignments: (
       row.learning_assignments || row.assignment_context?.learning_assignments

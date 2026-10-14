@@ -28,7 +28,7 @@ export function GroupPicker({
       )
       .join(" / ");
   const matching = groups.filter((group) =>
-    path(group.id).toLowerCase().includes(query.toLowerCase()),
+    path(group.id).toLowerCase().includes(query.trim().toLowerCase()),
   );
   const visible = [...matching].sort((a, b) =>
     path(a.id).localeCompare(path(b.id)),

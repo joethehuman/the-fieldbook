@@ -22,6 +22,7 @@ import type { ReaderShellContext } from "@/lib/reader-types";
 import { brandingFromSettings } from "@/lib/branding";
 import { accountMenuLinks } from "@/lib/external-links";
 import { mergeSavedContent } from "@/lib/content-save";
+import type { AiRouter } from "@/lib/ai";
 const Admin = dynamic(() => import("@/components/Admin"));
 export function AdminWorkspace({
   initial,
@@ -32,6 +33,7 @@ export function AdminWorkspace({
     user: User;
     shell: ReaderShellContext;
     destination: AdminDestination;
+    aiRouter: AiRouter | null;
   };
   runtime: AdminRuntime;
 }) {
@@ -110,6 +112,7 @@ export function AdminWorkspace({
       <ReportAvailability.Provider value={reportIssue}>
         <Admin
           data={data}
+          aiRouter={initial.aiRouter}
           initialDestination={initial.destination}
           onWriteDestination={async (destination, replace, name) => {
             if (!(await beforeLocalNavigation())) return false;

@@ -5,7 +5,6 @@ import {
   contentAudienceKey,
   updateAudienceKeys,
 } from "./content-audiences";
-import { sourcePassages } from "./search";
 
 export type UpdateAssignmentTarget =
   | {
@@ -114,9 +113,6 @@ export function updateSelectionOptions(
         updateAudienceKeys(item).includes(key),
       ).length,
       description: item.summary,
-      searchText: sourcePassages(item)
-        .map((passage) => passage.text)
-        .join(" "),
     }));
 }
 

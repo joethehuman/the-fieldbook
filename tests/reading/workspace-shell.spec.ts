@@ -109,6 +109,30 @@ test.beforeEach(async ({ page, request }) => {
   ]);
 });
 
+test("learner and management routes share chrome while keeping separate content layouts", async ({ page }) => {
+  await page.goto("/courses");
+  await expect(page.locator(".learner-workspace")).toBeVisible();
+  const chrome = () => page.locator(".workspace-chrome").evaluateAll((elements) => elements.map((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color, font: style.fontFamily };
+  }));
+  const appearance = await chrome();
+  const headingFont = await page.locator("main h1").first().evaluate((element) => getComputedStyle(element).fontFamily);
+  for (const route of ["/admin", "/team", "/updates", contentPath("doc", docId, doc.title)]) {
+    await page.goto(route);
+    await expect(page.locator("main h1").first()).toBeVisible();
+    await expect.poll(chrome).toEqual(appearance);
+    await expect(page.locator("main h1").first()).toHaveCSS("font-family", headingFont);
+    await expect(page.locator(".main-content")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    if (route === "/admin" || route === "/team") await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
+    else await expect(page.locator(".app")).toHaveClass(/learner-workspace/);
+    await page.keyboard.press("Control+k");
+    await expect(page.getByRole("textbox", { name: "Search all content", exact: true })).toBeFocused();
+    await expect(page.getByRole("navigation", { name: "Browse content" })).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
+});
+
 test("Admin, Team and reader keep one frame, search controller and account with fresh document navigation", async ({
   page,
   request,
@@ -121,6 +145,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
   });
   await page.goto("/admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
   await page.evaluate(() => {
     (window as any).shellReferences = [
       document.querySelector(".app"),
@@ -143,6 +168,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
   await expect(
     page.getByRole("heading", { name: doc.title, exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".app")).toHaveClass(/learner-workspace/);
   await expect(
     page.locator('.sidebar a[href="/docs/' + docId + '"]'),
   ).toHaveCount(1);
@@ -151,6 +177,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
   await expect(
     page.getByRole("heading", { name: "Team progress", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
   await openNavigation(page);
   await page.getByRole("link", { name: "Docs", exact: true }).first().click();
   await expect(
@@ -161,6 +188,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
   ).toHaveCount(1);
   await account(page, "Manage organization");
   await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
   expect(
     await page.evaluate(() => {
       const current = [

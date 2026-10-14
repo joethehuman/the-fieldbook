@@ -2,12 +2,12 @@
 
 The Fieldbook is a source-available learning and knowledge platform for teams that want to run their own installation. It gives each kind of content a job: **Updates** share news and perspective, **Courses** teach through lessons and knowledge checks, and **Docs** hold maintained reference material. Authors work in the built-in admin interface; readers use the same site.
 
-The documented installation uses **Vercel, hosted Supabase, and Google sign-in**. Each operator supplies and controls their own accounts, data, media, domain, and content. The optional interactive demo uses fictional data stored in the browser; it does not create a working installation or persist learner records on a server.
+The released installation uses **Vercel with hosted Supabase**. The [installation recipes](docs/installation.md) also describe **DigitalOcean App Platform with Managed PostgreSQL, self-hosted Supabase Auth/REST/Storage and private Spaces**; the DigitalOcean recipe has not yet shipped in a Fieldbook release. Both use Google sign-in. Optional Ask AI can use Vercel AI Gateway or a configured DigitalOcean Inference Router independently of hosting. Each operator supplies and controls their own accounts, data, media, domain, and content. The optional interactive demo uses fictional data stored in the browser; it does not create a working installation or persist learner records on a server.
 
 ## Start here
 
-- [Install Fieldbook](docs/installation.md) from your own accounts. The guide covers the single database setup command, hosting, sign-in, media, and first-use checks.
-- [Upgrade an installation](docs/upgrading.md), including any database changes required by the release.
+- Choose an [installation recipe](docs/installation.md): [Vercel with hosted Supabase](docs/installation.md#vercel-with-hosted-supabase) or [DigitalOcean App Platform](docs/installation.md#digitalocean-app-platform).
+- [Update and maintain an installation](docs/upgrading.md), including Fieldbook migrations, backend component updates, cleanup and recovery.
 - [Contribute](CONTRIBUTING.md) or read the [agent instructions](AGENTS.md) and [design system](docs/design-system.md) before changing the software.
 - Read the [license](LICENSE), [third-party notices](docs/third-party-notices.md), and [security reporting instructions](SECURITY.md).
 
@@ -17,9 +17,11 @@ Reader and named Admin record links include a readable title followed by the com
 
 Organization Settings → Categories manages separate Course and Update category lists, including empty categories. Administrators can rename categories, move selected or all content, and permanently remove a category after its items have moved elsewhere. Moves update category labels in drafts and published copies while preserving other edits and learning history. Course category order controls the Courses homepage; Curricula remain at the bottom. Update category order does not change the feed. Category management uses the existing database and requires no migration.
 
+Organization Settings → Docs navigation lets administrators arrange direct Docs and subsections in any order within a section. Drag items, use the handle’s arrow keys, or choose Move up/down from Actions, then save settings. The reader sidebar and Previous/Next links follow the same order. Existing navigation retains its order until edited.
+
 Contributors place content in existing Docs sections or subsections and Course or Update categories. Only administrators create, rename, delete, or reorder those structures. Contributors can save unfinished drafts while waiting for an administrator to create a destination; publishing requires a valid section or category. The same permissions apply through the editor, API, and MCP.
 
-Search is built in. Installed search favors titles and lesson headings, supports partial words, common English word forms and basic typos, including swapped adjacent letters. Literal matching remains available for technical terms and other languages. Ask AI and the authenticated MCP endpoint are optional. MCP access follows the account's publishing or reporting permissions and the connection's approved capabilities. The demo can illustrate the interface, but its simulated identities and data do not establish installed permissions or persistence.
+Search is built in. Installed reader search favors titles and lesson headings, supports partial words, common English word forms and basic typos, including swapped adjacent letters. Literal matching remains available for technical terms and other languages. Admin lists and assignment pickers search titles or names, with email matching for people; matching ignores case and surrounding spaces. Hierarchy choosers also match parent paths. Feedback and review screens can search their visible comments or details. Ask AI and the authenticated MCP endpoint are optional. MCP access follows the account's publishing or reporting permissions and the connection's approved capabilities. The demo can illustrate the interface, but its simulated identities and data do not establish installed permissions or persistence.
 
 On public installations, guest course progress stays in that browser. After sign-in, Fieldbook quietly saves compatible progress to the account and disregards invalid records, unavailable courses and older course versions. Temporary connection or service failures leave browser records available for a later attempt. This does not interrupt sign-in or show an import prompt.
 

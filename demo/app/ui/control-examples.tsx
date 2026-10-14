@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CountBadge } from "@/components/ui/badge";
 import { ActionGroup } from "@/components/ui/action-group";
-import { FieldGroup } from "@/components/ui/field";
+import { Field, FieldGroup } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { TextField } from "@/components/patterns/text-field";
 import { PendingChangesBar } from "@/components/patterns/pending-changes-bar";
 import { SettingsSection } from "@/components/patterns/settings-section";
@@ -29,6 +36,9 @@ export function ControlExamples() {
   const [status, setStatus] = useState("");
   const [pendingExample, setPendingExample] = useState(true);
   const [settingsExampleDirty, setSettingsExampleDirty] = useState(false);
+  const [choice, setChoice] = useState("first");
+  const [choiceOpen, setChoiceOpen] = useState(false);
+  const [choiceChanges, setChoiceChanges] = useState(0);
   return (
     <section
       id="control-pilot"
@@ -128,6 +138,56 @@ export function ControlExamples() {
           <Button asChild variant="outline">
             <a href="#input-pilot">Jump to input examples</a>
           </Button>
+        </div>
+      </Card>
+      <Card aria-label="Dropdown behavior">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            Default choice
+            <Select
+              defaultValue="first"
+              onValueChange={() => setChoiceChanges((count) => count + 1)}
+            >
+              <SelectTrigger aria-label="Default choice">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="first">First choice</SelectItem>
+                <SelectItem value="second">Second choice</SelectItem>
+                <SelectItem value="unavailable" disabled>
+                  Unavailable choice
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            Controlled choice
+            <Select
+              value={choice}
+              open={choiceOpen}
+              onOpenChange={setChoiceOpen}
+              onValueChange={(next) => {
+                setChoice(next);
+                setChoiceChanges((count) => count + 1);
+              }}
+            >
+              <SelectTrigger aria-label="Controlled choice">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="first">First choice</SelectItem>
+                <SelectItem value="second">Second choice</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <p
+            role="status"
+            aria-label="Dropdown changes"
+            className="text-copy text-muted-foreground sm:col-span-2"
+          >
+            {choiceChanges} value changes. Choosing the current option closes
+            the menu without changing the value.
+          </p>
         </div>
       </Card>
       <SettingsSection

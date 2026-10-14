@@ -1,0 +1,12 @@
+# The amd64 upstream image has no shell. Add a pinned static BusyBox only to
+# materialize the database CA before exec-ing the upstream binary.
+FROM busybox:1.37.0-musl@sha256:5cec3fc171c87218698e85a52af7087de727372aae264a787b8112901a5b0092 AS shell
+RUN mkdir /fieldbook-tmp && touch /fieldbook-tmp/.keep && chmod 1777 /fieldbook-tmp
+FROM postgrest/postgrest:v16.4@sha256:d155c6718ed9a9f990d159a2ab7c0a3f16944dbb6d0a0344557421042acfe0df
+COPY --from=shell /bin/busybox /fieldbook/busybox
+COPY --from=shell --chown=1000:1000 /fieldbook-tmp /tmp
+COPY .do/with-database-ca.sh /fieldbook/with-database-ca.sh
+# Avoid RUN in this scratch-based stage: Kaniko requires absent account files.
+USER 1000:1000
+ENTRYPOINT ["/fieldbook/busybox", "sh", "/fieldbook/with-database-ca.sh"]
+CMD ["/bin/postgrest"]

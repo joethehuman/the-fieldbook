@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { adminSnapshot } from "../../server/admin-snapshot";
 import { defaultSettings } from "../../lib/settings";
 import { seedContent } from "../../lib/seed";
-import type { User } from "../../lib/types";
+import type { Content, User } from "../../lib/types";
+import { requiresPassing } from "../../lib/course-quiz";
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -161,6 +162,7 @@ async function fixture(run: (requests: URL[]) => Promise<void>) {
         id: row.id,
         revision: row.revision,
         published_revision: row.published_revision,
+        publishedRequirePassing: (row.published as Content | null)?.requirePassing ?? null,
         updated_at: row.updated_at,
       }));
       return Response.json(rows, {
@@ -228,6 +230,37 @@ test("governance reads all published assignable content and preserves published 
       ),
     );
   });
+});
+
+test("content summaries compare the actual published completion rule, including legacy courses and staged changes", async () => {
+  const original = structuredClone(documents[0]);
+  try {
+    for (const publishedRule of [false, true, undefined]) {
+      for (const draftRule of [false, true]) {
+        (documents[0].published as Content).requirePassing = publishedRule;
+        (documents[0].draft as Content).requirePassing = draftRule;
+        await fixture(async (requests) => {
+          for (const role of ["admin", "contributor"] as const) {
+            const result = await adminSnapshot({ ...admin, role }, "content");
+            const live = result.publishedContent!.find((item) => item.id === course.id)!;
+            assert.equal(live.requirePassing, publishedRule ?? true);
+            assert.equal(
+              requiresPassing(documents[0].draft as Content) !== requiresPassing(live),
+              draftRule !== (publishedRule ?? true),
+            );
+            assert.deepEqual(live.lessons, []);
+            assert.deepEqual(live.questions, []);
+          }
+          const selects = requests.filter((url) => url.pathname.endsWith("/fb_documents"))
+            .map((url) => url.searchParams.get("select")!);
+          assert.ok(selects.every((select) => select.includes("publishedRequirePassing:published->requirePassing")));
+          assert.ok(selects.every((select) => !select.split(",").includes("published")));
+        });
+      }
+    }
+  } finally {
+    Object.assign(documents[0], original);
+  }
 });
 
 test("people and person scopes never fetch the assignment-content payload, and unauthorized users trigger no reads", async () => {

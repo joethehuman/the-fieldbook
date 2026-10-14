@@ -49,7 +49,7 @@ export function DeadlineReview({
           key: `course:${row.personId}:${row.contentId}`,
         })),
       ].filter((row) =>
-        `${row.name} ${row.title}`.toLowerCase().includes(query.toLowerCase()),
+        `${row.name} ${row.title}`.toLowerCase().includes(query.trim().toLowerCase()),
       )
     : [];
   return (

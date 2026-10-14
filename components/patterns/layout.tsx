@@ -221,6 +221,7 @@ export function SplitPanel({
 }) {
   return (
     <div
+      data-slot="split-panel"
       className={cn(
         "grid min-w-0 gap-6",
         align === "stretch" ? "items-stretch" : "items-start",
