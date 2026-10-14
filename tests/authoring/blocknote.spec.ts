@@ -79,6 +79,99 @@ async function setup(
   return { editor, read };
 }
 
+test("media commands share the native file panel and persist their URLs", async ({
+  page,
+}, info) => {
+  const { editor, read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    "Media fixture.",
+    true,
+  );
+  await page.route("https://media.example.test/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    }),
+  );
+  await page.route(
+    /https:\/\/(?:www\.youtube-nocookie\.com|i\.ytimg\.com)\//,
+    (route) => route.fulfill({ status: 200, body: "" }),
+  );
+  for (const media of [
+    {
+      command: "Image",
+      type: "image",
+      action: "Embed image",
+      url: "https://media.example.test/image.png",
+    },
+    {
+      command: "Upload video",
+      type: "video",
+      action: "Embed video",
+      url: "https://media.example.test/video.mp4",
+    },
+    {
+      command: "Embed video link",
+      type: "videoEmbed",
+      action: "Embed video",
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    },
+  ]) {
+    await editor.locator('[data-content-type="paragraph"]').last().click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("/");
+    await page
+      .getByRole("option", {
+        name: new RegExp("^" + media.command + "(?: |$)"),
+      })
+      .click();
+    const panel = page.locator(".bn-panel");
+    await expect(panel).toHaveCount(1);
+    await expect(panel).toBeVisible();
+    const embedTab = panel.getByRole("tab", { name: "Embed", exact: true });
+    if (await embedTab.isVisible()) await embedTab.click();
+    await expect(
+      panel.getByRole("textbox", { name: "Enter URL", exact: true }),
+    ).toBeVisible();
+    await expect(
+      panel.getByRole("button", { name: media.action, exact: true }),
+    ).toHaveCount(1);
+    // Demo has one Embed tab; the native two-tab control remains for real uploads.
+    if (info.project.name.startsWith("demo"))
+      await expect(panel.getByRole("tablist")).toBeHidden();
+    await panel
+      .getByRole("textbox", { name: "Enter URL", exact: true })
+      .fill(media.url);
+    await panel
+      .getByRole("button", { name: media.action, exact: true })
+      .click();
+    await expect(panel).toBeHidden();
+    await waitForDraftSaved(page);
+    await expect
+      .poll(async () =>
+        (await read()).bodyDocument?.blocks.some(
+          (block) => block.type === media.type && block.props.url === media.url,
+        ),
+      )
+      .toBe(true);
+    expect((await read()).body).toContain(media.url);
+    await page.reload();
+    await expect(
+      editor.locator(`[data-content-type="${media.type}"]`),
+    ).toBeVisible();
+  }
+  await expect(
+    editor.getByRole("textbox", { name: "Video URL", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("table grips wait for a completed click and retain keyboard and touch activation", async ({
   page,
 }, info) => {

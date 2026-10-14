@@ -32,6 +32,7 @@ import {
   TableRowHeaderItem,
   TableColumnHeaderItem,
   TableHandlesController,
+  FilePanelController,
   type SideMenuProps,
 } from "@blocknote/react";
 import {
@@ -40,6 +41,7 @@ import {
 } from "@blocknote/core";
 import {
   SuggestionMenu,
+  FilePanelExtension,
   getDefaultSlashMenuItems,
 } from "@blocknote/core/extensions";
 import { syntaxHighlighter } from "@blocknote/code-block";
@@ -67,9 +69,10 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Alert } from "../ui/alert";
-import { createWritingSchema } from "./blocknote-schema";
+import { createWritingSchema, writingDictionary } from "./blocknote-schema";
 import { writingShadCNComponents } from "./blocknote-ui";
 import { WritingTableHandle } from "./blocknote-table-handle";
+import { WritingFilePanel } from "./blocknote-file-panel";
 import {
   blockDocumentSchema,
   exportBlockMarkdown,
@@ -225,6 +228,7 @@ export default function WritingEditorEngine({
     [],
   );
   const editor = useCreateBlockNote({
+    dictionary: writingDictionary,
     schema: writingSchema,
     initialContent:
       initialDocument.blocks as unknown as (typeof writingSchema.PartialBlock)[],
@@ -441,6 +445,7 @@ export default function WritingEditorEngine({
               formattingToolbar={false}
               sideMenu={false}
               tableHandles={false}
+              filePanel={false}
               className="fieldbook-blocknote"
             >
               <SuggestionMenuController
@@ -466,10 +471,14 @@ export default function WritingEditorEngine({
                       group: "Media",
                       icon: <LinkIcon size={18} />,
                       aliases: ["youtube", "vimeo", "loom"],
-                      onItemClick: () =>
-                        insertOrUpdateBlockForSlashMenu(editor, {
+                      onItemClick: () => {
+                        const block = insertOrUpdateBlockForSlashMenu(editor, {
                           type: "videoEmbed",
-                        }),
+                        });
+                        editor
+                          .getExtension(FilePanelExtension)
+                          ?.showMenu(block.id);
+                      },
                     },
                   ].sort(
                     (a, b) =>
@@ -483,6 +492,7 @@ export default function WritingEditorEngine({
               />
               <SideMenuController sideMenu={WritingSideMenu} />
               <TableHandlesController tableHandle={WritingTableHandle} />
+              <FilePanelController filePanel={WritingFilePanel} />
             </BlockNoteView>
           </div>
         </WritingTitleEnterContext.Provider>

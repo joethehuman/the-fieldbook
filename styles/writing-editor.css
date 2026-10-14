@@ -178,19 +178,6 @@
 .fieldbook-blocknote :is(td, th) {
   border-color: var(--border);
 }
-.writing-media-block {
-  width: 100%;
-  min-width: 0;
-}
-.writing-video-fields {
-  display: flex;
-  gap: var(--space-2);
-  padding-block: var(--space-2);
-}
-.writing-video-fields input {
-  flex: 1;
-  min-width: 0;
-}
 .editor-mobile-navigation {
   flex: none;
 }
@@ -345,6 +332,7 @@
   :is(
     .bn-suggestion-menu,
     .bn-menu-dropdown,
+    .bn-panel,
     .bn-toolbar,
     [data-slot="select-content"],
     [data-slot="popover-content"]
@@ -354,6 +342,28 @@
   background: var(--popover);
   color: var(--popover-foreground);
   box-shadow: var(--elevation-floating);
+}
+.bn-shadcn .bn-panel {
+  width: 24rem;
+  max-width: calc(100vw - 2rem);
+  padding: var(--space-3);
+}
+/* The native panel's tabs and form share one surface, without a second card. */
+.bn-shadcn .bn-panel [data-slot="card"] {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.bn-shadcn .bn-panel [data-slot="card-content"] {
+  padding: 0;
+}
+/* A single Embed tab adds no navigation; retain tabs when Upload is available. */
+.bn-shadcn
+  .bn-panel
+  [data-slot="tabs-list"]:has(> [data-slot="tabs-trigger"]:only-child) {
+  display: none;
 }
 .bn-container.bn-shadcn .bn-suggestion-menu {
   width: 24rem;

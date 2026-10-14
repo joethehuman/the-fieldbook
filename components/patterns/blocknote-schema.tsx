@@ -7,74 +7,76 @@ import {
   createHeadingBlockSpec,
   createCodeBlockSpec,
 } from "@blocknote/core";
-import { createReactBlockSpec } from "@blocknote/react";
+import {
+  createReactBlockSpec,
+  ResizableFileBlockWrapper,
+} from "@blocknote/react";
+import { en } from "@blocknote/core/locales";
 import { codeBlockOptions } from "@blocknote/code-block";
 import { CourseVideo } from "./course-video";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
+import { Video } from "lucide-react";
+import type { ComponentProps } from "react";
 import { videoSource } from "@/lib/video";
-import { useId, useState } from "react";
 import type { BlockDocument, WritingBlock } from "@/lib/block-document";
+
+export const writingDictionary = {
+  ...en,
+  formatting_toolbar: {
+    ...en.formatting_toolbar,
+    file_replace: {
+      ...en.formatting_toolbar.file_replace,
+      tooltip: {
+        ...en.formatting_toolbar.file_replace.tooltip,
+        videoEmbed: "Replace video",
+      },
+    },
+  },
+  file_blocks: {
+    ...en.file_blocks,
+    add_button_text: {
+      ...en.file_blocks.add_button_text,
+      videoEmbed: "Add video",
+    },
+  },
+  file_panel: {
+    ...en.file_panel,
+    embed: {
+      ...en.file_panel.embed,
+      embed_button: {
+        ...en.file_panel.embed.embed_button,
+        videoEmbed: "Embed video",
+      },
+    },
+  },
+};
 
 const videoEmbed = createReactBlockSpec(
   {
     type: "videoEmbed",
-    propSchema: { url: { default: "" }, title: { default: "Video" } },
+    propSchema: {
+      ...defaultBlockSpecs.video.config.propSchema,
+      title: { default: "Video" },
+    },
     content: "none",
   },
   {
-    render: function VideoEmbed({ block, editor }) {
-      const [issue, setIssue] = useState("");
-      const issueId = useId();
+    meta: { fileBlockAccept: ["video/*"] },
+    render: function VideoEmbed(props) {
+      const { block } = props;
+      // The public helper is typed to `file`, although it supports custom file
+      // blocks. This schema supplies the native video's complete file props.
+      const fileProps = props as unknown as ComponentProps<
+        typeof ResizableFileBlockWrapper
+      >;
       return (
-        <div className="writing-media-block" contentEditable={false}>
-          {block.props.url && videoSource(block.props.url) ? (
+        <ResizableFileBlockWrapper
+          {...fileProps}
+          buttonIcon={<Video size={24} />}
+        >
+          <div className="bn-visual-media-wrapper" contentEditable={false}>
             <CourseVideo url={block.props.url} title={block.props.title} />
-          ) : (
-            <p>Add a supported video link.</p>
-          )}
-          {editor.isEditable && (
-            <div className="writing-video-fields">
-              <Input
-                aria-label="Video URL"
-                key={block.props.url}
-                type="text"
-                inputMode="url"
-                maxLength={2000}
-                aria-invalid={!!issue}
-                aria-describedby={issue ? issueId : undefined}
-                placeholder="YouTube, Vimeo or Loom URL"
-                defaultValue={block.props.url}
-                onBlur={(event) => {
-                  const url = event.target.value.trim();
-                  if (!url || videoSource(url)) {
-                    setIssue("");
-                    editor.updateBlock(block, { props: { url } });
-                  } else setIssue("Use a supported HTTPS video URL.");
-                }}
-                onInput={() => setIssue("")}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    event.currentTarget.blur();
-                  }
-                }}
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => editor.removeBlocks([block])}
-              >
-                Remove video
-              </Button>
-            </div>
-          )}
-          {issue && (
-            <p id={issueId} className="text-copy text-destructive" role="alert">
-              {issue}
-            </p>
-          )}
-        </div>
+          </div>
+        </ResizableFileBlockWrapper>
       );
     },
     toExternalHTML: function VideoLink({ block }) {
