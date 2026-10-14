@@ -394,6 +394,27 @@
 .bn-shadcn :is(.bn-menu-dropdown, [data-slot="select-content"]) {
   padding: 6px;
 }
+.bn-container.bn-shadcn .bn-select {
+  width: max-content;
+  min-width: min(20rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+  max-height: min(
+    24rem,
+    calc(var(--bn-vv-height, 100dvh) * 0.6),
+    var(--available-height, 24rem)
+  );
+}
+.bn-shadcn .bn-select [data-slot="select-item"] {
+  white-space: normal;
+}
+.bn-container.bn-shadcn .bn-color-picker-dropdown {
+  max-height: min(
+    24rem,
+    calc(var(--bn-vv-height, 100dvh) * 0.6),
+    var(--available-height, 24rem)
+  );
+  overscroll-behavior: contain;
+}
 .bn-shadcn :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
   min-height: 36px;
   padding: var(--space-2) var(--space-3);

@@ -18,6 +18,7 @@ import {
   BlockTypeSelect,
   BasicTextStyleButton,
   CreateLinkButton,
+  ColorStyleButton,
   FileCaptionButton,
   FileReplaceButton,
   NestBlockButton,
@@ -27,6 +28,7 @@ import {
   SideMenu,
   DragHandleMenu,
   RemoveBlockItem,
+  BlockColorsItem,
   TableRowHeaderItem,
   TableColumnHeaderItem,
   type SideMenuProps,
@@ -145,6 +147,7 @@ function WritingDragHandleMenu() {
   return (
     <DragHandleMenu>
       <RemoveBlockItem>Delete</RemoveBlockItem>
+      <BlockColorsItem>Colors</BlockColorsItem>
       <TableRowHeaderItem>Header row</TableRowHeaderItem>
       <TableColumnHeaderItem>Header column</TableColumnHeaderItem>
     </DragHandleMenu>
@@ -163,6 +166,7 @@ function WritingFormattingToolbar() {
       <BasicTextStyleButton basicTextStyle="strike" />
       <BasicTextStyleButton basicTextStyle="code" />
       <CreateLinkButton />
+      <ColorStyleButton />
       <TextAlignButton textAlignment="left" />
       <TextAlignButton textAlignment="center" />
       <TextAlignButton textAlignment="right" />
@@ -405,7 +409,7 @@ export default function WritingEditorEngine({
             {title && <div className="writing-document-heading">{title}</div>}
             <BlockNoteView
               editor={editor}
-            theme="light"
+              theme="light"
               editable={!disabled}
               onChange={changed}
               slashMenu={false}

@@ -93,16 +93,23 @@ export function BlockDocumentReader({
           const CheckIcon = entry.props.checked ? SquareCheck : Square;
           return (
             <li key={entry.id} data-text-alignment={entry.props.textAlignment}>
-              {entry.type === "checkListItem" && (
-                <span
-                  className="block-check"
-                  role="img"
-                  aria-label={entry.props.checked ? "Completed" : "Incomplete"}
-                >
-                  <CheckIcon size={18} />
-                </span>
-              )}
-              {Array.isArray(entry.content) && inline(entry.content)}
+              <AuthoredColor
+                textColor={entry.props.textColor}
+                backgroundColor={entry.props.backgroundColor}
+              >
+                {entry.type === "checkListItem" && (
+                  <span
+                    className="block-check"
+                    role="img"
+                    aria-label={
+                      entry.props.checked ? "Completed" : "Incomplete"
+                    }
+                  >
+                    <CheckIcon size={18} />
+                  </span>
+                )}
+                {Array.isArray(entry.content) && inline(entry.content)}
+              </AuthoredColor>
               {blocks(entry.children)}
             </li>
           );
@@ -171,7 +178,12 @@ export function BlockDocumentReader({
       } else if (b.type === "quote") {
         result.push(
           <blockquote key={b.id}>
-            <p data-text-alignment={b.props.textAlignment}>{text}</p>
+            <AuthoredColor
+              textColor={b.props.textColor}
+              backgroundColor={b.props.backgroundColor}
+            >
+              <p data-text-alignment={b.props.textAlignment}>{text}</p>
+            </AuthoredColor>
             {blocks(b.children)}
           </blockquote>,
         );
@@ -237,6 +249,10 @@ export function BlockDocumentReader({
                       typeof cell === "object" && !Array.isArray(cell)
                         ? cell.props.textAlignment
                         : undefined;
+                    const colors =
+                      typeof cell === "object" && !Array.isArray(cell)
+                        ? cell.props
+                        : undefined;
                     const Cell =
                       rowIndex < (table.headerRows || 0) ||
                       columnIndex < (table.headerCols || 0)
@@ -254,7 +270,12 @@ export function BlockDocumentReader({
                               : undefined
                         }
                       >
-                        {inline(tableCellInline(cell))}
+                        <AuthoredColor
+                          textColor={colors?.textColor}
+                          backgroundColor={colors?.backgroundColor}
+                        >
+                          {inline(tableCellInline(cell))}
+                        </AuthoredColor>
                       </Cell>
                     );
                   })}
@@ -290,7 +311,12 @@ export function BlockDocumentReader({
                   <ChevronRight size={18} />
                 </Button>
               </CollapsibleTrigger>
-              {element}
+              <AuthoredColor
+                textColor={b.props.textColor}
+                backgroundColor={b.props.backgroundColor}
+              >
+                {element}
+              </AuthoredColor>
             </div>
             <CollapsibleContent className="block-toggle-content">
               {blocks(b.children)}
