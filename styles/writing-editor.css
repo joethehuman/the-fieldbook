@@ -542,16 +542,22 @@
   height: 36px;
 }
 .bn-container.bn-shadcn .bn-side-menu {
+  --writing-side-control-size: 1.75rem;
+  --writing-side-icon-size: 0.875rem;
   gap: var(--space-1);
   padding: var(--space-1);
 }
 .bn-container.bn-shadcn .bn-side-menu .bn-button {
-  width: var(--control-height-sm);
-  height: var(--control-height-sm);
-  min-height: var(--control-height-sm);
-  padding: var(--space-2);
+  width: var(--writing-side-control-size);
+  height: var(--writing-side-control-size);
+  min-height: var(--writing-side-control-size);
+  padding: var(--space-1);
   color: var(--muted-foreground);
   border-radius: var(--control-radius);
+}
+.bn-container.bn-shadcn .bn-side-menu .bn-button svg {
+  width: var(--writing-side-icon-size);
+  height: var(--writing-side-icon-size);
 }
 .bn-container.bn-shadcn
   .bn-side-menu
@@ -602,6 +608,10 @@
   outline-offset: 2px;
 }
 @media (any-pointer: coarse) {
+  .bn-container.bn-shadcn .bn-side-menu {
+    --writing-side-control-size: max(2.75rem, var(--control-height-sm));
+    --writing-side-icon-size: 1rem;
+  }
   .bn-shadcn [data-slot="input"],
   .bn-shadcn.fieldbook-blocknote .writing-code-language {
     min-height: 44px;
