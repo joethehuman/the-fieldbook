@@ -31,6 +31,7 @@ import {
   BlockColorsItem,
   TableRowHeaderItem,
   TableColumnHeaderItem,
+  TableHandlesController,
   type SideMenuProps,
 } from "@blocknote/react";
 import {
@@ -68,6 +69,7 @@ import { Button } from "../ui/button";
 import { Alert } from "../ui/alert";
 import { createWritingSchema } from "./blocknote-schema";
 import { writingShadCNComponents } from "./blocknote-ui";
+import { WritingTableHandle } from "./blocknote-table-handle";
 import {
   blockDocumentSchema,
   exportBlockMarkdown,
@@ -438,6 +440,7 @@ export default function WritingEditorEngine({
               slashMenu={false}
               formattingToolbar={false}
               sideMenu={false}
+              tableHandles={false}
               className="fieldbook-blocknote"
             >
               <SuggestionMenuController
@@ -479,6 +482,7 @@ export default function WritingEditorEngine({
                 formattingToolbar={WritingFormattingToolbar}
               />
               <SideMenuController sideMenu={WritingSideMenu} />
+              <TableHandlesController tableHandle={WritingTableHandle} />
             </BlockNoteView>
           </div>
         </WritingTitleEnterContext.Provider>

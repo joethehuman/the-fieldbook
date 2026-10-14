@@ -12,6 +12,8 @@ import type { Content } from "../../lib/types";
 const id = "00000000-0000-4000-8000-000000000011";
 const source =
   '## Start here\n\nKeep **important** text.\n\n- First\n  - Nested\n\n> A reminder.\n\n| Topic | Detail |\n| --- | --- |\n| Product | Customer |\n\n```js\nconst message = "hello";\n```';
+const gripTable =
+  "| One | Two | Three |\n| --- | --- | --- |\n| A | B | C |\n| D | E | F |\n| G | H | I |";
 async function setup(
   page: Page,
   production: boolean,
@@ -75,6 +77,172 @@ async function setup(
               .content[0],
         );
   return { editor, read };
+}
+
+test("table grips wait for a completed click and retain keyboard and touch activation", async ({
+  page,
+}, info) => {
+  const touch = info.project.use.hasTouch === true;
+  const { editor, read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    gripTable,
+    true,
+  );
+  const before = (await read()).body;
+  const cell = editor.getByRole("columnheader", { name: "One", exact: true });
+  for (const orientation of ["Row", "Column"]) {
+    await cell.hover();
+    const grip = page.getByRole("button", {
+      name: `${orientation} actions`,
+      exact: true,
+    });
+    await expect(grip).toBeVisible();
+    const box = (await grip.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await expect(page.getByRole("menu")).toBeHidden();
+    await page.mouse.up();
+    await expect(
+      page.getByRole("menuitem", {
+        name: `Delete ${orientation.toLowerCase()}`,
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(editor).toBeFocused();
+    for (const key of ["Enter", "Space"]) {
+      await cell.hover();
+      await grip.focus();
+      await page.keyboard.press(key);
+      await expect(page.getByRole("menu")).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
+    if (touch) {
+      await cell.hover();
+      await grip.tap();
+      await expect(page.getByRole("menu")).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
+  }
+  expect((await read()).body).toBe(before);
+});
+
+for (const orientation of ["row", "column"] as const) {
+  test(`table grips preserve native ${orientation} dragging without opening a menu`, async ({
+    page,
+  }, info) => {
+    test.skip(
+      info.project.use.hasTouch === true,
+      "HTML drag-and-drop is checked with a desktop pointer; touch taps are covered separately.",
+    );
+    const { editor, read } = await setup(
+      page,
+      info.project.name.startsWith("production"),
+      "doc",
+      gripTable,
+      true,
+    );
+    const table = editor.getByRole("table");
+    const origin =
+      orientation === "row"
+        ? table.getByRole("cell", { name: "A", exact: true })
+        : table.getByRole("columnheader", { name: "One", exact: true });
+    await origin.hover();
+    const grip = page.getByRole("button", {
+      name: orientation === "row" ? "Row actions" : "Column actions",
+      exact: true,
+    });
+    const start = (await grip.boundingBox())!;
+    const target = await (
+      orientation === "row"
+        ? table.getByRole("cell", { name: "G", exact: true })
+        : table.getByRole("columnheader", { name: "Three", exact: true })
+    ).boundingBox();
+    await page.mouse.move(
+      start.x + start.width / 2,
+      start.y + start.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      start.x + start.width / 2 + 12,
+      start.y + start.height / 2 + 12,
+      { steps: 5 },
+    );
+    await expect(page.locator(".bn-table-handle-dragging")).toBeVisible();
+    await expect(page.getByRole("menu")).toBeHidden();
+    await page.mouse.move(
+      target!.x + target!.width / 2,
+      target!.y + target!.height / 2,
+      { steps: 10 },
+    );
+    await page.mouse.up();
+    await expect(page.getByRole("menu")).toBeHidden();
+    if (orientation === "row")
+      await expect
+        .poll(async () =>
+          (await table.getByRole("row").allTextContents()).map((text) =>
+            text.replace(/\s/g, ""),
+          ),
+        )
+        .toEqual(["OneTwoThree", "DEF", "GHI", "ABC"]);
+    else
+      await expect
+        .poll(async () =>
+          (await table.getByRole("columnheader").allTextContents()).map(
+            (text) => text.trim(),
+          ),
+        )
+        .toEqual(["Two", "Three", "One"]);
+    await waitForDraftSaved(page);
+    const saved = (await read()).body;
+    await page.reload();
+    await expect(editor).toBeVisible();
+    expect((await read()).body).toBe(saved);
+    await table.getByRole("columnheader").first().hover();
+    await page
+      .getByRole("button", { name: "Column actions", exact: true })
+      .click();
+    await expect(
+      page.getByRole("menuitem", { name: "Delete column", exact: true }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath("table-grip-menu.png"),
+      fullPage: false,
+    });
+    await page.keyboard.press("Escape");
+    const rowsBeforeCancel = await table.getByRole("row").allTextContents();
+    await origin.hover();
+    const cancelStart = (await grip.boundingBox())!;
+    await page.mouse.move(
+      cancelStart.x + cancelStart.width / 2,
+      cancelStart.y + cancelStart.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      cancelStart.x + cancelStart.width / 2 + 12,
+      cancelStart.y + cancelStart.height / 2 + 12,
+      { steps: 5 },
+    );
+    await expect(page.locator(".bn-table-handle-dragging")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    await expect(page.getByRole("menu")).toBeHidden();
+    expect(await table.getByRole("row").allTextContents()).toEqual(
+      rowsBeforeCancel,
+    );
+    await origin.hover();
+    await grip.focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      page.getByRole("menuitem", {
+        name: `Delete ${orientation}`,
+        exact: true,
+      }),
+    ).toBeVisible();
+  });
 }
 for (const kind of ["doc", "brief", "course"] as const) {
   test(`${kind}: legacy source stays unchanged on open, then blocks persist through save and reload`, async ({
