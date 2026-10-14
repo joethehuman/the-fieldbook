@@ -343,7 +343,11 @@ export default function WritingEditorEngine({
     </div>
   );
   const enterBody = () => {
-    editor.setTextCursorPosition(editor.document[0], "start");
+    let first = editor.document[0];
+    if (!Array.isArray(first.content)) {
+      first = editor.insertBlocks([{ type: "paragraph" }], first, "before")[0];
+    }
+    editor.setTextCursorPosition(first, "start");
     editor.focus();
   };
   return (

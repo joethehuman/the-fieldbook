@@ -42,7 +42,12 @@ const propsSchema = z
     textAlignment: z.enum(["left", "center", "right", "justify"]).optional(),
     level: z.number().int().min(1).max(6).optional(),
     isToggleable: z.boolean().optional(),
-    language: z.string().min(1).max(100).optional(),
+    language: z
+      .string()
+      .min(1)
+      .max(100)
+      .regex(/^[^\s`]+$/)
+      .optional(),
     start: z.number().int().min(0).max(100000).optional(),
     checked: z.boolean().optional(),
     url: z.string().max(2000).optional(),
@@ -165,6 +170,30 @@ export const blockDocumentSchema: z.ZodType<BlockDocument> = z
         return;
       }
       ids.add(block.id);
+      if (
+        ["divider", "image", "video", "videoEmbed"].includes(block.type) &&
+        block.content &&
+        (!Array.isArray(block.content) || block.content.length)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "This block does not accept inline content.",
+        });
+      if (
+        block.type === "codeBlock" &&
+        Array.isArray(block.content) &&
+        block.content.some(
+          (item) =>
+            item.type !== "text" ||
+            Object.values(item.styles).some(
+              (value) => !!value && value !== "default",
+            ),
+        )
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Code blocks accept plain text only.",
+        });
       if (block.type === "image") {
         const url = block.props.url || "";
         if (
@@ -215,6 +244,7 @@ type Ast = {
   alt?: string;
   title?: string | null;
   lang?: string | null;
+  meta?: string | null;
   ordered?: boolean;
   start?: number | null;
   checked?: boolean | null;
@@ -373,12 +403,15 @@ export function importMarkdownDocument(markdown: string): BlockDocument {
           };
         });
       if (n.type === "thematicBreak") return [block("divider")];
-      if (n.type === "code")
+      if (n.type === "code") {
+        if (n.meta)
+          throw new Error("This code annotation requires Markdown recovery.");
         return [
           block("codeBlock", [text(n.value || "")], {
             language: n.lang || "text",
           }),
         ];
+      }
       if (n.type === "table") {
         const saved = widths[tableIndex++];
         return [

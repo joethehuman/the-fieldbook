@@ -883,7 +883,8 @@
                   "language": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 100
+                    "maxLength": 100,
+                    "pattern": "^[^\\s`]+$"
                   },
                   "start": {
                     "type": "integer",
@@ -1986,7 +1987,8 @@
                   "language": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 100
+                    "maxLength": 100,
+                    "pattern": "^[^\\s`]+$"
                   },
                   "start": {
                     "type": "integer",

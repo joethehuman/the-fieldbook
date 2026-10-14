@@ -475,3 +475,29 @@ test("pasting a web link over selected text preserves the label and survives rel
     editor.getByRole("link", { name: "Selected", exact: true }),
   ).toHaveAttribute("href", "https://example.com/resource");
 });
+
+test("Return from the title provides a writing line before media without replacing it", async ({
+  page,
+}, info) => {
+  const { editor, read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    "[Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\nExisting text.",
+  );
+  await page
+    .getByRole("textbox", { name: "Title", exact: true })
+    .press("Enter");
+  await expect(editor).toBeFocused();
+  await page.keyboard.type("Before the media.");
+  await waitForDraftSaved(page);
+  const saved = await read();
+  expect(saved.bodyDocument!.blocks[0].type).toBe("paragraph");
+  expect(saved.body).toContain("dQw4w9WgXcQ");
+  expect(saved.body).toContain("Existing text.");
+  expect(saved.body.indexOf("Before the media.")).toBeLessThan(
+    saved.body.indexOf("[Video]"),
+  );
+  await page.reload();
+  await expect(editor).toContainText("Before the media.");
+});

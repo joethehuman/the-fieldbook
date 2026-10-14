@@ -13,6 +13,7 @@ import { CourseVideo } from "./course-video";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { videoSource } from "@/lib/video";
+import { useId, useState } from "react";
 import type { BlockDocument, WritingBlock } from "@/lib/block-document";
 
 const videoEmbed = createReactBlockSpec(
@@ -23,6 +24,8 @@ const videoEmbed = createReactBlockSpec(
   },
   {
     render: function VideoEmbed({ block, editor }) {
+      const [issue, setIssue] = useState("");
+      const issueId = useId();
       return (
         <div className="writing-media-block" contentEditable={false}>
           {block.props.url && videoSource(block.props.url) ? (
@@ -34,19 +37,22 @@ const videoEmbed = createReactBlockSpec(
             <div className="writing-video-fields">
               <Input
                 aria-label="Video URL"
-                type="url"
+                key={block.props.url}
+                type="text"
+                inputMode="url"
+                maxLength={2000}
+                aria-invalid={!!issue}
+                aria-describedby={issue ? issueId : undefined}
                 placeholder="YouTube, Vimeo or Loom URL"
                 defaultValue={block.props.url}
                 onBlur={(event) => {
                   const url = event.target.value.trim();
-                  if (!url || videoSource(url))
+                  if (!url || videoSource(url)) {
+                    setIssue("");
                     editor.updateBlock(block, { props: { url } });
-                  else
-                    event.target.setCustomValidity(
-                      "Use a supported HTTPS video URL.",
-                    );
+                  } else setIssue("Use a supported HTTPS video URL.");
                 }}
-                onInput={(event) => event.currentTarget.setCustomValidity("")}
+                onInput={() => setIssue("")}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -62,6 +68,11 @@ const videoEmbed = createReactBlockSpec(
                 Remove video
               </Button>
             </div>
+          )}
+          {issue && (
+            <p id={issueId} className="text-copy text-destructive" role="alert">
+              {issue}
+            </p>
           )}
         </div>
       );
@@ -89,9 +100,8 @@ const {
 } = defaultBlockSpecs;
 /** Preserve imported fence labels, including aliases and unrecognized languages. */
 export function createWritingSchema(document: BlockDocument) {
-  const languages: Record<string, { name: string; aliases?: string[] }> = {
-    ...codeBlockOptions.supportedLanguages,
-  };
+  const languages: Record<string, { name: string; aliases?: string[] }> =
+    Object.assign(Object.create(null), codeBlockOptions.supportedLanguages);
   const highlighting = new Map<string, string>();
   for (const [key, value] of Object.entries(
     codeBlockOptions.supportedLanguages,
@@ -102,7 +112,11 @@ export function createWritingSchema(document: BlockDocument) {
   function registerLanguages(document: BlockDocument) {
     function visit(block: WritingBlock) {
       const language = block.props.language;
-      if (block.type === "codeBlock" && language && !languages[language]) {
+      if (
+        block.type === "codeBlock" &&
+        language &&
+        !Object.hasOwn(languages, language)
+      ) {
         const known = highlighting.get(language.toLowerCase());
         languages[language] = {
           name: known ? `${languages[known].name} (${language})` : language,
