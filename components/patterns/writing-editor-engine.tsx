@@ -405,6 +405,7 @@ export default function WritingEditorEngine({
             {title && <div className="writing-document-heading">{title}</div>}
             <BlockNoteView
               editor={editor}
+            theme="light"
               editable={!disabled}
               onChange={changed}
               slashMenu={false}
