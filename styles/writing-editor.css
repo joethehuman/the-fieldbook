@@ -316,6 +316,28 @@
   z-index: 50;
 }
 /* The shadcn skin uses Fieldbook's shared menu, control and elevation tokens. */
+.bn-root.bn-shadcn[data-color-scheme] {
+  /* Native text, block backgrounds and picker swatches share the reader palette.
+     Apply this to every themed root, including menus portalled outside the editor. */
+  --bn-colors-highlights-gray-text: var(--authored-gray-text);
+  --bn-colors-highlights-gray-background: var(--authored-gray-background);
+  --bn-colors-highlights-brown-text: var(--authored-brown-text);
+  --bn-colors-highlights-brown-background: var(--authored-brown-background);
+  --bn-colors-highlights-red-text: var(--authored-red-text);
+  --bn-colors-highlights-red-background: var(--authored-red-background);
+  --bn-colors-highlights-orange-text: var(--authored-orange-text);
+  --bn-colors-highlights-orange-background: var(--authored-orange-background);
+  --bn-colors-highlights-yellow-text: var(--authored-yellow-text);
+  --bn-colors-highlights-yellow-background: var(--authored-yellow-background);
+  --bn-colors-highlights-green-text: var(--authored-green-text);
+  --bn-colors-highlights-green-background: var(--authored-green-background);
+  --bn-colors-highlights-blue-text: var(--authored-blue-text);
+  --bn-colors-highlights-blue-background: var(--authored-blue-background);
+  --bn-colors-highlights-purple-text: var(--authored-purple-text);
+  --bn-colors-highlights-purple-background: var(--authored-purple-background);
+  --bn-colors-highlights-pink-text: var(--authored-pink-text);
+  --bn-colors-highlights-pink-background: var(--authored-pink-background);
+}
 .bn-container.bn-shadcn {
   font-family: var(--font-geist-sans), sans-serif;
 }
