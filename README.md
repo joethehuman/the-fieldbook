@@ -2,7 +2,7 @@
 
 The Fieldbook is a source-available learning and knowledge platform for teams that want to run their own installation. It gives each kind of content a job: **Updates** share news and perspective, **Courses** teach through lessons and knowledge checks, and **Docs** hold maintained reference material. Authors work in the built-in admin interface; readers use the same site.
 
-The released installation uses **Vercel with hosted Supabase**. The [installation recipes](docs/installation.md) also describe **DigitalOcean App Platform with Managed PostgreSQL, self-hosted Supabase Auth/REST/Storage and private Spaces**; the DigitalOcean recipe has not yet shipped in a Fieldbook release. Both use Google sign-in. Optional Ask AI can use Vercel AI Gateway or a configured DigitalOcean Inference Router independently of hosting. Each operator supplies and controls their own accounts, data, media, domain, and content. The optional interactive demo uses fictional data stored in the browser; it does not create a working installation or persist learner records on a server.
+The supported [installation recipes](docs/installation.md) are **Vercel with hosted Supabase** and **DigitalOcean App Platform with Managed PostgreSQL, self-hosted Supabase Auth/REST/Storage and private Spaces**. Both use Google sign-in. Optional Ask AI can use Vercel AI Gateway or a configured DigitalOcean Inference Router independently of hosting. Each operator supplies and controls their own accounts, data, media, domain, and content. The optional interactive demo uses fictional data stored in the browser; it does not create a working installation or persist learner records on a server.
 
 ## Start here
 

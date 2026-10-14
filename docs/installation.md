@@ -9,8 +9,6 @@ Choose a recipe for your own accounts and infrastructure. Both run the same Fiel
 | [Vercel with hosted Supabase](#vercel-with-hosted-supabase) | Vercel       | Hosted Supabase Database, Auth and Storage                                  |
 | [DigitalOcean App Platform](#digitalocean-app-platform)     | App Platform | Managed PostgreSQL, App Platform Supabase Auth/REST/Storage, private Spaces |
 
-Vercel with hosted Supabase is the released configuration. The DigitalOcean recipe has not yet shipped in a Fieldbook release. Its component versions and configuration are listed below.
-
 ## Vercel with hosted Supabase
 
 ### 1. Get the source and create a Supabase project

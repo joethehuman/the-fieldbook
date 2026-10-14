@@ -19,7 +19,7 @@ Use the Node.js and pnpm versions declared in `package.json`. Install dependenci
 | `server/providers/` | Provider-specific integrations. |
 | `supabase/migrations/` | Ordered database changes for the current supported backend. |
 
-The released installation is Vercel with hosted Supabase. The unreleased DigitalOcean App Platform recipe uses managed PostgreSQL and self-hosted Supabase services. The installation guide defines the recipe configurations and tested component versions. Both retain Google sign-in. Treat further provider combinations as contribution targets until their implementation and installation instructions have been verified.
+The supported installation recipes are Vercel with hosted Supabase and DigitalOcean App Platform with managed PostgreSQL and self-hosted Supabase services. The installation guide defines the recipe configurations and tested component versions. Both retain Google sign-in. Treat further provider combinations as contribution targets until their implementation and installation instructions have been verified.
 
 ## Implement through provider interfaces
 
