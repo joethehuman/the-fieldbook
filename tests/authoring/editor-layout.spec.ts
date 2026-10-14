@@ -105,6 +105,40 @@ async function open(
   };
 }
 
+async function expectCourseReturnChain(page: Page, read: () => Promise<{ content: Content[] }>, populated: boolean, touch: boolean) {
+  const courseTitle = page.locator("#editor-title");
+  const lessonTitle = page.getByRole("textbox", { name: "Lesson title", exact: true });
+  const writer = page.getByRole("textbox", { name: "Lesson content", exact: true });
+  if (!populated) { await courseTitle.fill(""); await lessonTitle.fill(""); }
+  const titleBefore = await courseTitle.inputValue();
+  const lessonBefore = await lessonTitle.inputValue();
+  const bodyBefore = await writer.textContent();
+  if (touch) await courseTitle.tap(); else await courseTitle.click();
+  await page.keyboard.press("Enter");
+  await expect(lessonTitle).toBeFocused();
+  await expect(courseTitle).toHaveValue(titleBefore);
+  await expect(lessonTitle).toHaveValue(lessonBefore);
+  await expect(writer).toHaveText(bodyBefore!);
+  await page.keyboard.insertText("Lesson continuation.");
+  await expect(lessonTitle).toHaveValue(/Lesson continuation\./);
+  if (lessonBefore) expect(await lessonTitle.inputValue()).toContain(lessonBefore);
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("Immediate writing.");
+  await expect(writer).toBeFocused();
+  await expect(writer).toContainText("Immediate writing.");
+  await expect.poll(() => writer.evaluate(node => {
+    const selection = window.getSelection();
+    return Boolean(selection?.isCollapsed && node.contains(selection.focusNode));
+  })).toBe(true);
+  await expect(courseTitle).toHaveValue(titleBefore);
+  await waitForDraftSaved(page);
+  const course = (await read()).content[0];
+  expect(course.title).toBe(titleBefore);
+  expect(course.lessons[0].title).toContain("Lesson continuation.");
+  expect(course.lessons[0].body).toContain("Immediate writing.");
+  if (populated) expect(course.lessons[0].body).toContain("Paragraph 1.");
+}
+
 for (const kind of ["doc", "brief", "course"] as const)
   test(`${kind}: reading width stays independent of menu clearance and resize defaults`, async ({ page }, info) => {
     await page.setViewportSize({ width: 1600, height: 1000 });
@@ -2614,6 +2648,18 @@ test("desktop code font and Quiz focus keep their existing layout", async ({ pag
   await expect(page.locator(".course-quiz-focus-space")).toHaveCount(0);
 });
 
+test.describe("desktop Course title Return", () => {
+  test.use({ hasTouch: false, isMobile: false, viewport: { width: 1440, height: 1000 } });
+  for (const populated of [false, true]) {
+    test(`Course title Return continues through lesson title into ${populated ? "existing" : "empty"} writing`, async ({ page }, info) => {
+      const { read } = await open(page, info.project.name.startsWith("production"), "course", 2, item => {
+        if (!populated) item.lessons[0].body = "";
+      });
+      await expectCourseReturnChain(page, read, populated, false);
+    });
+  }
+});
+
 // These tests exercise native document layout and actual browser input. Resizing
 // a browser viewport does not emulate an OS keyboard or establish device acceptance.
 test.describe("native mobile editing", () => {
@@ -2730,18 +2776,8 @@ test.describe("native mobile editing", () => {
 
   for (const populated of [false, true]) {
     test(`title and lesson Return preserve immediate input with ${populated ? "existing" : "empty"} content`, async ({ page }, info) => {
-      const { writer, read } = await fixture(page, info.project.name.startsWith("production"), { empty: !populated });
-      for (const field of [page.locator("#editor-title"), page.getByRole("textbox", { name: "Lesson title", exact: true })]) {
-        const value = await field.inputValue();
-        await field.tap(); await field.press("Enter");
-        await page.keyboard.insertText("Immediate writing.");
-        await expect(writer).toBeFocused(); await expect(writer).toContainText("Immediate writing.");
-        await expect(field).toHaveValue(value);
-      }
-      await waitForDraftSaved(page);
-      const body = (await read()).content[0].lessons[0].body;
-      expect(body).toContain("Immediate writing.");
-      if (populated) expect(body).toContain("Paragraph 1.");
+      const { read } = await fixture(page, info.project.name.startsWith("production"), { empty: !populated });
+      await expectCourseReturnChain(page, read, populated, true);
     });
   }
 

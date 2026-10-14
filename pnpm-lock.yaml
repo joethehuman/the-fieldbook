@@ -11,7 +11,7 @@ overrides:
 
 patchedDependencies:
   '@mdxeditor/editor@4.2.5':
-    hash: ca48d5c8a7ab0bef6aebf52a162c1e16f4aed8e2cdba42a572a41378831edf27
+    hash: 8a348e6309c51f4672bdbc4789212cb06e7fdfdd396e1809f57c1df53944f8ef
     path: patches/@mdxeditor__editor@4.2.5.patch
   lexical@0.48.0:
     hash: 1f2c0caa13c07467ad6f95b1aee1c70d74a37aefd7e2c6c4bbde0f89bb6d0ebb
@@ -56,7 +56,7 @@ importers:
         version: 1.2.3
       '@mdxeditor/editor':
         specifier: 4.2.5
-        version: 4.2.5(patch_hash=ca48d5c8a7ab0bef6aebf52a162c1e16f4aed8e2cdba42a572a41378831edf27)(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)
+        version: 4.2.5(patch_hash=8a348e6309c51f4672bdbc4789212cb06e7fdfdd396e1809f57c1df53944f8ef)(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)
       '@mdxeditor/gurx':
         specifier: 1.2.4
         version: 1.2.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -237,7 +237,7 @@ importers:
         version: 1.2.3
       '@mdxeditor/editor':
         specifier: 4.2.5
-        version: 4.2.5(patch_hash=ca48d5c8a7ab0bef6aebf52a162c1e16f4aed8e2cdba42a572a41378831edf27)(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)
+        version: 4.2.5(patch_hash=8a348e6309c51f4672bdbc4789212cb06e7fdfdd396e1809f57c1df53944f8ef)(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)
       '@mdxeditor/gurx':
         specifier: 1.2.4
         version: 1.2.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -4312,7 +4312,7 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.4': {}
 
-  '@mdxeditor/editor@4.2.5(patch_hash=ca48d5c8a7ab0bef6aebf52a162c1e16f4aed8e2cdba42a572a41378831edf27)(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)':
+  '@mdxeditor/editor@4.2.5(patch_hash=8a348e6309c51f4672bdbc4789212cb06e7fdfdd396e1809f57c1df53944f8ef)(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)':
     dependencies:
       '@codemirror/commands': 6.11.1
       '@codemirror/lang-markdown': 6.5.2

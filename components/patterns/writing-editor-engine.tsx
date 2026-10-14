@@ -773,11 +773,13 @@ export default function WritingEditorEngine({
         // flattening the decorator into its paragraph and losing the table.
         $insertNodeToNearestRootAtCaret(table, $caretFromPoint(selection.focus, "next"), { removeEmptyDestination: true });
         if (!$isElementNode(table.getNextSibling())) table.insertAfter($createParagraphNode());
-        table.selectNext();
       } else $insertNodes([table]);
       if (line.isAttached() && $isParagraphNode(line) && line.getChildrenSize() === 0) line.remove();
-    }, { discrete: true });
-    lexical.focus();
+      // The nested cell editor owns the next caret. Its mount subscription
+      // receives this request without briefly focusing the paragraph below.
+      $setSelection(null);
+      table.select([0, 0]);
+    }, { discrete: true, tag: SKIP_DOM_SELECTION_TAG });
   }
   const keepSlashAsText = useCallback((query = slashQuery, restoreCaret = true) => {
     const lexical = lexicalEditor.current;
@@ -1110,10 +1112,10 @@ export default function WritingEditorEngine({
         setSlashOpen(false);
       };
       if (!lexical) { dismissInvalidTarget(); return; }
-      if (mediaCommand) {
+      if (mediaCommand || run === insertTableAtCaret) {
         if (!hasAttachedInsertTarget(selection)) { dismissInvalidTarget(); return; }
-        // A chooser handoff restores the editor target without touching its
-        // DOM focus or selection, so it cannot briefly reopen the keyboard.
+        // A chooser or nested-cell handoff restores only the insertion target.
+        // Its destination owns focus; the outer prose must not take it first.
         lexical.update(() => { if (selection) $setSelection(selection.clone()); }, {
           discrete: true, tag: [SKIP_DOM_SELECTION_TAG, SKIP_SCROLL_INTO_VIEW_TAG],
         });
@@ -1125,7 +1127,7 @@ export default function WritingEditorEngine({
       }
       return;
     }
-    if (!slashFromToolbar) { run(); return; }
+    if (!slashFromToolbar || run === insertTableAtCaret) { run(); return; }
     const lexical = lexicalEditor.current;
     const selection = slashSelection.current;
     if (!lexical) { run(); return; }

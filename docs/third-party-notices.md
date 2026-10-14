@@ -34,7 +34,7 @@ Copyright (c) Meta Platforms, Inc. and affiliates. These upstream changes remain
 
 ## MDXEditor table focus
 
-The pinned `@mdxeditor/editor@4.2.5` dependency includes a [table focus patch](../patches/@mdxeditor__editor@4.2.5.patch). A cell that already owns native focus no longer receives a redundant programmatic focus update; keyboard navigation still focuses newly selected cells. pnpm applies the patch to both apps. When updating MDXEditor, verify native tap placement and keyboard cell navigation before removing it. MDXEditor retains its MIT license and packaged copyright notice.
+The pinned `@mdxeditor/editor@4.2.5` dependency includes a [table focus patch](../patches/@mdxeditor__editor@4.2.5.patch). A cell that already owns native focus no longer receives a redundant programmatic focus update; keyboard navigation still focuses newly selected cells. A newly inserted table retains its cell-selection request until its editor mounts. pnpm applies the patch to both apps. When updating MDXEditor, verify insertion into the first cell, native tap placement and keyboard cell navigation before removing it. MDXEditor retains its MIT license and packaged copyright notice.
 
 ## Code highlighting
 

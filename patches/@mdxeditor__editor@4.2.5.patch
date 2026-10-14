@@ -14,3 +14,30 @@ index 37f78dee795175a110eee3978c83fdcf0170602a..09c6524a58e39f898366ea00bf0e6124
        editor.focus();
      }
    }, [focus, editor]);
+diff --git a/dist/plugins/table/TableNode.js b/dist/plugins/table/TableNode.js
+index 4110014e650114ed496f3fb7e65acd7152cab276..986d969d662be1aa1dcda986c54deafe30fb90b9 100644
+--- a/dist/plugins/table/TableNode.js
++++ b/dist/plugins/table/TableNode.js
+@@ -8,12 +8,21 @@ import { TableEditor } from "./TableEditor.js";
+ const EMPTY_CELL = { type: "tableCell", children: [] };
+ function coordinatesEmitter() {
+   let subscription = noop;
++  let pending;
+   return {
+     publish: (coords) => {
+-      subscription(coords);
++      // A newly inserted table can be selected before its React editor mounts.
++      // Deliver that request when the cell focus owner subscribes.
++      if (subscription === noop) pending = coords;
++      else subscription(coords);
+     },
+     subscribe: (cb) => {
+       subscription = cb;
++      if (pending !== void 0) {
++        const coords = pending;
++        pending = void 0;
++        cb(coords);
++      }
+     }
+   };
+ }
