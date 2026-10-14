@@ -204,3 +204,21 @@ test("native links reject executable schemes and preserve web, email and relativ
   ])
     assert.doesNotThrow(() => importMarkdownDocument(`[Safe](${url})`));
 });
+
+test("formatted legacy links and zero-based numbered lists retain their meaning", () => {
+  const document = importMarkdownDocument(
+    "**[A bold link](https://example.com)**\n\n0. First step\n1. Next step",
+  );
+  const link =
+    Array.isArray(document.blocks[0].content) && document.blocks[0].content[0];
+  assert.ok(link && link.type === "link" && link.content[0].styles.bold);
+  assert.equal(document.blocks[1].props.start, 0);
+  assert.ok(exportBlockMarkdown(document).includes("0. First step"));
+});
+test("code annotations retain source recovery instead of disappearing during conversion", () => {
+  assert.throws(
+    () =>
+      importMarkdownDocument('```js title="script.js"\nconst value = 1;\n```'),
+    /recovery/,
+  );
+});

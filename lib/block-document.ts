@@ -313,7 +313,7 @@ export function importMarkdownDocument(markdown: string): BlockDocument {
           {
             type: "link",
             href: ref.url,
-            content: inline(n.children || []).flatMap((x) =>
+            content: inline(n.children || [], styles).flatMap((x) =>
               x.type === "text" ? [x] : x.content,
             ),
           },
@@ -396,7 +396,7 @@ export function importMarkdownDocument(markdown: string): BlockDocument {
             props:
               item.checked != null
                 ? { checked: item.checked }
-                : n.ordered && index === 0 && n.start && n.start !== 1
+                : n.ordered && index === 0 && n.start != null && n.start !== 1
                   ? { start: n.start }
                   : {},
             children,
@@ -499,7 +499,7 @@ export function exportBlockMarkdown(doc: BlockDocument): string {
           list = {
             type: "list",
             ordered,
-            start: b.props.start || 1,
+            start: b.props.start ?? 1,
             children: [],
           };
           nodes.push(list);

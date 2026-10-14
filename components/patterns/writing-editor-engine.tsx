@@ -210,15 +210,18 @@ export default function WritingEditorEngine({
       },
     },
     tables: { headers: true },
-    uploadFile: async (file) => {
-      if (!latest.current.onUpload) throw new Error("Uploads are unavailable.");
-      try {
-        return await latest.current.onUpload(file);
-      } catch (reason) {
-        setError((reason as Error).message || "Upload failed. Try again.");
-        throw reason;
-      }
-    },
+    uploadFile: onUpload
+      ? async (file) => {
+          if (!latest.current.onUpload)
+            throw new Error("Uploads are unavailable.");
+          try {
+            return await latest.current.onUpload(file);
+          } catch (reason) {
+            setError((reason as Error).message || "Upload failed. Try again.");
+            throw reason;
+          }
+        }
+      : undefined,
   });
   const lastValue = useRef(value);
   const lastDoc = useRef(JSON.stringify(bodyDocument));
@@ -343,11 +346,11 @@ export default function WritingEditorEngine({
     </div>
   );
   const enterBody = () => {
-    let first = editor.document[0];
-    if (!Array.isArray(first.content)) {
-      first = editor.insertBlocks([{ type: "paragraph" }], first, "before")[0];
-    }
-    editor.setTextCursorPosition(first, "start");
+    const first = editor.document[0];
+    const target = Array.isArray(first.content)
+      ? first.id
+      : editor.insertBlocks([{ type: "paragraph" }], first, "before")[0].id;
+    editor.setTextCursorPosition(target, "start");
     editor.focus();
   };
   return (
