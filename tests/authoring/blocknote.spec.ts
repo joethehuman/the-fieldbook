@@ -700,19 +700,12 @@ test("native code block and language select preserve editing and saved formattin
   const source = code.locator("pre code");
   const picker = code.getByRole("combobox", { name: "Code language" });
   const geometry = await code.evaluate((element) => {
-    const header = element
-      .querySelector("select")!
-      .parentElement!.getBoundingClientRect();
-    const pre = element.querySelector("pre")!.getBoundingClientRect();
     const style = getComputedStyle(element.querySelector("pre code")!);
     return {
-      headerBottom: header.bottom,
-      codeTop: pre.top,
       color: style.color,
       background: getComputedStyle(element).backgroundColor,
     };
   });
-  expect(geometry.headerBottom).toBeLessThanOrEqual(geometry.codeTop);
   expect(geometry.color).not.toBe("rgb(255, 255, 255)");
   expect(geometry.background).not.toBe("rgb(22, 22, 22)");
   await source.click({ position: { x: 3, y: 8 } });

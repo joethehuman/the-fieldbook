@@ -115,104 +115,52 @@
 .fieldbook-blocknote {
   width: 100%;
 }
+/* Only the surrounding column inset belongs to Fieldbook. Native blocks
+   keep their own padding, line heights, indentation and scrolling. */
 .fieldbook-blocknote .bn-editor {
   font-family: var(--font-geist-sans), sans-serif;
-  color: var(--foreground);
-  background: var(--background);
-  font-size: 1rem;
-  line-height: var(--type-body-leading, 1.7);
   padding-block: var(--space-6) 0;
   padding-inline: var(--editor-content-padding, var(--space-6));
   padding-inline-start: max(
     52px,
     var(--editor-content-padding, var(--space-6))
   );
-  outline: none;
 }
-.fieldbook-blocknote [data-content-type="paragraph"] {
-  line-height: 1.7;
-}
-/* BlockNote sets heading typography on the content wrapper. Its editable
-   heading and placeholder must inherit the same line metrics, rather than
-   the application page-heading or Markdown reader styles. */
+/* Isolate native heading metrics from application page-heading styles. */
 .fieldbook-blocknote .bn-inline-content:is(h1, h2, h3, h4, h5, h6) {
   font-weight: inherit;
   line-height: inherit;
   letter-spacing: inherit;
 }
-.fieldbook-blocknote .bn-block-group .bn-block-group {
-  margin-left: 1.5rem;
-}
-.fieldbook-blocknote [data-content-type="quote"] {
-  border-left: 3px solid var(--border);
-  padding-inline-start: var(--space-4);
-}
-.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] {
-  flex-direction: column;
-  padding: 0;
-  background: var(--muted);
+.fieldbook-blocknote [data-content-type="quote"] blockquote {
+  border-left-color: var(--border);
   color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
-.fieldbook-blocknote
-  .bn-block-content[data-content-type="codeBlock"]
-  > div:has(> select) {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
-  color: var(--muted-foreground);
-  font-family: var(--font-geist-sans), sans-serif;
+/* A light code palette changes appearance, not the native layout or selector. */
+.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] {
+  background-color: var(--muted);
+  color: var(--foreground);
+  border-radius: var(--radius);
 }
 .fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] > pre {
   --bn-suggestion-surface: var(--muted);
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  min-height: 4.5rem;
-  max-height: 24rem;
-  border: 0;
-  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
-  background: transparent;
-  color: var(--foreground);
-  caret-color: var(--foreground);
-  overflow: auto;
-  overscroll-behavior: contain;
-  font-size: 0.8125rem;
-  line-height: 1.75;
-}
-.fieldbook-blocknote
-  .bn-block-content[data-content-type="codeBlock"]
-  > pre
-  code {
-  display: block;
-  min-height: 1.75em;
-  padding: 0;
-  background: transparent;
   color: inherit;
-  white-space: pre;
-  overflow-wrap: normal;
+  caret-color: var(--foreground);
+}
+.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] code {
   font-family:
     var(--font-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: inherit;
 }
-/* BlockNote's bundled Shiki themes supply both palettes; use the light palette. */
-.fieldbook-blocknote
-  .bn-block-content[data-content-type="codeBlock"]
-  > pre
-  .shiki {
+.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] .shiki {
   color: var(--shiki-light, var(--foreground));
 }
-.fieldbook-blocknote [data-content-type="table"] {
-  max-width: 100%;
-  overflow-x: auto;
+.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] select {
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
 }
-.fieldbook-blocknote table {
-  font-size: var(--type-body, 1rem);
-}
-.fieldbook-blocknote :is(td, th) {
-  border-color: var(--border);
+.fieldbook-blocknote .bn-block-content[data-content-type="codeBlock"] option {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
 }
 .editor-mobile-navigation {
   flex: none;
@@ -316,18 +264,8 @@
 }
 /* BlockNote's supported viewport container owns mobile keyboard geometry. */
 .app[data-mobile-editor].bn-scroll-container {
-  position: fixed;
   inset: auto;
-  top: var(--bn-vv-top, 0px);
-  left: var(--bn-vv-left, 0px);
-  width: var(--bn-vv-width, 100%);
-  height: var(--bn-vv-height, 100dvh);
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.app[data-mobile-editor].bn-scroll-container[data-bn-allow-pull-to-refresh] {
-  overscroll-behavior-y: auto;
 }
 .app[data-mobile-editor].bn-scroll-container .main-shell {
   min-height: 100%;
@@ -335,8 +273,18 @@
 .bn-mobile-formatting-toolbar {
   z-index: 50;
 }
-/* The shadcn skin uses Fieldbook's shared menu, control and elevation tokens. */
+/* Native blocks retain geometry. The theme and explicitly configured controls
+   keep Fieldbook colors and the supported menu/table refinements. */
 .bn-root.bn-shadcn[data-color-scheme] {
+  --bn-colors-editor-text: var(--foreground);
+  --bn-colors-editor-background: var(--background);
+  --bn-colors-menu-text: var(--popover-foreground);
+  --bn-colors-menu-background: var(--popover);
+  --bn-colors-hovered-text: var(--accent-foreground);
+  --bn-colors-hovered-background: var(--accent);
+  --bn-colors-border: var(--border);
+  --bn-colors-side-menu: var(--muted-foreground);
+  --bn-font-family: var(--font-geist-sans), sans-serif;
   /* Native text, block backgrounds and picker swatches share the reader palette.
      Apply this to every themed root, including menus portalled outside the editor. */
   --bn-colors-highlights-gray-text: var(--authored-gray-text);
@@ -370,11 +318,29 @@
     [data-slot="select-content"],
     [data-slot="popover-content"]
   ) {
-  border: 1px solid var(--border);
+  border-color: var(--border);
   border-radius: var(--radius);
-  background: var(--popover);
+  background-color: var(--popover);
   color: var(--popover-foreground);
   box-shadow: var(--elevation-floating);
+}
+.bn-shadcn :is(.bn-panel, [data-slot="card"]) {
+  border-color: var(--border);
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}
+.bn-shadcn :is(.bn-side-menu .bn-button, .bn-table-handle) {
+  color: var(--muted-foreground);
+  border-radius: var(--control-radius);
+}
+.bn-shadcn
+  :is(.bn-side-menu .bn-button, .bn-table-handle):is(:hover, [aria-expanded="true"]) {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+/* Preserve the single media-panel surface and approved menu/handle controls. */
+.bn-shadcn .bn-panel {
+  border: 1px solid var(--border);
 }
 .bn-shadcn .bn-panel {
   width: 24rem;
@@ -592,22 +558,10 @@
   cursor: pointer;
   pointer-events: auto;
 }
-.bn-shadcn :is(button, input):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
 @media (any-pointer: coarse) {
   .bn-container.bn-shadcn .bn-side-menu {
     --writing-side-control-size: max(2.75rem, var(--control-height-sm));
     --writing-side-icon-size: 1rem;
-  }
-  .bn-shadcn [data-slot="input"],
-  .bn-container.bn-shadcn.fieldbook-blocknote
-    .bn-block-content[data-content-type="codeBlock"]
-    > div
-    > select {
-    min-height: 44px;
-    font-size: 1rem;
   }
   .bn-shadcn :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
     min-height: 44px;
@@ -616,45 +570,4 @@
     min-width: 44px;
     height: 44px;
   }
-}
-.bn-container.fieldbook-blocknote
-  .bn-block-content[data-content-type="codeBlock"]
-  > div
-  > select {
-  position: static;
-  opacity: 1;
-  transition: none;
-  appearance: auto;
-  width: auto;
-  max-width: 100%;
-  min-width: 0;
-  min-height: var(--control-height-sm);
-  margin: 0;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--control-radius);
-  background: transparent;
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), sans-serif;
-  font-size: var(--type-label);
-}
-.bn-container.fieldbook-blocknote
-  .bn-block-content[data-content-type="codeBlock"]
-  > div
-  > select:hover:not(:disabled) {
-  background: var(--accent);
-}
-.bn-container.fieldbook-blocknote
-  .bn-block-content[data-content-type="codeBlock"]
-  > div
-  > select:focus-visible {
-  box-shadow: 0 0 0 2px var(--ring);
-}
-.bn-container.fieldbook-blocknote
-  .bn-block-content[data-content-type="codeBlock"]
-  > div
-  > select
-  > option {
-  background: var(--popover);
-  color: var(--popover-foreground);
 }

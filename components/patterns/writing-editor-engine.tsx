@@ -70,7 +70,6 @@ import {
 import { Button } from "../ui/button";
 import { Alert } from "../ui/alert";
 import { createWritingSchema, writingDictionary } from "./blocknote-schema";
-import { writingShadCNComponents } from "./blocknote-ui";
 import { WritingTableHandle } from "./blocknote-table-handle";
 import { WritingFilePanel } from "./blocknote-file-panel";
 import {
@@ -437,7 +436,6 @@ export default function WritingEditorEngine({
             {title && <div className="writing-document-heading">{title}</div>}
             <BlockNoteView
               editor={editor}
-              shadCNComponents={writingShadCNComponents}
               theme="light"
               editable={!disabled}
               onChange={changed}
