@@ -67,6 +67,7 @@ import {
 import { Button } from "../ui/button";
 import { Alert } from "../ui/alert";
 import { createWritingSchema } from "./blocknote-schema";
+import { writingShadCNComponents } from "./blocknote-ui";
 import {
   blockDocumentSchema,
   exportBlockMarkdown,
@@ -90,26 +91,47 @@ type EditorProps = WritingEditorProps & {
   viewControls?: ReactNode;
 };
 const commandOrder = [
-  "paragraph",
   "heading",
   "heading_2",
   "heading_3",
   "heading_4",
+  "paragraph",
+  "quote",
   "bullet_list",
   "numbered_list",
   "check_list",
   "toggle_list",
-  "toggle_heading",
-  "toggle_heading_2",
-  "toggle_heading_3",
-  "quote",
+  "divider",
   "table",
   "code_block",
-  "divider",
   "image",
   "video",
   "videoEmbed",
+  "toggle_heading",
+  "toggle_heading_2",
+  "toggle_heading_3",
 ];
+const commandGroups: Record<string, string> = {
+  heading: "Headings",
+  heading_2: "Headings",
+  heading_3: "Headings",
+  heading_4: "Headings",
+  paragraph: "Basic blocks",
+  quote: "Basic blocks",
+  bullet_list: "Basic blocks",
+  numbered_list: "Basic blocks",
+  check_list: "Basic blocks",
+  toggle_list: "Basic blocks",
+  divider: "Basic blocks",
+  table: "Advanced",
+  code_block: "Advanced",
+  image: "Media",
+  video: "Media",
+  videoEmbed: "Media",
+  toggle_heading: "Collapsible headings",
+  toggle_heading_2: "Collapsible headings",
+  toggle_heading_3: "Collapsible headings",
+};
 const commandIcons: Record<string, LucideIcon> = {
   paragraph: Type,
   heading: Heading1,
@@ -409,6 +431,7 @@ export default function WritingEditorEngine({
             {title && <div className="writing-document-heading">{title}</div>}
             <BlockNoteView
               editor={editor}
+              shadCNComponents={writingShadCNComponents}
               theme="light"
               editable={!disabled}
               onChange={changed}
@@ -426,35 +449,30 @@ export default function WritingEditorEngine({
                       const Icon = commandIcons[item.key] || Plus;
                       return {
                         ...item,
-                        size: "small" as const,
                         icon: <Icon size={18} />,
-                        group: ["image", "video"].includes(item.key)
-                          ? "Media"
-                          : "Blocks",
+                        group: commandGroups[item.key],
                         title: renamed[item.key] || item.title,
                       };
                     });
-                  const sorted = items.sort(
+                  const sorted = [
+                    ...items,
+                    {
+                      key: "videoEmbed",
+                      title: "Embed video link",
+                      subtext: "YouTube, Vimeo or Loom video",
+                      group: "Media",
+                      icon: <LinkIcon size={18} />,
+                      aliases: ["youtube", "vimeo", "loom"],
+                      onItemClick: () =>
+                        insertOrUpdateBlockForSlashMenu(editor, {
+                          type: "videoEmbed",
+                        }),
+                    },
+                  ].sort(
                     (a, b) =>
                       commandOrder.indexOf(a.key) - commandOrder.indexOf(b.key),
                   );
-                  return filterSuggestionItems(
-                    [
-                      ...sorted,
-                      {
-                        title: "Embed video link",
-                        size: "small" as const,
-                        group: "Media",
-                        icon: <LinkIcon size={18} />,
-                        aliases: ["youtube", "vimeo", "loom"],
-                        onItemClick: () =>
-                          insertOrUpdateBlockForSlashMenu(editor, {
-                            type: "videoEmbed",
-                          }),
-                      },
-                    ],
-                    query,
-                  );
+                  return filterSuggestionItems(sorted, query);
                 }}
               />
               <FormattingToolbarController
