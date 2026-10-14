@@ -88,6 +88,7 @@ export function Article({
         <div className="article">
           <div className="markdown">
             <ReactMarkdown
+              document={item.bodyDocument}
               headingPrefix={isDoc ? prefix : undefined}
               sameSiteOrigins={sameSiteOrigins}
             >
@@ -210,7 +211,7 @@ export function CourseOverview({
       </div>
       {item.body && (
         <div className="markdown">
-          <ReactMarkdown linkContext="course">{item.body}</ReactMarkdown>
+          <ReactMarkdown document={item.bodyDocument} linkContext="course">{item.body}</ReactMarkdown>
         </div>
       )}
       <h2>In this course</h2>

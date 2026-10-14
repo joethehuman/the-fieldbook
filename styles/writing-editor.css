@@ -1,551 +1,60 @@
-/* Adapter for MDXEditor's nested table/media UI; main controls use Fieldbook primitives. */
-.writing-editor .mdxeditor,
-.mdxeditor-popup-container {
-  --basePageBg: var(--background);
-  --baseBase: var(--background);
-  --baseBgSubtle: var(--muted);
-  --baseBg: var(--muted);
-  --baseBgHover: var(--accent);
-  --baseBgActive: var(--accent);
-  --baseLine: var(--border);
-  --baseBorder: var(--control-border);
-  --baseBorderHover: var(--control-hover);
-  --baseSolid: var(--primary);
-  --baseSolidHover: var(--primary-hover);
-  --baseText: var(--muted-foreground);
-  --baseTextContrast: var(--foreground);
-  --accentBgActive: var(--accent);
-  --accentText: var(--foreground);
-  --accentSolid: var(--primary);
-  --accentSolidHover: var(--primary-hover);
-  --accentBorder: var(--ring);
-  --font-body: var(--font-geist-sans), sans-serif;
-  --font-mono: monospace;
-  color: var(--foreground);
-  font-family: var(--font-body);
-}
-.writing-editor,
-.writing-editor .mdxeditor,
-.writing-editor .mdxeditor-root-contenteditable,
-.writing-editor .mdxeditor-contenteditable-wrapper,
-.writing-editor .writing-content {
-  box-sizing: border-box;
-  min-width: 0;
-  max-width: 100%;
-}
+/* Fieldbook's writing shell, with BlockNote owning editing and floating controls. */
 .writing-surface {
+  display: flex;
+  flex-direction: column;
   background: var(--background);
-  display: flex;
-  flex-direction: column;
-  overflow: clip;
+  min-width: 0;
 }
-/* The privacy draft stays a readable width while its editor can grow vertically. */
-.privacy-policy-editor .writing-surface {
-  height: 30rem;
-  min-height: 18rem;
-  resize: vertical;
-  overflow: auto;
-}
-.writing-editor .mdxeditor {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
+.writing-editor {
+  width: 100%;
+  min-width: 0;
 }
 .writing-viewport {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior-y: auto;
-  scroll-padding-block: var(--space-6);
   scrollbar-gutter: stable;
-}
-.writing-source-panel {
-  display: flex;
-  overflow: clip;
-}
-.writing-source {
-  flex: 1 1 auto;
-  min-height: 0;
-  resize: none;
   scroll-padding-block: var(--space-6);
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  overscroll-behavior-y: auto;
 }
-.editor[data-scroll-layout="workspace"] :is(.writing-root, .writing-surface) { flex: 1 1 0; min-height: 0; }
-.editor[data-scroll-layout="workspace"] .writing-scroll-area { overscroll-behavior-y: contain; }
-.editor[data-scroll-layout="workspace"] .writing-content[contenteditable] { min-height: 0; }
-.editor[data-scroll-layout="workspace"] .writing-viewport > .mdxeditor-root-contenteditable { display: flex; flex-direction: column; min-height: 100%; }
-.editor[data-scroll-layout="workspace"] .mdxeditor-contenteditable-wrapper { display: flex; flex: 1; flex-direction: column; }
-.editor[data-scroll-layout="workspace"] .writing-content[contenteditable] { flex: 1; }
-.editor[data-scroll-layout="page"] .writing-viewport:not(.writing-source-panel) { overflow-y: visible; }
-.writing-surface:focus-within,
-.writing-surface[data-editor-interacting="true"] {
-  border-color: var(--ring);
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-.writing-editor,
-.writing-editor .mdxeditor,
-.writing-editor .mdxeditor-root-contenteditable,
-.writing-editor .mdxeditor-contenteditable-wrapper,
-.writing-editor .writing-content {
-  width: 100%;
-}
-.editor-frame[data-mobile] .writing-content::highlight(fieldbook-writing-target) {
-  background: var(--selected);
-  color: var(--selected-foreground);
-}
-.writing-slash-menu {
-  position: fixed;
-  z-index: 60;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  width: min(18rem, calc(100vw - 2rem));
-  padding: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--background);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
-  overflow: hidden;
-}
-:is(.writing-slash-menu, .writing-media-chooser)[data-mobile-palette="true"] {
-  position: absolute;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(18rem, calc(100% - 16px));
-  max-height: min(24rem, var(--editor-mobile-overlay-height, 65svh));
-  pointer-events: auto;
-}
-.writing-media-chooser[data-mobile-palette="true"] {
-  width: min(324px, calc(100% - 16px));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-:is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] {
-  animation: writing-touch-menu-enter 140ms ease-out;
-}
-@keyframes writing-touch-menu-enter { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  :is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] { animation: none; }
-}
-.writing-slash-options {
-  display: grid;
+.editor[data-scroll-layout="workspace"] :is(.writing-root, .writing-surface) {
+  flex: 1 1 0;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-top: var(--space-1);
 }
-.writing-slash-group-label {
-  padding: var(--space-2) var(--space-3);
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
-  font-weight: var(--weight-label);
+.editor[data-scroll-layout="workspace"] .writing-scroll-area {
+  overscroll-behavior-y: contain;
 }
-.writing-slash-menu [role="menuitem"] {
-  width: 100%;
-  min-width: 0;
-  justify-content: flex-start;
-  text-align: left;
-  transition: none;
+.editor[data-scroll-layout="page"]
+  .writing-viewport:not(.writing-source-panel) {
+  overflow-y: visible;
 }
-.writing-slash-options [role="menuitem"]:hover,
-.writing-slash-options [role="menuitem"]:focus {
-  background: transparent;
-}
-.writing-slash-footer [role="menuitem"]:hover,
-.writing-slash-footer [role="menuitem"]:focus,
-.writing-slash-options [role="menuitem"][aria-current="true"] {
-  background: var(--accent);
-}
-.writing-slash-menu [role="menuitem"]:focus {
-  box-shadow: none;
-  outline: none;
-}
-.writing-slash-menu [role="menuitem"]:focus-visible {
-  outline: 2px solid var(--muted-foreground);
-  outline-offset: -2px;
-}
-.writing-slash-footer {
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
-}
-.writing-slash-footer [role="menuitem"] {
-  justify-content: space-between;
-}
-.writing-slash-footer kbd {
-  color: var(--muted-foreground);
-  font: inherit;
-  font-size: 0.75rem;
-}
-.writing-editor .mdxeditor-toolbar,
-.writing-view-header {
-  position: relative;
-  flex: 0 0 auto;
-  z-index: 10;
-}
-.editor-frame:has(.writing-editor, .writing-view-header)
-  .editor-frame-controls::after {
-  display: none;
-}
-.writing-editor .mdxeditor-toolbar,
-.writing-view-header {
-  border-bottom: 1px solid var(--border);
-  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
-  background: var(--muted);
-  padding: var(--space-2);
-  overflow: visible;
-}
-.writing-toolbar {
+.writing-document {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-width: 0;
+  flex-direction: column;
+  min-height: 100%;
 }
-.writing-toolbar-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  max-width: 100%;
-}
-.writing-toolbar-group {
-  display: flex;
-  flex-wrap: wrap;
-  max-width: 100%;
-  align-items: center;
-  gap: var(--space-1);
-}
-/* A single compact row fits Back and five 44px targets at a 320px viewport. */
-.editor-mobile-toolbar :is(.editor-controls-surface, .writing-toolbar-controls, .writing-toolbar-group) {
-  flex-wrap: nowrap;
-  gap: 0;
-}
-.editor-mobile-navigation { flex: none; }
-.editor-mobile-navigation .detail-navigation-label { display: none; }
-.editor-mobile-navigation .detail-navigation-short-label { display: inline; }
-.editor-mobile-navigation [data-slot="button"] {
-  width: 56px;
-  min-width: 56px;
-  height: 44px;
-  min-height: 44px;
-  margin: 0;
-  padding: 0;
-  gap: 4px;
-  font-size: 14px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-.editor-mobile-navigation [data-slot="button"] svg { width: 16px; height: 16px; }
-.editor-mobile-toolbar :is(.editor-panel-toggle, .writing-toolbar-controls [data-slot="button"]) {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-}
-@media (max-width: 767px) {
-  .writing-command-label { display: none; }
-  .writing-toolbar-controls { gap: var(--space-1); flex-wrap: nowrap; }
-  .writing-phone-format { flex-shrink: 0; }
-}
-.writing-editor .writing-content {
-  --writing-content-start: max(52px, var(--editor-content-padding, var(--space-6)));
-  padding: var(--space-6);
-  padding-inline: var(--editor-content-padding, var(--space-6));
-  padding-inline-start: var(--writing-content-start);
-  outline: none;
-}
-.writing-editor .writing-content[contenteditable] {
-  min-height: 24rem;
-}
-.writing-editor .writing-content > :first-child {
-  margin-top: 0;
-}
-.writing-editor .mdxeditor-root-contenteditable > .writing-content:not([contenteditable]) {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  min-height: 0;
-  color: var(--muted-foreground);
-  opacity: 0.65;
-  pointer-events: none;
-}
-.writing-editor:has(.writing-content[contenteditable]:focus-within)
-  .writing-content:not([contenteditable]),
-.writing-editor:has(.writing-media-line)
-  .writing-content:not([contenteditable]) {
-  display: none;
-}
-.writing-editor .writing-content:focus-within
-  > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
-    .writing-command-line,
-    .writing-media-line
-  ) {
-  position: relative;
-}
-.writing-editor .writing-content:focus-within
-  > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
-    .writing-command-line,
-    .writing-media-line
-  )::before {
-  content: "Type / for commands…";
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 0;
-  color: var(--muted-foreground);
-  opacity: 0.65;
-  pointer-events: none;
-}
-.writing-editor .writing-content:focus-within > p.writing-command-line::before {
-  content: "/";
-  color: var(--foreground);
-  pointer-events: none;
-}
-.writing-editor .writing-content:focus-within > p.writing-command-line > br {
-  display: none;
-}
-.writing-editor .writing-content:focus-within > p.writing-command-line::after {
-  content: attr(data-slash-query);
-  display: inline-block;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius);
-  background: var(--muted);
-  color: var(--muted-foreground);
-  pointer-events: none;
-}
-.writing-editor .writing-content .writing-media-line,
-.writing-media-loading {
-  display: flex;
-  align-items: center;
-  min-height: 3.5rem;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--muted);
-}
-.writing-media-loading {
-  width: 100%;
-  gap: var(--space-2);
-  color: var(--muted-foreground);
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-.writing-editor .writing-content > p.writing-media-line::before {
-  content: attr(data-media-placeholder);
-  color: var(--muted-foreground);
-  opacity: 1;
-}
-.writing-media-chooser {
-  position: fixed;
-  z-index: 61;
-  display: grid;
-  gap: var(--space-2);
-  width: min(21rem, calc(100vw - 1rem));
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--background);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
-}
-.writing-media-tabs {
-  display: flex;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--border);
-}
-.writing-media-tabs [aria-pressed="true"] {
-  border-bottom: 2px solid var(--foreground);
-  border-radius: 0;
-}
-.writing-media-fields {
-  display: grid;
-  gap: var(--space-2);
-}
-.writing-editor .mdxeditor-root-contenteditable {
-  position: relative;
-  min-width: 0;
-  overflow-x: clip;
-}
-.writing-editor .writing-content [data-lexical-decorator="true"]:has(table) {
-  display: block;
-  width: 100%;
-  overflow-x: auto;
-  border-radius: var(--radius);
-}
-.writing-editor .writing-content [data-lexical-decorator="true"] table {
-  table-layout: auto;
-  width: max-content;
-  height: auto;
-}
-.writing-editor .writing-content [data-lexical-decorator="true"] table:has(col[style*="width"]) {
-  table-layout: fixed;
-}
-.writing-editor .writing-content [data-lexical-decorator="true"] table:has(col[style*="width"]) tbody > tr > :is(td, th):not([data-tool-cell="true"]):not(:first-child) {
-  min-width: 0;
-}
-.writing-editor .writing-content table :is(td, th) {
-  overflow-wrap: anywhere;
-}
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table
-  tbody
-  > tr
-  > :is(td, th):not([data-tool-cell="true"]):not(:first-child) {
-  min-width: 11rem;
-  border-color: var(--authored-table-border);
-}
-.writing-editor .writing-content table tbody > tr > th:not([data-tool-cell="true"]):not(:first-child) {
-  font-weight: var(--weight-heading);
-}
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table
-  [data-tool-cell="true"] {
-  min-width: 1.5rem;
-  width: 1.5rem;
-  height: 1.5rem;
-  padding: 0;
-  border: 0;
-}
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table
-  :is(thead, tfoot)
-  th:not([data-tool-cell="true"]) {
-  min-width: 1.5rem;
-  width: 1.5rem;
-  padding: 0;
-  border: 0;
-}
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table
-  :is(tr:first-child, tr:last-child):has([data-tool-cell="true"]) {
-  height: 1.5rem;
-}
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table
-  :is(tr:first-child, tr:last-child):has([data-tool-cell="true"])
-  > [data-tool-cell="true"]
-  button {
-  min-height: 1.5rem;
-}
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table
-  :is(thead, tfoot)
-  button,
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table
-  tbody
-  [data-tool-cell="true"]
-  button {
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table:hover
-  :is(thead, tfoot)
-  button,
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table:hover
-  tbody
-  [data-tool-cell="true"]
-  button,
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table:focus-within
-  :is(thead, tfoot)
-  button,
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table:focus-within
-  tbody
-  [data-tool-cell="true"]
-  button,
-.writing-editor
-  .writing-content
-  [data-lexical-decorator="true"]
-  table
-  button[data-state="open"] {
-  opacity: 1;
-}
-@media (hover: none) {
-  .writing-editor
-    .writing-content
-    [data-lexical-decorator="true"]
-    table
-    :is(thead, tfoot)
-    button,
-  .writing-editor
-    .writing-content
-    [data-lexical-decorator="true"]
-    table
-    tbody
-    [data-tool-cell="true"]
-    button {
-    opacity: 0.7;
-  }
-}
-.mdxeditor-popup-container {
-  z-index: 60;
-}
-@media (max-width: 600px) {
-  .writing-toolbar [data-slot="button"],
-  .writing-toolbar [role="tab"],
-  .writing-view-header [role="tab"],
-  [data-writing-selection-menu] [data-slot="button"] {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-  }
-  .writing-editor .writing-content {
-    padding: var(--space-4);
-    padding-inline: var(--editor-content-padding, var(--space-4));
-    padding-inline-start: var(--writing-content-start);
-  }
-}
-
-/* One document measure and media presentation for visual writing and reading. */
-.writing-document { display: flex; flex-direction: column; min-height: 100%; }
-.editor[data-scroll-layout="workspace"] .writing-document > .mdxeditor-root-contenteditable { display: flex; flex: 1; flex-direction: column; }
-.writing-source-panel { flex-direction: column; }
 .writing-document-heading {
   flex-shrink: 0;
   display: grid;
   gap: var(--space-6);
   padding-block-start: var(--space-6);
   padding-inline: var(--editor-content-padding, var(--space-6));
-  padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6)));
+  padding-inline-start: max(
+    52px,
+    var(--editor-content-padding, var(--space-6))
+  );
 }
-.writing-editor .writing-source { padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6))); }
-.writing-title-field { position: relative; display: grid; min-width: 0; }
-.writing-title-field:has(.document-title[data-reveal-focus="true"]:focus)::after {
-  content: "";
-  position: absolute;
-  inset: -6px -8px;
-  border: 2px solid var(--ring);
-  border-radius: var(--radius);
-  pointer-events: none;
+.writing-course-heading {
+  padding-inline: var(--editor-content-padding, var(--space-6));
+  padding-inline-start: max(
+    52px,
+    var(--editor-content-padding, var(--space-6))
+  );
+  padding-block-start: var(--space-6);
+}
+.writing-title-field {
+  position: relative;
+  display: grid;
+  min-width: 0;
 }
 .document-title {
   min-height: 0;
@@ -555,100 +64,196 @@
   font-weight: var(--weight-heading);
   background: transparent;
 }
-.writing-document-heading + .mdxeditor-root-contenteditable .writing-content { padding-block-start: var(--space-6); }
-.writing-media-block { display: block; position: relative; width: 100%; }
-.writing-media-block .course-video-actions:empty { display: none; }
-.writing-editor [data-editor-block-type="image"] { max-width: 100%; }
-.writing-editor [data-editor-block-type="image"] img { display: block; max-width: 100%; height: auto; }
-@media (max-width: 600px) {
-  .writing-document-heading { padding-inline-end: var(--space-4); }
+.writing-title-field:has(
+    .document-title[data-reveal-focus="true"]:focus
+  )::after {
+  content: "";
+  position: absolute;
+  inset: -6px -8px;
+  border: 2px solid var(--ring);
+  border-radius: var(--radius);
+  pointer-events: none;
 }
-
-.course-builder-panel .writing-content h1 { font-size: 1.75rem; line-height: 1.3; letter-spacing: -0.035em; }
-
-/* Block menus live in the writing gutter, outside media and table content. */
-.writing-block-actions { position: absolute; inset-block-start: 0; inset-inline-start: -44px; inset-inline-end: auto; z-index: 2; display: inline-flex; width: 44px; opacity: 0; }
-.writing-block-actions [data-slot="button"] { width: var(--control-height); height: var(--control-height); padding: var(--space-2); color: var(--muted-foreground); }
-.writing-block-actions [data-slot="button"]:is(:hover, :focus-visible, [data-state="open"]) { color: var(--foreground); }
-:is(.writing-media-block, .writing-code-block, .writing-table-block, [data-editor-block-type="image"]):is(:hover, :focus-within) > .writing-block-actions,
-.writing-block-actions:has([data-state="open"]) { opacity: 1; }
-.writing-code-block { position: relative; }
-.editor-frame[data-mobile] .writing-code-block .code-block-header { gap: 4px; padding-inline: 8px; }
-.editor-frame[data-mobile] .writing-code-block .code-block-language { flex: 1; min-width: 0; }
-.editor-frame[data-mobile] .writing-code-block .code-block-language > svg { display: none; }
-.editor-frame[data-mobile] .writing-code-block .code-language-picker { width: 100%; min-height: 44px; gap: 4px; }
-.editor-frame[data-mobile] .writing-code-block .code-language-picker > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.editor-frame[data-mobile] .writing-code-block .code-block-header > [data-slot="button"] {
+.writing-view-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--editor-content-padding, var(--space-4));
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.writing-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.writing-source-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+}
+.writing-source {
+  flex: 1 1 auto;
+  min-height: 20rem;
+  resize: none;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.writing-source-panel .writing-source {
+  padding-inline-start: max(
+    52px,
+    var(--editor-content-padding, var(--space-6))
+  );
+}
+.privacy-policy-editor .writing-surface {
+  height: 30rem;
+  min-height: 18rem;
+  resize: vertical;
+  overflow: auto;
+}
+.fieldbook-blocknote {
+  flex: 1;
+  min-height: 20rem;
+  width: 100%;
+}
+.fieldbook-blocknote .bn-editor {
+  font-family: var(--font-geist-sans), sans-serif;
+  color: var(--foreground);
+  background: var(--background);
+  font-size: 1rem;
+  line-height: var(--type-body-leading, 1.7);
+  padding-block: var(--space-6)
+    max(var(--space-6), var(--writing-canvas-space, 0px));
+  padding-inline: var(--editor-content-padding, var(--space-6));
+  padding-inline-start: max(
+    52px,
+    var(--editor-content-padding, var(--space-6))
+  );
+  min-height: 20rem;
+  outline: none;
+}
+.fieldbook-blocknote .bn-block-content {
+  padding: 3px 0;
+}
+.fieldbook-blocknote [data-content-type="paragraph"] {
+  line-height: 1.7;
+}
+.fieldbook-blocknote [data-content-type="heading"] {
+  font-weight: var(--weight-heading);
+  letter-spacing: -0.025em;
+  padding-block-start: var(--space-4);
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="1"] {
+  font-size: 1.75rem;
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="2"] {
+  font-size: 1.45rem;
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="3"] {
+  font-size: 1.2rem;
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="4"] {
+  font-size: 1.05rem;
+}
+.fieldbook-blocknote .bn-block-group .bn-block-group {
+  margin-left: 1.5rem;
+}
+.fieldbook-blocknote [data-content-type="quote"] {
+  border-left: 3px solid var(--border);
+  padding-inline-start: var(--space-4);
+}
+.fieldbook-blocknote [data-content-type="codeBlock"] {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.fieldbook-blocknote [data-content-type="table"] {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.fieldbook-blocknote table {
+  font-size: var(--type-body, 1rem);
+}
+.fieldbook-blocknote :is(td, th) {
+  border-color: var(--border);
+}
+.writing-media-block {
+  width: 100%;
+  min-width: 0;
+}
+.writing-video-fields {
+  display: flex;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+}
+.writing-video-fields input {
+  flex: 1;
+  min-width: 0;
+}
+.editor-mobile-navigation {
+  flex: none;
+}
+.editor-mobile-navigation .detail-navigation-label {
+  display: none;
+}
+.editor-mobile-navigation .detail-navigation-short-label {
+  display: inline;
+}
+.editor-mobile-navigation [data-slot="button"] {
+  width: 56px;
+  min-width: 56px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  gap: 4px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.editor-mobile-toolbar
+  :is(.editor-controls-surface, .writing-toolbar-controls) {
+  flex-wrap: nowrap;
+  gap: 0;
+}
+.editor-mobile-toolbar
+  :is(.editor-panel-toggle, .writing-toolbar-controls [data-slot="button"]) {
   width: 44px;
   height: 44px;
   min-width: 44px;
   min-height: 44px;
-  padding: 4px;
+  padding: 0;
 }
-@media (any-pointer: coarse) {
-  .writing-code-block .cm-editor {
-    font-size: max(16px, 1rem);
+.editor-frame[data-mobile] .writing-command-label {
+  display: none;
+}
+.editor-frame[data-mobile]
+  :is(.writing-document-heading, .fieldbook-blocknote .bn-editor) {
+  padding-inline-end: var(--space-4);
+}
+.editor-frame[data-mobile] .writing-surface {
+  overflow: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fieldbook-blocknote * {
+    scroll-behavior: auto;
   }
 }
-.writing-editor [data-editor-block-type="image"] { position: relative; padding: var(--space-2); border-radius: var(--radius); }
-.writing-editor .writing-content .writing-table-block { position: relative; padding: calc(var(--control-height) + var(--space-1)) var(--space-4) var(--space-4) calc(var(--control-height) + var(--space-1)); border-radius: 0; }
-.writing-table-edge-fade { position: absolute; pointer-events: none; }
-.writing-block-gutter-actions { position: absolute; z-index: 3; display: flex; width: 44px; height: var(--control-height); opacity: 0; }
-.writing-block-gutter-actions:is([data-hovered="true"], :hover, :focus-within, :has([data-state="open"])) { opacity: 1; }
-.writing-block-gutter-actions .writing-block-actions { position: static; opacity: 1; }
-.writing-editor .writing-table-block table :is(thead, tfoot),
-.writing-editor .writing-table-block table [data-tool-cell],
-.writing-editor .writing-table-block table col:first-child,
-.writing-editor .writing-table-block table col:last-child { display: none; }
-.writing-table-handle { position: absolute; z-index: 2; transform: translate(-50%, -50%); }
-.writing-table-row { transform: translate(-100%, -50%); }
-.writing-table-column { transform: translate(-50%, -100%); }
-.writing-table-row .writing-table-grip { justify-content: flex-end; padding-inline-end: var(--space-1); }
-.writing-table-column .writing-table-grip { align-items: flex-end; padding-block-end: var(--space-1); }
-.writing-editor .writing-content [data-lexical-decorator="true"] table :is(td, th):not([data-tool-cell])[data-active="true"] { outline: 2px solid var(--ring); outline-offset: -1px; }
-.writing-editor .writing-content [data-lexical-decorator="true"] table :is(td, th):not([data-tool-cell])[data-writing-cell-selected] { background: var(--selected); box-shadow: none; }
-.writing-editor .writing-content [data-lexical-decorator="true"][data-table-cell-selection] table :is(td, th):not([data-tool-cell])[data-active="true"] { outline: none; }
-.writing-editor [data-table-cell-selection] { user-select: none; }
-.writing-table-resizer { position: absolute; z-index: 2; width: 16px; height: 28px; transform: translate(-50%, -50%); cursor: grab; touch-action: none; border: 0; background: transparent; display: grid; place-items: center; }
-.writing-table-resizer:is(:active, [data-resizing="true"]) { cursor: grabbing; }
-.writing-table-resizer > span { display: block; width: 3px; height: 16px; border-radius: 2px; background: var(--muted-foreground); opacity: .65; }
-.writing-table-resizer:is(:hover, :focus-visible) > span { background: var(--ring); opacity: 1; }
-.writing-table-resizer:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.writing-table-handle .writing-table-grip { background: transparent; touch-action: none; cursor: grab; }
-.writing-table-handle .writing-table-grip:is(:active, [data-pressed="true"]) { cursor: grabbing; }
-.writing-table-grip-mark { display: block; width: var(--space-4); height: var(--space-1); border-radius: var(--radius); background: var(--muted-foreground); box-shadow: 0 0 0 3px var(--background); }
-.writing-table-row .writing-table-grip-mark { width: var(--space-1); height: var(--space-4); }
-.writing-table-grip:is(:hover, :focus-visible, [data-state="open"]) .writing-table-grip-mark { background: var(--ring); }
-.writing-table-drag-source { position: absolute; pointer-events: none; z-index: 1; background: var(--accent); outline: 2px dashed var(--ring); opacity: 0.65; }
-.writing-table-drop { position: absolute; z-index: 3; pointer-events: none; background: var(--ring); }
-.writing-table-drop-row { height: 3px; transform: translateY(-50%); }
-.writing-table-drop-column { width: 3px; transform: translateX(-50%); }
-.writing-table-drag-shield { position: fixed; inset: 0; z-index: 1000; cursor: grabbing; }
-.writing-table-drag-preview { position: fixed; z-index: 1001; display: flex; align-items: baseline; gap: var(--space-2); max-width: min(17.5rem, calc(100vw - 16px)); padding: var(--space-2) var(--space-3); overflow: hidden; pointer-events: none; white-space: nowrap; border: 1px solid var(--control-border); border-radius: var(--radius); background: var(--card); color: var(--foreground); box-shadow: var(--elevation-floating); }
-.writing-table-drag-preview span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted-foreground); }
-@media (hover: none) { .writing-block-actions, .writing-block-gutter-actions { opacity: 1; } }
-.writing-editor .mdxeditor-contenteditable-wrapper { position: relative; }
-/* Block decorators must not leave anonymous inline line boxes around their content. */
-.writing-editor .writing-content > [data-lexical-decorator="true"],
-.writing-editor .writing-content [data-lexical-decorator="true"]:has(.writing-media-block, [data-editor-block-type="image"], .writing-media-loading),
-.writing-editor .writing-content [data-editor-block-type="image"] { display: block; }
-/* Image-only blocks need no extra caret line inside their wrapper. */
-.writing-editor .writing-content :is(p, li, blockquote, h1, h2, h3, h4, h5, h6):has(> [data-lexical-decorator="true"]:first-child:nth-last-child(2)):has(
-  [data-editor-block-type="image"], .writing-media-loading
-) > br[data-lexical-managed-linebreak]:last-child { display: none; }
-.writing-editor .writing-content :is(.writing-code-block, .writing-media-block, [data-editor-block-type="image"], .writing-table-block),
-.writing-editor .writing-content > hr { margin-block-end: var(--space-6); }
-
-/* Content authoring is a blank canvas. Settings editors retain their framed surface. */
-.editor .writing-surface { border: 0; border-radius: 0; }
-/* The title attention outline uses the existing page inset on narrow layouts. */
-.editor[data-scroll-layout="page"] .writing-surface { overflow: visible; }
-.editor .writing-surface:focus-within, .editor .writing-surface[data-editor-interacting="true"] { outline: none; }
-.editor .writing-editor .mdxeditor-toolbar, .editor .writing-view-header {
-  border: 0;
-  border-radius: 0;
-  background: var(--background);
-  padding: var(--space-1) var(--space-2);
+/* Preserve the existing centered desktop canvas and sticky title composition. */
+.editor-frame
+  :is(
+    .writing-course-heading,
+    .writing-document-heading,
+    .writing-content,
+    .writing-source,
+    .course-quiz-content
+  ) {
+  padding-inline: var(--editor-text-inset);
+}
+.editor-frame .writing-editor-notice {
+  margin-inline: var(--editor-text-inset);
+}
+.editor-frame .writing-viewport {
+  scrollbar-gutter: stable both-edges;
 }
 .editor .writing-document-heading {
   position: sticky;
@@ -662,49 +267,176 @@
   font-size: 1.75rem;
   line-height: 2.25rem;
 }
-.editor[data-scroll-layout="page"] .writing-document-heading { top: var(--editor-navigation-height, 0px); }
-.editor-frame[data-mobile] .writing-document-heading { position: relative; top: auto; }
-.editor-frame[data-mobile] .writing-document-heading::after,
-.app:has(.topbar[data-content-scrolled="true"]) .editor-frame[data-mobile] .writing-document-heading::before { display: none; }
-.editor .writing-document-heading::after {
-  content: "";
-  position: absolute;
-  inset: 100% 0 auto;
-  height: var(--scroll-fade-size);
-  pointer-events: none;
-  background: var(--scroll-fade-overlay);
-  opacity: 0;
-  transition: opacity 160ms ease;
+.editor[data-scroll-layout="page"] .writing-document-heading {
+  top: var(--editor-navigation-height, 0px);
 }
-.editor .writing-viewport[data-scroll-fade-before="true"] .writing-document-heading::after,
-.app:has(.topbar[data-content-scrolled="true"]) .editor[data-scroll-layout="page"] .writing-document-heading::after { opacity: 1; }
-@media (prefers-reduced-motion: reduce) { .editor .writing-document-heading::after { transition: none; } }
+.editor-frame[data-mobile] .writing-document-heading,
+.editor[data-flowing-heading] .writing-document-heading {
+  position: relative;
+  top: auto;
+}
 .editor .writing-course-heading {
   flex-shrink: 0;
-  padding: var(--space-2) var(--editor-content-padding, var(--space-6));
-  padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6)));
+  padding-block: var(--space-2);
 }
-.editor .writing-viewport:has(.writing-document-heading) { mask-image: none; }
-.editor .writing-document-heading + .mdxeditor-root-contenteditable .writing-content { padding-block-start: var(--space-3); }
-.editor .writing-source-panel .writing-document-heading { position: relative; }
-.editor .course-quiz-content { padding: var(--space-3) var(--editor-content-padding); }
-.editor .course-quiz-canvas > .writing-document-heading { top: var(--editor-navigation-height, 0px); }
-.editor[data-flowing-heading] .writing-document-heading { position: relative; top: auto; }
-.editor-frame-canvas[data-navigation-scrolled="true"] .course-quiz-canvas > .writing-document-heading::after { opacity: 1; }
-.editor .writing-editor .mdxeditor-toolbar { display: none; }
-.editor-frame :is(.writing-course-heading, .writing-document-heading, .writing-content, .writing-source, .course-quiz-content) { padding-inline: var(--editor-text-inset); }
-.editor-frame .writing-content { --writing-content-start: var(--editor-text-inset); }
-.editor-frame .writing-editor-notice { margin-inline: var(--editor-text-inset); }
-.editor-frame .writing-viewport { scrollbar-gutter: stable both-edges; }
-.editor-frame[data-cards="true"] .writing-content { padding-block-end: var(--space-6); }
-/* Desktop blank writing room remains inside its existing bounded canvas. */
-.editor .writing-root[data-writing-canvas-space="true"] .writing-document > .mdxeditor-root-contenteditable > .mdxeditor-contenteditable-wrapper > .writing-content[contenteditable] {
-  padding-block-end: max(var(--space-6), var(--writing-canvas-space, 0px));
+.editor .writing-viewport:has(.writing-document-heading) {
+  mask-image: none;
 }
-.editor-frame[data-cards="true"] .writing-toolbar-controls { flex-wrap: nowrap; gap: var(--space-2); }
-.editor-frame[data-cards="true"] :is(.writing-block-actions, .writing-block-gutter-actions) { opacity: 1; }
-
-.writing-toolbar-controls[data-mobile="true"] .writing-command-label { display: none; }
-.editor .writing-toolbar-controls[data-canvas="true"]:not([data-mobile="true"]) { display: none; }
-.editor .writing-editor .mdxeditor-toolbar:has(.writing-toolbar-controls:not([data-mobile="true"])),
-.editor .writing-view-header:empty { display: none; }
+.editor .fieldbook-blocknote .bn-editor {
+  padding-block-start: var(--space-3);
+}
+.editor .course-quiz-content {
+  padding-block: var(--space-3);
+}
+.editor .writing-view-header {
+  display: none;
+}
+.editor-frame[data-mobile] .fieldbook-blocknote .bn-editor {
+  padding-block-end: 6rem;
+}
+/* BlockNote's supported viewport container owns mobile keyboard geometry. */
+.app[data-mobile-editor].bn-scroll-container {
+  position: fixed;
+  inset: auto;
+  top: var(--bn-vv-top, 0px);
+  left: var(--bn-vv-left, 0px);
+  width: var(--bn-vv-width, 100%);
+  height: var(--bn-vv-height, 100dvh);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.app[data-mobile-editor].bn-scroll-container[data-bn-allow-pull-to-refresh] {
+  overscroll-behavior-y: auto;
+}
+.app[data-mobile-editor].bn-scroll-container .main-shell {
+  min-height: 100%;
+}
+.bn-mobile-formatting-toolbar {
+  z-index: 50;
+}
+/* The shadcn skin uses Fieldbook's shared menu, control and elevation tokens. */
+.bn-container.bn-shadcn {
+  font-family: var(--font-geist-sans), sans-serif;
+}
+.bn-shadcn
+  :is(
+    .bn-suggestion-menu,
+    .bn-menu-dropdown,
+    .bn-toolbar,
+    [data-slot="select-content"],
+    [data-slot="popover-content"]
+  ) {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: var(--elevation-floating);
+}
+.bn-shadcn .bn-suggestion-menu {
+  width: 17rem;
+  max-width: calc(100vw - 2rem);
+  max-height: min(24rem, 60dvh);
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.bn-shadcn .bn-suggestion-menu-label {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.bn-shadcn .bn-suggestion-menu > .bn-suggestion-menu-item {
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-3);
+  border-radius: var(--control-radius);
+  font-size: var(--type-label);
+  line-height: var(--type-label-leading);
+}
+.bn-shadcn
+  .bn-suggestion-menu
+  > .bn-suggestion-menu-item
+  > [data-position="left"] {
+  padding: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+.bn-shadcn
+  .bn-suggestion-menu
+  > .bn-suggestion-menu-item
+  > .flex-1
+  > :first-child {
+  font-size: var(--type-label);
+  min-height: 0;
+  padding: 0;
+  line-height: var(--type-label-leading);
+}
+.bn-shadcn
+  .bn-suggestion-menu
+  > .bn-suggestion-menu-item
+  > .flex-1
+  > :nth-child(2) {
+  display: none;
+}
+.bn-shadcn
+  .bn-suggestion-menu
+  > .bn-suggestion-menu-item:is([aria-selected="true"], :hover) {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.bn-shadcn :is(.bn-menu-dropdown, [data-slot="select-content"]) {
+  padding: 6px;
+}
+.bn-shadcn :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--control-radius);
+  font-size: var(--type-label);
+}
+.bn-shadcn
+  :is(
+    [data-slot="button"],
+    [data-slot="toggle"],
+    [data-slot="input"],
+    [data-slot="select-trigger"]
+  ) {
+  border-radius: var(--control-radius);
+  font-family: inherit;
+  font-size: var(--type-label);
+}
+.bn-shadcn .bn-toolbar :is([data-slot="button"], [data-slot="toggle"]) {
+  min-width: 36px;
+  height: 36px;
+}
+.bn-shadcn :is(button, input):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@media (any-pointer: coarse) {
+  .bn-shadcn .bn-suggestion-menu > .bn-suggestion-menu-item,
+  .bn-shadcn :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
+    min-height: 44px;
+  }
+  .bn-shadcn .bn-toolbar :is([data-slot="button"], [data-slot="toggle"]) {
+    min-width: 44px;
+    height: 44px;
+  }
+}
+.fieldbook-blocknote .writing-code-language {
+  min-height: 32px;
+  margin: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: var(--type-label);
+}
+.fieldbook-blocknote .writing-code-language:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

@@ -55,7 +55,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const lesson = course.lessons[step];
   const previousLesson = course.lessons[step - 1];
   // Keep the opening image button mounted while the viewer changes so focus can return.
-  const lessonContent = useMemo(() => lesson ? <Markdown linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown> : null, [lesson]);
+  const lessonContent = useMemo(() => lesson ? <Markdown document={lesson.bodyDocument} linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown> : null, [lesson]);
   const allDone = course.lessons.every((item) => p?.lessons.includes(item.id));
   const complete = isComplete(course, progress);
   const latestAttempt = p?.attempts?.at(-1);

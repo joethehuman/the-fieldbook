@@ -27,7 +27,7 @@ export function useWritingCanvasSpace(ref: RefObject<HTMLElement | null>, canvas
       const heading = root!.querySelector<HTMLElement>(".writing-document-heading");
       const navigation = editor!.dataset.scrollLayout === "page"
         ? root!.closest(".editor-frame-canvas")?.querySelector<HTMLElement>(".editor-canvas-navigation") : null;
-      const toolbar = root!.querySelector<HTMLElement>(".mdxeditor-toolbar, .writing-view-header");
+      const toolbar = root!.querySelector<HTMLElement>(".writing-view-header");
       const next = new Set<Element>([page!, ...[writing, heading, navigation, toolbar].filter((element): element is HTMLElement => !!element)]);
       for (const element of observed) if (!next.has(element)) {
         resize.unobserve(element);
@@ -37,7 +37,7 @@ export function useWritingCanvasSpace(ref: RefObject<HTMLElement | null>, canvas
         resize.observe(element);
         observed.add(element);
       }
-      const content = root!.querySelector(".writing-document > .mdxeditor-root-contenteditable > .mdxeditor-contenteditable-wrapper > .writing-content[contenteditable]");
+      const content = root!.querySelector(".writing-document .writing-content[contenteditable]");
       if (touch.matches || !writing || !content) { clear(); return; }
       const owner = editor!.dataset.scrollLayout === "workspace" ? writing : page!;
       const style = getComputedStyle(owner);

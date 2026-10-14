@@ -1,3 +1,4 @@
+export type UploadMedia = (file: File, onProgress?: (progress: UploadProgress) => void) => Promise<string>;
 import { request, RequestError } from "./workspace-save";
 
 export type UploadProgress = {

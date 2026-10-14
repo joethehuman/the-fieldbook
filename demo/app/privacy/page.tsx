@@ -33,7 +33,7 @@ export default function DemoPrivacyPage() {
         <a href={policy.url}>View configured privacy policy</a>
       ) : policy ? (
         <article className="markdown">
-          <Markdown>{policy.body}</Markdown>
+          <Markdown document={policy.bodyDocument}>{policy.body}</Markdown>
         </article>
       ) : (
         <p>No policy has been published in this browser.</p>

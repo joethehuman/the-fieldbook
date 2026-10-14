@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { IdentityPresentation } from "../components/IdentityPresentation";
 import { signInPresentation } from "@server/identity";
 import { TooltipProvider } from "../components/ui/tooltip";
@@ -53,3 +54,5 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     </html>
   );
 }
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, interactiveWidget: "resizes-content" };

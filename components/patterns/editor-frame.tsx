@@ -7,9 +7,7 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { blurWritingInput, captureWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout } from "./use-editor-cards-layout";
-import { useMobileEditorToolbar } from "./use-mobile-editor-toolbar";
 
 export const EditorMobileOverlayContext = createContext<HTMLElement | null>(null);
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
@@ -64,7 +62,6 @@ export function EditorFrame({
   const controls = useRef<HTMLDivElement>(null);
   const toolbarSlot = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
-  useMobileEditorToolbar(phone, toolbarSlot, toolbar);
   const [writingActionsHost, setWritingActionsHost] = useState<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
@@ -72,22 +69,7 @@ export function EditorFrame({
   const [panels, setPanels] = useState({ outline: false, details: false });
   const panelState = useRef(panels);
   panelState.current = panels;
-  const lastWritingCursor = useRef<WritingCursor | null>(null);
-  const panelReturn = useRef<WritingCursor | null>(null);
-  const preparedPanel = useRef<"outline" | "details" | null>(null);
-  function preparePanel(side: "outline" | "details") {
-    if (!phone) return;
-    if (!panelState.current.outline && !panelState.current.details) {
-      const active = document.activeElement;
-      const chooser = active instanceof Element && !!active.closest(".writing-slash-menu, .writing-media-chooser, .editor-frame-controls");
-      // The popup's capture-phase dismissal can remove its focused input
-      // before this button receives pointerdown, returning focus to body.
-      panelReturn.current = captureWritingCursor(canvas.current) || (chooser || active === document.body ? lastWritingCursor.current : null);
-    }
-    preparedPanel.current = side;
-  }
   function returnToToggle(toggle: HTMLButtonElement | null) {
-    panelReturn.current = null;
     // Closing a panel returns to its button. A later writing tap chooses
     // the caret and opens the keyboard through the browser's normal path.
     toggle?.focus({ preventScroll: true });
@@ -95,21 +77,7 @@ export function EditorFrame({
   function togglePanel(side: "outline" | "details") {
     defaultsApplied.current = true;
     const closing = panelState.current[side];
-    if (!closing && preparedPanel.current !== side) preparePanel(side);
-    preparedPanel.current = null;
-    if (!closing && phone) {
-      const cursor = panelReturn.current;
-      if (cursor?.kind === "prose" && cursor.surface.isConnected && cursor.surface.textContent === cursor.value
-        && cursor.start.isConnected && cursor.end.isConnected) {
-        try {
-          const range = document.createRange();
-          range.setStart(cursor.start, cursor.startOffset); range.setEnd(cursor.end, cursor.endOffset);
-          cursor.surface.dispatchEvent(new CustomEvent("fieldbook:writing-handoff", { bubbles: true, detail: range }));
-        } catch { /* A completed gesture no longer owns its captured writing target. */ }
-      }
-      blurWritingInput();
-      window.getSelection()?.removeAllRanges();
-    }
+    if (!closing && phone && document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setPanels((current) => side === "outline"
       ? { outline: !current.outline, details: wide.current ? current.details : false }
       : { outline: wide.current ? current.outline : false, details: !current.details });
@@ -138,23 +106,6 @@ export function EditorFrame({
     };
   }, [hasNavigation, phone]);
 
-  useEffect(() => {
-    const element = controls.current;
-    const writing = canvas.current;
-    if (!phone || !element || !writing) return;
-    // Save only the insertion bookmark before a toolbar takes focus. No
-    // caret measurements or scrolling run on focus/selection/viewport events.
-    const remember = () => {
-      const cursor = captureWritingCursor(writing);
-      if (cursor) lastWritingCursor.current = cursor;
-    };
-    element.addEventListener("pointerdown", remember, true);
-    writing.addEventListener("fieldbook:writing-handoff", remember);
-    return () => {
-      element.removeEventListener("pointerdown", remember, true);
-      writing.removeEventListener("fieldbook:writing-handoff", remember);
-    };
-  }, [phone]);
   useEffect(() => {
     if (!phone || !panels.outline && !panels.details) return;
     const dismiss = (event: PointerEvent) => {
@@ -334,8 +285,6 @@ export function EditorFrame({
           <Button ref={outlineToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${phone ? "relative p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute size-11 rounded-full"}`} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
-            onPointerDown={() => { if (phone) preparePanel("outline"); }}
-            onPointerCancel={() => { preparedPanel.current = null; }}
             onMouseDown={(event) => { if (phone) event.preventDefault(); }}
             onClick={() => togglePanel("outline")}>
             {panels.outline ? <X aria-hidden="true" /> : <ListTree aria-hidden="true" />}
@@ -346,8 +295,6 @@ export function EditorFrame({
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
-          onPointerDown={() => { if (phone) preparePanel("details"); }}
-          onPointerCancel={() => { preparedPanel.current = null; }}
           onMouseDown={(event) => { if (phone) event.preventDefault(); }}
           onClick={() => togglePanel("details")}>
           {panels.details ? <X aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}

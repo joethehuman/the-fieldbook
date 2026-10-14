@@ -60,16 +60,16 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
         // Transfer the reading offset once when input capabilities/orientation
         // select a different layout. Keyboard opening never changes this mode.
         const writing = editor.querySelector<HTMLElement>(".writing-viewport") || editor.querySelector<HTMLElement>(".editor-frame-canvas");
-        const offset = mobileMode === true ? window.scrollY : mobileMode === false
+        const offset = mobileMode === true ? app?.scrollTop || 0 : mobileMode === false
           ? editor.dataset.scrollLayout === "workspace" ? writing?.scrollTop || 0 : viewport.scrollTop : 0;
         if (mobile) {
-          if (app) app.dataset.mobileEditor = "true";
+          if (app) { app.dataset.mobileEditor = "true"; app.classList.add("bn-scroll-container"); }
           editor.dataset.scrollLayout = "page";
           viewport.scrollTop = 0;
           if (writing) writing.scrollTop = 0;
-          window.scrollTo({ top: offset, behavior: "instant" });
+          if (app) app.scrollTop = offset;
         } else {
-          if (app) delete app.dataset.mobileEditor;
+          if (app) { delete app.dataset.mobileEditor; app.classList.remove("bn-scroll-container"); }
           if (mobileMode === true) transferredOffset = offset;
         }
         mobileMode = mobile;
@@ -87,7 +87,7 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
         ...Array.from(editor.children).filter((child) => child !== content),
         ...Array.from(content.children).filter((child) => child !== frame),
         ...Array.from(frame.children).filter((child) => !child.matches(".editor-frame-body")),
-        ...editor.querySelectorAll(".editor-canvas-navigation, .mdxeditor-toolbar, .writing-view-header, .writing-root > .writing-editor-notice"),
+        ...editor.querySelectorAll(".editor-canvas-navigation, .writing-view-header, .writing-root > .writing-editor-notice"),
       ];
       const headings = Array.from(editor.querySelectorAll<HTMLElement>(".writing-document-heading"));
       const next = new Set<Element>([editor, viewport, ...chrome, ...headings]);
@@ -124,7 +124,7 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
       mutations.disconnect();
       compact.removeEventListener("change", schedule);
       touch.removeEventListener("change", schedule);
-      if (app) delete app.dataset.mobileEditor;
+      if (app) { delete app.dataset.mobileEditor; app.classList.remove("bn-scroll-container"); }
     };
   }, [ref]);
 }

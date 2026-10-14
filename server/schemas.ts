@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { blockDocumentSchema } from "@/lib/block-document";
 import { askAiSettingsSchema } from "@/lib/ai-schema";
 import { validateDocSections } from "@/lib/docs-navigation";
 import { validateContentCategories } from "@/lib/content-categories";
@@ -53,6 +54,7 @@ export const contentBaseSchema = z.object({
   title: text(160).trim().min(1),
   summary: text(300),
   body: text(200000),
+  bodyDocument: blockDocumentSchema.optional(),
   category: text(80).trim().min(1),
   folder: text(300),
   sectionId: text(1500).optional(),
@@ -76,6 +78,7 @@ export const contentBaseSchema = z.object({
         id: text(100).min(1),
         title: text(160),
         body: text(200000),
+        bodyDocument: blockDocumentSchema.optional(),
         videoUrl: text(2000).optional(),
       }),
     )
@@ -173,6 +176,7 @@ const privacyDocumentSchema = z.object({
     )
     .optional(),
   body: text(100000),
+  bodyDocument: blockDocumentSchema.optional(),
   url: text(2000).refine(
     (s) => !s || (z.url().safeParse(s).success && s.startsWith("https://")),
   ),

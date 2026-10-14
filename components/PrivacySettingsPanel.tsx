@@ -122,7 +122,8 @@ export default function PrivacySettingsPanel({
               disabled={busy}
               label="Privacy policy draft"
               value={draft.body}
-              onChange={(body) => edit({ body })}
+              bodyDocument={draft.bodyDocument}
+              onChange={(body, bodyDocument) => edit({ body, bodyDocument })}
             />
             <p className="mt-2 text-caption text-muted-foreground">
               Scroll within the editor to review the policy, or drag its

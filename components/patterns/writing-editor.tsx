@@ -1,13 +1,30 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Component, createContext, useContext, useLayoutEffect, type ReactNode, useMemo, useState, useRef } from "react";
+import {
+  blockDocumentSchema,
+  importMarkdownDocument,
+  type BlockDocument,
+} from "@/lib/block-document";
+import {
+  Component,
+  createContext,
+  useContext,
+  useLayoutEffect,
+  type ReactNode,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import { Textarea } from "../ui/textarea";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
-import type { UploadMedia } from "../MarkdownEditor";
+import type { UploadMedia } from "@/lib/upload-media";
 import { MarkdownDownloadButton } from "./markdown-download";
-import { WritingTitleContext, WritingIntroductionContext } from "./writing-title";
+import {
+  WritingTitleContext,
+  WritingIntroductionContext,
+} from "./writing-title";
 import { useScrollFade } from "./use-scroll-fade";
 import { revealEditorTarget } from "./reveal-editor-target";
 import { useWritingCanvasSpace } from "./use-writing-canvas-space";
@@ -23,17 +40,26 @@ function StandaloneMarkdownDownload() {
 }
 
 function EditorViewHeader({ children }: { children: ReactNode }) {
-  return <div className="writing-view-header flex min-w-0 flex-wrap items-center">{children}</div>;
+  return (
+    <div className="writing-view-header flex min-w-0 flex-wrap items-center">
+      {children}
+    </div>
+  );
 }
 
 function WritingToolsLoading() {
   const viewControls = useContext(EditorViewContext);
-  return <div className="writing-surface min-w-0 rounded-lg border border-border bg-background" aria-busy="true">
-    <EditorViewHeader>{viewControls}</EditorViewHeader>
-    <div className="writing-viewport mt-0 focus-visible:ring-0">
-      <div className="min-h-96 p-4" aria-hidden="true" />
+  return (
+    <div
+      className="writing-surface min-w-0 rounded-lg border border-border bg-background"
+      aria-busy="true"
+    >
+      <EditorViewHeader>{viewControls}</EditorViewHeader>
+      <div className="writing-viewport mt-0 focus-visible:ring-0">
+        <div className="min-h-96 p-4" aria-hidden="true" />
+      </div>
     </div>
-  </div>;
+  );
 }
 
 const VisualEditor = dynamic(() => import("./writing-editor-engine"), {
@@ -63,7 +89,8 @@ export type WritingEditorProps = {
   introduction?: ReactNode;
   downloadName?: string;
   value: string;
-  onChange: (value: string) => void;
+  bodyDocument?: BlockDocument;
+  onChange: (value: string, document?: BlockDocument) => void;
   onUpload?: UploadMedia;
   disabled?: boolean;
   label?: string;
@@ -87,99 +114,188 @@ export function WritingEditor({
     const resize = new ResizeObserver(measure);
     function measure() {
       if (!element) return;
-      const next = element.querySelector<HTMLElement>(".mdxeditor-toolbar, .writing-view-header");
+      const next = element.querySelector<HTMLElement>(".writing-view-header");
       if (next !== toolbar) {
         if (toolbar) resize.unobserve(toolbar);
         toolbar = next;
         if (toolbar) resize.observe(toolbar);
       }
-      element.style.setProperty("--writing-toolbar-height", `${toolbar?.getBoundingClientRect().height || 0}px`);
+      element.style.setProperty(
+        "--writing-toolbar-height",
+        `${toolbar?.getBoundingClientRect().height || 0}px`,
+      );
     }
     const mutations = new MutationObserver(measure);
     mutations.observe(element, { childList: true, subtree: true });
     measure();
-    return () => { resize.disconnect(); mutations.disconnect(); };
+    return () => {
+      resize.disconnect();
+      mutations.disconnect();
+    };
   }, []);
-  const [mode, setMode] = useState("write");
-  const [issue, setIssue] = useState("");
+  const [initial, setInitial] = useState(() => {
+    try {
+      return {
+        document: props.bodyDocument
+          ? blockDocumentSchema.parse(props.bodyDocument)
+          : importMarkdownDocument(props.value),
+        issue: "",
+      };
+    } catch {
+      return {
+        document: null,
+        issue:
+          "This content uses formatting the visual editor cannot open. Your saved content is retained.",
+      };
+    }
+  });
+  const [mode, setMode] = useState(initial.document ? "write" : "source");
+  const [issue, setIssue] = useState(initial.issue);
   const [failureDetail, setFailureDetail] = useState("");
   const sourceFade = useScrollFade<HTMLTextAreaElement>(mode === "source");
-  useLayoutEffect(() => { sourceFade.measure(); }, [mode, props.value, sourceFade.measure]);
+  useLayoutEffect(() => {
+    sourceFade.measure();
+  }, [mode, props.value, sourceFade.measure]);
   // Keep the toolbar slot stable while typing so the engine's plugins stay stable.
-  const viewControls = useMemo(() => canvas ? null : <StandaloneMarkdownDownload />, [canvas]);
+  const viewControls = useMemo(
+    () => (canvas ? null : <StandaloneMarkdownDownload />),
+    [canvas],
+  );
   return (
-    <MarkdownDownloadContext.Provider value={{ value: props.value, name: downloadName }}>
-    <WritingTitleContext.Provider value={title}>
-    <WritingIntroductionContext.Provider value={introduction}>
-    <EditorViewContext.Provider value={viewControls}>
-        <section ref={root} className="writing-root flex min-w-0 flex-col gap-3" aria-label={`${label} editor`} onFocusCapture={(event) => {
-          if (window.matchMedia("(max-width: 1279px)").matches) return;
-          const target = event.target;
-          if (!(target instanceof HTMLElement) || !target.matches('[contenteditable], textarea, [role="tabpanel"]')) return;
-          const surface = target.closest<HTMLElement>(".writing-surface");
-          const viewport = surface?.closest<HTMLElement>(".main-content");
-          if (surface && viewport && !surface.closest('.editor[data-scroll-layout="workspace"]') && getComputedStyle(surface).maxHeight !== "none")
-            revealEditorTarget(surface, { container: viewport, focus: false });
-        }}>
-          {issue && (
-            <div className="writing-editor-notice grid gap-3">
-              <Alert role="alert">
-                {issue}
-                {process.env.NODE_ENV === "development" && failureDetail && <details className="mt-2">
-                  <summary>Editor error details</summary>
-                  <p className="mt-2 font-mono text-sm">{failureDetail}</p>
-                </details>}
-              </Alert>
-              <Button type="button" variant="outline" size="sm" disabled={props.disabled}
-                onClick={() => { setIssue(""); setFailureDetail(""); setMode("write"); }}>Retry visual editor</Button>
-            </div>
-          )}
-          {mode !== "write" ? (
-            <div className="writing-surface min-w-0 rounded-lg border border-border bg-background">
-              <EditorViewHeader>{viewControls}</EditorViewHeader>
-                <div className="writing-viewport writing-source-panel mt-0 focus-visible:ring-0">
-                  {introduction && <div className="writing-course-heading">{introduction}</div>}
-                  {title && <div className="writing-document-heading">{title}</div>}
-                  <Textarea
-                    ref={sourceFade.ref}
-                    aria-label={`${label} Markdown`}
-                    rows={18}
-                    value={props.value}
-                    disabled={props.disabled}
-                    onChange={(event) => props.onChange(event.target.value)}
-                    onScroll={sourceFade.measure}
-                    data-scroll-fade-before={sourceFade.edges.before}
-                    data-scroll-fade-after={false}
-                    className="writing-source writing-scroll-area scroll-fade rounded-none border-0 px-[var(--editor-content-padding,var(--space-3))] font-mono leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0"
-                  />
-                </div>
-            </div>
-          ) : (
-            <EditorBoundary
-              onFailure={(error) => {
-                setIssue("The visual editor couldn’t open this content. Continue editing in Markdown below.");
-                setFailureDetail(`${error.name}: ${error.message}`);
-                setMode("source");
+    <MarkdownDownloadContext.Provider
+      value={{ value: props.value, name: downloadName }}
+    >
+      <WritingTitleContext.Provider value={title}>
+        <WritingIntroductionContext.Provider value={introduction}>
+          <EditorViewContext.Provider value={viewControls}>
+            <section
+              ref={root}
+              className="writing-root flex min-w-0 flex-col gap-3"
+              aria-label={`${label} editor`}
+              onFocusCapture={(event) => {
+                if (window.matchMedia("(max-width: 1279px)").matches) return;
+                const target = event.target;
+                if (
+                  !(target instanceof HTMLElement) ||
+                  !target.matches(
+                    '[contenteditable], textarea, [role="tabpanel"]',
+                  )
+                )
+                  return;
+                const surface = target.closest<HTMLElement>(".writing-surface");
+                const viewport = surface?.closest<HTMLElement>(".main-content");
+                if (
+                  surface &&
+                  viewport &&
+                  !surface.closest('.editor[data-scroll-layout="workspace"]') &&
+                  getComputedStyle(surface).maxHeight !== "none"
+                )
+                  revealEditorTarget(surface, {
+                    container: viewport,
+                    focus: false,
+                  });
               }}
             >
-              <VisualEditor
-                {...props}
-                canvas={canvas}
-                label={label}
-                viewControls={viewControls}
-                onUnsupported={() => {
-                  setIssue(
-                    "This formatting isn’t supported by the visual editor. Continue editing in Markdown below.",
-                  );
-                  setMode("source");
-                }}
-              />
-            </EditorBoundary>
-          )}
-        </section>
-    </EditorViewContext.Provider>
-    </WritingIntroductionContext.Provider>
-    </WritingTitleContext.Provider>
+              {issue && (
+                <div className="writing-editor-notice grid gap-3">
+                  <Alert role="alert">
+                    {issue}
+                    {process.env.NODE_ENV === "development" &&
+                      failureDetail && (
+                        <details className="mt-2">
+                          <summary>Editor error details</summary>
+                          <p className="mt-2 font-mono text-sm">
+                            {failureDetail}
+                          </p>
+                        </details>
+                      )}
+                  </Alert>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={props.disabled}
+                    onClick={() => {
+                      try {
+                        const document = props.bodyDocument
+                          ? blockDocumentSchema.parse(props.bodyDocument)
+                          : importMarkdownDocument(props.value);
+                        setInitial({ document, issue: "" });
+                        setIssue("");
+                        setFailureDetail("");
+                        setMode("write");
+                      } catch (error) {
+                        setFailureDetail((error as Error).message);
+                        setIssue(
+                          "This formatting still needs Markdown editing. Your content is retained below.",
+                        );
+                      }
+                    }}
+                  >
+                    Retry visual editor
+                  </Button>
+                </div>
+              )}
+              {mode !== "write" ? (
+                <div className="writing-surface min-w-0 rounded-lg border border-border bg-background">
+                  <EditorViewHeader>{viewControls}</EditorViewHeader>
+                  <div className="writing-viewport writing-source-panel mt-0 focus-visible:ring-0">
+                    {introduction && (
+                      <div className="writing-course-heading">
+                        {introduction}
+                      </div>
+                    )}
+                    {title && (
+                      <div className="writing-document-heading">{title}</div>
+                    )}
+                    <Textarea
+                      ref={sourceFade.ref}
+                      aria-label={`${label} Markdown`}
+                      rows={18}
+                      value={props.value}
+                      disabled={props.disabled}
+                      readOnly={!!props.bodyDocument}
+                      onChange={(event) =>
+                        props.onChange(event.target.value, undefined)
+                      }
+                      onScroll={sourceFade.measure}
+                      data-scroll-fade-before={sourceFade.edges.before}
+                      data-scroll-fade-after={false}
+                      className="writing-source writing-scroll-area scroll-fade rounded-none border-0 px-[var(--editor-content-padding,var(--space-3))] font-mono leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <EditorBoundary
+                  onFailure={(error) => {
+                    setIssue(
+                      props.bodyDocument
+                        ? "The visual editor couldn’t open this content. Its Markdown export is available below; retry to continue editing the blocks."
+                        : "The visual editor couldn’t open this content. Continue editing in Markdown below.",
+                    );
+                    setFailureDetail(`${error.name}: ${error.message}`);
+                    setMode("source");
+                  }}
+                >
+                  <VisualEditor
+                    {...props}
+                    initialDocument={initial.document!}
+                    canvas={canvas}
+                    label={label}
+                    viewControls={viewControls}
+                    onUnsupported={() => {
+                      setIssue(
+                        "This formatting isn’t supported by the visual editor. Continue editing in Markdown below.",
+                      );
+                      setMode("source");
+                    }}
+                  />
+                </EditorBoundary>
+              )}
+            </section>
+          </EditorViewContext.Provider>
+        </WritingIntroductionContext.Provider>
+      </WritingTitleContext.Provider>
     </MarkdownDownloadContext.Provider>
   );
 }

@@ -148,7 +148,7 @@ import {
 } from "lucide-react";
 import { CardArtEditor } from "./patterns/card-art-editor";
 import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
-import { type UploadMedia } from "./MarkdownEditor";
+import { type UploadMedia } from "@/lib/upload-media";
 import { CourseBuilder } from "./CourseBuilder";
 import { requiresPassing, validQuestion } from "@/lib/course-quiz";
 import { canAdminister, canOpenAdminTab, roleLabel } from "@/lib/permissions";
@@ -3201,7 +3201,8 @@ export function Editor({
                     />
                 }
                 value={c.body}
-                onChange={(value) => set("body", value)}
+                bodyDocument={c.bodyDocument}
+                onChange={(body, bodyDocument) => setC(current => ({ ...current, body, bodyDocument }))}
                 onUpload={upload}
                 disabled={busy}
               />
