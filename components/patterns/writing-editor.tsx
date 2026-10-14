@@ -27,7 +27,6 @@ import {
 } from "./writing-title";
 import { useScrollFade } from "./use-scroll-fade";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { useWritingCanvasSpace } from "./use-writing-canvas-space";
 import "../../styles/writing-editor.css";
 
 // Next's loading component does not receive the lazy editor's props.
@@ -106,7 +105,6 @@ export function WritingEditor({
   ...props
 }: WritingEditorProps) {
   const root = useRef<HTMLElement>(null);
-  useWritingCanvasSpace(root, canvas);
   useLayoutEffect(() => {
     const element = root.current;
     if (!element) return;

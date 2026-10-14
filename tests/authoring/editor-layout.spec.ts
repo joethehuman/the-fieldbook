@@ -1375,57 +1375,6 @@ for (const kind of ["doc", "brief", "course"] as const)
   });
 
 for (const kind of ["doc", "brief", "course"] as const) {
-  test(`${kind}: final desktop writing row has useful room through menus and owner changes`, async ({ page }, info) => {
-    await page.setViewportSize({ width: 1600, height: 1000 });
-    await open(page, info.project.name.startsWith("production"), kind);
-    const writer = page.locator('.writing-content[contenteditable="true"]');
-    const mounted = await writer.elementHandle();
-    const details = page.getByRole("button", { name: "Details", exact: true });
-    for (const size of [{ width: 1600, height: 1000 }, { width: 1100, height: 780 }, { width: 600, height: 1000 }]) {
-      await page.setViewportSize(size);
-      await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", size.width >= 1100 ? "workspace" : "page");
-      if (await details.getAttribute("aria-expanded") === "true") await details.click();
-      const finalRow = writer.locator("p").last();
-      const finalBounds = (await finalRow.boundingBox())!;
-      await finalRow.click({ position: { x: finalBounds.width - 4, y: finalBounds.height - 14 } });
-      await expect.poll(() => finalRow.evaluate((paragraph) => {
-        const selection = window.getSelection();
-        return !!selection?.isCollapsed && paragraph.contains(selection.focusNode);
-      })).toBe(true);
-      await page.locator(".editor").evaluate(async (editor) => {
-        const owner = editor.getAttribute("data-scroll-layout") === "workspace" ? editor.querySelector<HTMLElement>(".writing-viewport")! : editor.closest<HTMLElement>(".main-content")!;
-        owner.scrollTop = owner.scrollHeight;
-        await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
-      });
-      const read = () => page.locator(".editor").evaluate((editor) => {
-        const owner = editor.getAttribute("data-scroll-layout") === "workspace" ? editor.querySelector<HTMLElement>(".writing-viewport")! : editor.closest<HTMLElement>(".main-content")!;
-        const bounds = owner.getBoundingClientRect();
-        const heading = editor.querySelector(".writing-document-heading")!.getBoundingClientRect();
-        const navigation = editor.querySelector(".editor-canvas-navigation")?.getBoundingClientRect();
-        const last = Array.from(editor.querySelectorAll(".writing-content > p")).at(-1)!.getBoundingClientRect();
-        return { gap: bounds.bottom - last.bottom, usable: bounds.bottom - Math.max(bounds.top, heading.bottom, navigation?.bottom || bounds.top), scrollTop: owner.scrollTop };
-      });
-      const before = await read();
-      expect(before.gap).toBeGreaterThanOrEqual(before.usable * 0.28 - 2);
-      expect(before.gap).toBeLessThanOrEqual(before.usable * 0.36 + 32);
-      await writer.evaluate((element) => element.blur());
-      await writer.evaluate((element) => element.focus({ preventScroll: true }));
-      // The control is already visible in pinned navigation. A screen-point
-      // click avoids Playwright's extra scrollIntoView on that sticky row.
-      await expect(details).toBeInViewport({ ratio: 1 });
-      let button = (await details.boundingBox())!;
-      await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2);
-      await expect(page.getByRole("complementary", { name: "Content details", exact: true })).toBeVisible();
-      button = (await details.boundingBox())!;
-      await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2);
-      const after = await read();
-      expect(after.scrollTop).toBeCloseTo(before.scrollTop, 0);
-      expect(after.gap).toBeCloseTo(before.gap, 0);
-      expect(await mounted!.evaluate((element) => element.isConnected)).toBe(true);
-      await page.screenshot({ path: info.outputPath(`${kind}-desktop-writing-room-${size.width}.png`) });
-    }
-  });
-
   test(`${kind}: short desktop writing canvas does not gain an extra scroll page`, async ({ page }, info) => {
     await page.setViewportSize({ width: 1600, height: 1000 });
     await open(page, info.project.name.startsWith("production"), kind, 2, item => {
@@ -2896,13 +2845,11 @@ test.describe("native mobile editing", () => {
         pageScroll: scrollY,
         mainScroll: node.closest(".main-content")!.scrollTop,
         canvasScroll: node.closest(".writing-viewport")!.scrollTop,
-        desktopSpace: node.closest(".writing-root")!.hasAttribute("data-writing-canvas-space"),
       };
     });
     expect(position.pageScroll).toBeGreaterThan(0);
     expect(position.mainScroll).toBe(0);
     expect(position.canvasScroll).toBe(0);
-    expect(position.desktopSpace).toBe(false);
     expect(position.gap).toBeGreaterThanOrEqual(0);
     expect(position.gap).toBeLessThan(55);
     await expect(writer).toBeFocused();

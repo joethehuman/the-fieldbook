@@ -79,6 +79,78 @@ async function setup(
   return { editor, read };
 }
 
+for (const [ending, body] of Object.entries({
+  paragraph: "Last paragraph.",
+  table: "| Name | Value |\n| --- | --- |\n| Last | Cell |",
+  code: "```text\nlast_code_line\n```",
+})) {
+  test(`native trailing placeholder adds a stable paragraph after ${ending}`, async ({
+    page,
+  }, info) => {
+    const { editor, read } = await setup(
+      page,
+      info.project.name.startsWith("production"),
+      "doc",
+      body,
+      true,
+    );
+    const original = (await read()).bodyDocument!.blocks;
+    const widget = editor.locator(".bn-trailing-block");
+    await expect(widget).toBeVisible();
+    const geometry = await widget.evaluate((element) => {
+      const area = element.closest(".bn-editor")!;
+      const rect = element.getBoundingClientRect();
+      return {
+        height: rect.height,
+        padding: getComputedStyle(area).paddingBottom,
+        gap: area.getBoundingClientRect().bottom - rect.bottom,
+      };
+    });
+    expect(geometry.height).toBeCloseTo(30, 0);
+    expect(geometry.padding).toBe("0px");
+    expect(Math.abs(geometry.gap)).toBeLessThan(1);
+    // Space outside the native editor is workspace layout, not a false line.
+    const rect = await widget.boundingBox();
+    const point = { x: rect!.x + 80, y: rect!.y + rect!.height + 16 };
+    expect(
+      await page.evaluate(
+        ({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".bn-editor"),
+        point,
+      ),
+    ).toBe(false);
+    await page.mouse.click(point.x, point.y);
+    expect((await read()).bodyDocument!.blocks).toEqual(original);
+
+    await widget.click();
+    await expect
+      .poll(async () => (await read()).bodyDocument!.blocks.length)
+      .toBe(original.length + 1);
+    await expect
+      .poll(() =>
+        editor.evaluate(() => {
+          const node = window.getSelection()?.anchorNode;
+          const element =
+            node?.nodeType === 1 ? (node as Element) : node?.parentElement;
+          return element
+            ?.closest("[data-content-type]")
+            ?.getAttribute("data-content-type");
+        }),
+      )
+      .toBe("paragraph");
+    await page.keyboard.type("Next line.");
+    await waitForDraftSaved(page);
+    await expect.poll(async () => (await read()).body).toContain("Next line.");
+      // BlockNote fills its default props on the first edit; authored values
+      // and the original block's identity and content must be retained.
+      expect((await read()).bodyDocument!.blocks[0]).toMatchObject(original[0]);
+    await page.reload();
+    await expect(
+      editor.locator('[data-content-type="paragraph"]').last(),
+    ).toHaveText("Next line.");
+    await expect(widget).toBeVisible();
+  });
+}
+
 test("media commands share the native file panel and persist their URLs", async ({
   page,
 }, info) => {

@@ -113,8 +113,6 @@
   overflow: auto;
 }
 .fieldbook-blocknote {
-  flex: 1;
-  min-height: 20rem;
   width: 100%;
 }
 .fieldbook-blocknote .bn-editor {
@@ -123,14 +121,12 @@
   background: var(--background);
   font-size: 1rem;
   line-height: var(--type-body-leading, 1.7);
-  padding-block: var(--space-6)
-    max(var(--space-6), var(--writing-canvas-space, 0px));
+  padding-block: var(--space-6) 0;
   padding-inline: var(--editor-content-padding, var(--space-6));
   padding-inline-start: max(
     52px,
     var(--editor-content-padding, var(--space-6))
   );
-  min-height: 20rem;
   outline: none;
 }
 .fieldbook-blocknote .bn-block-content {
@@ -321,9 +317,6 @@
 }
 .editor .writing-view-header {
   display: none;
-}
-.editor-frame[data-mobile] .fieldbook-blocknote .bn-editor {
-  padding-block-end: 6rem;
 }
 /* BlockNote's supported viewport container owns mobile keyboard geometry. */
 .app[data-mobile-editor].bn-scroll-container {
