@@ -19,11 +19,16 @@ export function legacyWorkspace(): Workspace {
       name: "Hoolibook",
       docCategoryOrder: [...DOC_CATEGORY_ORDER],
     },
-    content: structuredClone(seedContent).map((c) =>
-      c.kind === "brief" && ["brief-1", "brief-2"].includes(c.id)
-        ? { ...c, groups: ["sales"] }
-        : c,
-    ),
+    content: structuredClone(seedContent)
+      .filter((c) => !["course-13", "course-14"].includes(c.id))
+      .map((c) =>
+        c.kind === "brief" && ["brief-1", "brief-2"].includes(c.id)
+          ? { ...c, groups: ["sales"] }
+          : c.kind === "course" &&
+              ["course-4", "course-10", "course-11", "course-12"].includes(c.id)
+            ? { ...c, groups: ["sales"] }
+            : c,
+      ),
     curricula: [
       {
         id: "sales-foundations",

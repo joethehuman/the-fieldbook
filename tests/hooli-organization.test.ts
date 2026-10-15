@@ -29,7 +29,7 @@ test("Hooli has a valid fixed organization and four selectable profiles", () => 
   assert.equal(data.users.length, 200);
   assert.equal(teams.length, 50);
   assert.equal(data.groups.length, 6);
-  assert.equal(data.curricula!.length, 4);
+  assert.equal(data.curricula!.length, 5);
   assert.equal(new Set(data.users.map((user) => user.id)).size, 200);
   assert.equal(new Set(data.users.map((user) => user.email)).size, 200);
   validateOrganizationTeams(teams, data.settings!.organizationTeamId);
