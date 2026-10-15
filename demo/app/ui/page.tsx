@@ -2,6 +2,8 @@
 import { sortLabels } from "@/lib/collection-sort";
 import { SortPicker } from "@/components/patterns/sort-picker";
 import { EditorFrame, EditorDetailsGroup } from "@/components/patterns/editor-frame";
+import { DesktopEditingNotice } from "@/components/patterns/desktop-editing-notice";
+import { useDesktopEditingRequired } from "@/components/patterns/use-desktop-editing-required";
 import { NavigationButton } from "@/components/patterns/navigation-button";
 import { ResponsiveTabsNavigation } from "@/components/patterns/responsive-tabs-navigation";
 import { Spinner } from "@/components/ui/spinner";
@@ -105,6 +107,7 @@ const choices = (
   </>
 );
 export default function ComponentCatalog() {
+  const desktopEditingRequired = useDesktopEditingRequired();
   const notify = useToast();
   const { prompt } = useInteractionDialog();
   const [navigationPending, setNavigationPending] = useState(false);
@@ -241,8 +244,8 @@ export default function ComponentCatalog() {
       <ScrollingExamples />
       <section className="grid gap-4" aria-label="Content editor frame">
         <SectionHeader title={<h2>Content editor frame</h2>}
-          description="Outline and Details float beside a stable desktop canvas. Constrained windows and touch tablets use bottom controls that open cards. The writing canvas stays mounted when either panel changes." />
-        <EditorFrame revealCanvas={canvasRequest}
+          description="Outline and Details sit beside the desktop writing canvas. Narrow windows retain desktop controls. Compact touch layouts show the desktop-editing notice." />
+        {desktopEditingRequired ? <DesktopEditingNotice /> : <EditorFrame revealCanvas={canvasRequest}
           outlineContext={catalogLesson === "welcome" ? "Lesson 1 of 2" : "Lesson 2 of 2"}
           outline={<nav className="grid gap-1" aria-label="Example course outline">
             {[{ id: "welcome", label: "Welcome" }, { id: "practice", label: "Practice" }].map((lesson) => (
@@ -267,7 +270,7 @@ export default function ComponentCatalog() {
               <Textarea rows={6} value={catalogBody} onChange={(event) => setCatalogBody(event.target.value)} />
             </FormField>
           </div>
-        </EditorFrame>
+        </EditorFrame>}
       </section>
       <WritingExamples />
       <ImageViewerExamples />

@@ -17,9 +17,12 @@ export default defineConfig({
     channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
   },
   projects: [
+    // Restricted touch layouts cover the notice; native table taps run in an
+    // allowed landscape layout inside the existing table-controls check.
     {
       name: "demo-touch-chromium",
-      testMatch: "blocknote.spec.ts",
+      testMatch: ["blocknote.spec.ts", "desktop-editing.spec.ts"],
+      grep: /desktop editing requirement|table grips wait/,
       use: {
         baseURL: `http://127.0.0.1:${demoPort}`,
         browserName: "chromium",
@@ -30,7 +33,8 @@ export default defineConfig({
     },
     {
       name: "demo-touch-webkit",
-      testMatch: "blocknote.spec.ts",
+      testMatch: ["blocknote.spec.ts", "desktop-editing.spec.ts"],
+      grep: /desktop editing requirement|table grips wait/,
       use: {
         baseURL: `http://127.0.0.1:${demoPort}`,
         browserName: "webkit",
@@ -55,6 +59,7 @@ export default defineConfig({
     },
     {
       name: "production-phone",
+      // This is a narrow mouse viewport. Restriction checks opt into real touch.
       use: {
         baseURL: `http://127.0.0.1:${serverPort}`,
         viewport: { width: 375, height: 812 },

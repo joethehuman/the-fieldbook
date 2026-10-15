@@ -1,34 +1,16 @@
 "use client";
 
-import { createContext, useContext, useLayoutEffect, type RefObject } from "react";
+import { useLayoutEffect, type RefObject } from "react";
 import { compactLayoutQuery } from "./use-compact-layout";
-import { useEditorCardsLayout } from "./use-editor-cards-layout";
-
-// The shell renders its own class and data attribute together. An editor must
-// not imperatively amend a className that React replaces on later renders.
-export const EditorMobileScrollContext = createContext<((active: boolean) => void) | null>(null);
 
 /** CSS distributes the remaining space; measurement only chooses a usable layout. */
 export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, enabled = true) {
-  const mobile = useEditorCardsLayout();
-  const setMobileScroll = useContext(EditorMobileScrollContext);
-  useLayoutEffect(() => {
-    setMobileScroll?.(enabled && mobile);
-    return () => setMobileScroll?.(false);
-  }, [mobile, enabled, setMobileScroll]);
   useLayoutEffect(() => {
     if (!enabled) return;
     const editor = ref.current;
     const viewport = editor?.closest<HTMLElement>(".main-content");
     if (!editor || !viewport) return;
     const compact = window.matchMedia(compactLayoutQuery);
-    if (mobile) {
-      // BlockNote owns keyboard geometry. Mobile has one native app scroller,
-      // with no canvas sizing observers or viewport correction loops.
-      editor.dataset.scrollLayout = "page";
-      editor.removeAttribute("data-flowing-heading");
-      return;
-    }
     let request = 0;
     let initialized = false;
     const observed = new Set<Element>();
@@ -109,5 +91,5 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, enabled 
       mutations.disconnect();
       compact.removeEventListener("change", schedule);
     };
-  }, [ref, mobile, enabled]);
+  }, [ref, enabled]);
 }

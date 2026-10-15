@@ -518,6 +518,7 @@ test("table grips wait for a completed click and retain keyboard and touch activ
   page,
 }, info) => {
   const touch = info.project.use.hasTouch === true;
+  if (touch) await page.setViewportSize({ width: 1024, height: 768 });
   const { editor, read } = await setup(
     page,
     info.project.name.startsWith("production"),
@@ -986,7 +987,6 @@ test("code header menu opens without moving a scrolled canvas", async ({
         page: scrollY,
         main: element.closest(".main-content")!.scrollTop,
         canvas: element.closest(".writing-viewport")!.scrollTop,
-        mobile: element.closest(".bn-scroll-container")?.scrollTop || 0,
         codeY: element.getBoundingClientRect().top,
       };
     });
@@ -1354,28 +1354,4 @@ test("native rich paste retains its paragraph suffix and strips executable HTML"
   expect(saved.body).not.toContain("javascript:");
   await editor.press("ControlOrMeta+z");
   await expect(editor).toHaveText("Keep the suffix.");
-});
-
-test("mobile writing controls never submit or publish the surrounding editor form", async ({ page }, info) => {
-  test.skip(info.project.use.hasTouch !== true, "The app toolbar appears for touch editing");
-  const { editor } = await setup(page, info.project.name.startsWith("production"), "doc", "Published text.", true);
-  await editor.locator('[data-content-type="paragraph"]').first().click();
-  await page.keyboard.press("End");
-  await page.keyboard.type(" A private draft.");
-  await waitForDraftSaved(page);
-  await editor.evaluate(node => {
-    node.closest("form")!.addEventListener("submit", () => {
-      document.documentElement.dataset.editorFormSubmits = String(Number(document.documentElement.dataset.editorFormSubmits || 0) + 1);
-    });
-  });
-  await page.getByRole("button", { name: "Commands", exact: true }).tap();
-  await expect(page.getByRole("listbox")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Undo", exact: true }).tap();
-  await expect(editor).not.toContainText("A private draft.");
-  await page.getByRole("button", { name: "Redo", exact: true }).tap();
-  await expect(editor).toContainText("A private draft.");
-  expect(await page.locator("html").getAttribute("data-editor-form-submits")).toBeNull();
-  const published = await page.evaluate(() => JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!).publishedContent[0]);
-  expect(published.body).toBe("Published text.");
 });

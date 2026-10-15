@@ -124,12 +124,6 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         setSelected(navigation.step);
         surface?.focus({ preventScroll: true });
       };
-      if (surface?.closest('.app[data-mobile-editor]')) {
-        const owner = surface.closest<HTMLElement>(".bn-scroll-container");
-        if (owner) owner.scrollTop = 0;
-        finish();
-        return;
-      }
       if (surface?.closest('.editor[data-scroll-layout="workspace"]')) {
         const canvas = surface.closest<HTMLElement>(".editor-frame-canvas");
         if (canvas) canvas.scrollTop = 0;

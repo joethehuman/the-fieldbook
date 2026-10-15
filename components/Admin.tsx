@@ -25,7 +25,7 @@ import {
 } from "./patterns/editor-frame";
 import { WritingTitle } from "./patterns/writing-title";
 import { useEditorLayout } from "./patterns/use-editor-layout";
-import { useMobileEditorLayout } from "./patterns/use-editor-cards-layout";
+import { useDesktopEditingRequired } from "./patterns/use-desktop-editing-required";
 import { DesktopEditingNotice } from "./patterns/desktop-editing-notice";
 import { useCollapseDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { createLessonImageAltValidator } from "@/lib/markdown-compatibility";
@@ -2166,7 +2166,7 @@ export function Editor({
   ) => void | Promise<void>;
 }) {
   useCollapseDesktopSidebar();
-  const mobileEditor = useMobileEditorLayout();
+  const desktopEditingRequired = useDesktopEditingRequired();
   const notify = useToast();
   const form = useRef<HTMLFormElement>(null);
   const [savedMessage, setSavedMessage] = useState("");
@@ -2319,7 +2319,7 @@ export function Editor({
     }, 900);
     return () => clearTimeout(timer);
   }, [c, dirty, busy, saving]);
-  useEditorLayout(form, !mobileEditor);
+  useEditorLayout(form, !desktopEditingRequired);
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (pendingUploads.current || recoveringNow.current) return false;
@@ -2684,11 +2684,6 @@ export function Editor({
   const audienceLabel = audienceAssigned ? "Edit Audience" : "Assign audience";
   const details = (
     <FieldGroup disabled={busy} className="editor-details-content">
-      <div className="editor-publication-details">
-        <EditorDetailsGroup id="writing-publication" title="Publication status">
-          <PublicationStatus published={!!c.publishedRevision} />
-        </EditorDetailsGroup>
-      </div>
       {requirements.length > 0 && <EditorDetailsGroup id="writing-readiness" title="Before publishing">
           <ul className="grid gap-2">
             {requirements.map((item) => (
@@ -3049,7 +3044,7 @@ export function Editor({
   );
   // Keep the draft owner and its save/navigation guards mounted if a desktop
   // session crosses the device boundary. The phone view mounts no editing UI.
-  if (mobileEditor) return (
+  if (desktopEditingRequired) return (
     <div className="grid gap-4">
       {error && <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>}
       <DesktopEditingNotice onBack={async () => { if (await guard.current()) onCancel(); }} />

@@ -80,7 +80,7 @@ export async function replaceWritingText(page: Page, text: string) {
   }
 }
 
-/** Desktop has a canvas Back action; compact editors use the existing account menu. */
+/** Return through the editor Back action or the account navigation. */
 export async function returnToContent(page: Page) {
   const back = page.getByRole("button", {
     name: "Back to content",

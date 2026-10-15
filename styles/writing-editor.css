@@ -297,7 +297,6 @@
 .editor .course-quiz-canvas > .writing-document-heading {
   top: var(--editor-navigation-height, 0px);
 }
-.editor-frame[data-mobile] .writing-document-heading,
 .editor[data-flowing-heading] .writing-document-heading {
   position: relative;
   top: auto;
@@ -318,17 +317,6 @@
 .editor .writing-view-header {
   display: none;
 }
-/* Mobile uses the whole column. No side controls, fixed gutters or canvas
-   scroller compete with the native keyboard toolbar and app scroll container. */
-.mobile-editor .writing-surface { overflow: visible; }
-.mobile-editor .writing-viewport { overflow: visible; scrollbar-gutter: auto; }
-.mobile-editor :is(.writing-document-heading, .writing-course-heading, .writing-source) {
-  padding-inline: var(--editor-text-inset);
-}
-.mobile-editor .fieldbook-blocknote .bn-editor {
-  padding-inline: var(--editor-text-inset);
-}
-.mobile-editor .writing-source-panel { overflow: visible; }
 /* Native blocks retain geometry. The theme and explicitly configured controls
    keep Fieldbook colors and the supported menu/table refinements. */
 .bn-root.bn-shadcn[data-color-scheme] {
