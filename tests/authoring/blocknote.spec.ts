@@ -442,7 +442,7 @@ test("media commands share the native file panel and persist their URLs", async 
     }),
   );
   await page.route(
-    /https:\/\/(?:www\.youtube-nocookie\.com|i\.ytimg\.com)\//,
+    /^https:\/\/(?:www\.youtube-nocookie\.com|i\.ytimg\.com)\//,
     (route) => route.fulfill({ status: 200, body: "" }),
   );
   for (const media of [
