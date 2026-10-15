@@ -73,6 +73,7 @@ import { WritingFilePanel } from "./blocknote-file-panel";
 import { WritingCodeHeaders } from "./blocknote-code-header";
 import {
   blockDocumentSchema,
+  blockDocumentSignature,
   exportBlockMarkdown,
   importMarkdownDocument,
   type BlockDocument,
@@ -342,12 +343,12 @@ export default function WritingEditorEngine({
       : undefined,
   });
   const lastValue = useRef(value);
-  const lastDoc = useRef(JSON.stringify(bodyDocument));
+  const lastDoc = useRef(bodyDocument && blockDocumentSignature(bodyDocument));
   const lastSaved = useRef(JSON.stringify(editor.document));
   const pendingEchoes = useRef<{ value: string; document: string }[]>([]);
   const fade = useScrollFade<HTMLDivElement>();
   useEffect(() => {
-    const document = JSON.stringify(bodyDocument);
+    const document = bodyDocument && blockDocumentSignature(bodyDocument);
     // React may acknowledge one keystroke after the next transaction arrives.
     // Consume our own pending edits without replacing live selection or marks.
     const echo = pendingEchoes.current.findIndex(
@@ -376,7 +377,7 @@ export default function WritingEditorEngine({
         doc.blocks as unknown as (typeof writingSchema.PartialBlock)[],
       );
       lastValue.current = value;
-      lastDoc.current = JSON.stringify(bodyDocument);
+      lastDoc.current = document;
       lastSaved.current = JSON.stringify(editor.document);
     } catch {
       setError(
@@ -399,7 +400,7 @@ export default function WritingEditorEngine({
       const markdown = exportBlockMarkdown(doc);
       lastSaved.current = serialized;
       lastValue.current = markdown;
-      lastDoc.current = JSON.stringify(doc);
+      lastDoc.current = blockDocumentSignature(doc);
       pendingEchoes.current.push({
         value: markdown,
         document: lastDoc.current,
