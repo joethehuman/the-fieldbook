@@ -9,14 +9,15 @@ import { useEditorCardsLayout } from "./use-editor-cards-layout";
 export const EditorMobileScrollContext = createContext<((active: boolean) => void) | null>(null);
 
 /** CSS distributes the remaining space; measurement only chooses a usable layout. */
-export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
+export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, enabled = true) {
   const mobile = useEditorCardsLayout();
   const setMobileScroll = useContext(EditorMobileScrollContext);
   useLayoutEffect(() => {
-    setMobileScroll?.(mobile);
+    setMobileScroll?.(enabled && mobile);
     return () => setMobileScroll?.(false);
-  }, [mobile, setMobileScroll]);
+  }, [mobile, enabled, setMobileScroll]);
   useLayoutEffect(() => {
+    if (!enabled) return;
     const editor = ref.current;
     const viewport = editor?.closest<HTMLElement>(".main-content");
     if (!editor || !viewport) return;
@@ -108,5 +109,5 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
       mutations.disconnect();
       compact.removeEventListener("change", schedule);
     };
-  }, [ref, mobile]);
+  }, [ref, mobile, enabled]);
 }
