@@ -1,9 +1,17 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import type { Branding } from "@/lib/branding";
 import { AccountPage } from "./layout";
 import { InstallationIdentity } from "./installation-identity";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { AccessArtwork } from "./access-artwork";
+/** Shared account surface with the installation's validated theme. */
+export function BrandedAccountFrame({
+  branding,
+  ...props
+}: ComponentProps<typeof AccountPage> & { branding: Branding }) {
+  return <AccountPage {...props} style={brandThemeStyle(branding.accent)} />;
+}
+
 export function BrandedAccount({
   branding,
   children,
@@ -18,14 +26,14 @@ export function BrandedAccount({
   footer?: ReactNode;
 }) {
   return (
-    <AccountPage
+    <BrandedAccountFrame
+      branding={branding}
       centered={centered}
       className={
         illustrated
           ? "access-card access-card-illustrated max-w-[32rem] min-[801px]:max-w-[51rem] gap-0 overflow-hidden border-l-[5px] [border-left-color:var(--brand)] p-0 sm:p-0 [overflow-wrap:anywhere] [&_h1]:text-[clamp(1.65rem,3vw,2.35rem)]"
           : "access-card border-l-[5px] [border-left-color:var(--brand)] [overflow-wrap:anywhere]"
       }
-      style={brandThemeStyle(branding.accent)}
     >
       <div className="access-card-content">
         {!illustrated && <InstallationIdentity name={branding.name} />}
@@ -42,6 +50,6 @@ export function BrandedAccount({
         )}
       </div>
       {illustrated && <AccessArtwork />}
-    </AccountPage>
+    </BrandedAccountFrame>
   );
 }

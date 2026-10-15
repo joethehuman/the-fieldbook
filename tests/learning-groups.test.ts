@@ -147,7 +147,7 @@ test("Update recommendations feature at most two recent audience matches and ret
     ...base,
     id: `update-${String(index).padStart(2, "0")}`,
     groups: index === 23 ? ["parent"] : index % 3 === 0 ? ["sales"] : [],
-    updatedAt: `2026-09-${String(23 - index).padStart(2, "0")}T12:00:00.000Z`,
+    updatedAt: `2026-09-${String(30 - index).padStart(2, "0")}T12:00:00.000Z`,
   }));
   const result = updatesForUser(many, data.users[0], [
     { id: "parent", name: "Everyone" },

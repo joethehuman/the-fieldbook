@@ -143,8 +143,11 @@ test("original fixed-date browsers upgrade automatically while older unrelated f
   assert.match(card(upgraded, "course-7"), /Due in 5 days/);
   assert.match(card(upgraded, "course-6"), /28 days past due/);
   assert.equal(
-    upgraded.users.find((person) => person.id === "demo-contributor")!
-      .learningAssignments![0].dueDate,
+    upgraded.users
+      .find((person) => person.id === "demo-contributor")!
+      .learningAssignments!.find(
+        (assignment) => assignment.contentId === "course-2",
+      )!.dueDate,
     "2027-04-29",
   );
   const unrelated = sample(DEMO_LEARNING_DAY);
