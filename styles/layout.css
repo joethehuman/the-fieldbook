@@ -993,7 +993,28 @@
   }
   .demo-picker-heading h2 { font-size: 1.5rem; }
   @media (max-width: 800px) {
-    .demo-picker-intro { gap: var(--space-6); }
+    .demo-picker-intro,
+    .demo-picker-profiles {
+      gap: var(--space-3);
+      padding: var(--space-4);
+    }
+    .demo-picker-identity { gap: var(--space-2); }
+    .demo-picker-about {
+      gap: var(--space-3);
+      padding-top: 0;
+      border-top: 0;
+    }
+    .demo-picker-heading { gap: 0; }
+    .demo-picker-heading h2 { font-size: 1.25rem; }
+    .demo-picker .profile-list { gap: var(--space-2); }
+  }
+  @media (max-width: 800px) and (max-height: 600px) {
+    .demo-picker-intro,
+    .demo-picker-profiles {
+      gap: var(--space-1);
+      padding: var(--space-2) var(--space-3);
+    }
+    .demo-picker-about { gap: var(--space-1); }
   }
   .profile-list {
     display: grid;
