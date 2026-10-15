@@ -8,6 +8,7 @@ async function fixture(
   largeCategory = false,
   categoryCount = 0,
   courseTitle?: string,
+  shortCategory = false,
 ) {
   const data = withPublishedSnapshots(freshWorkspace());
   if (courseTitle) {
@@ -15,6 +16,13 @@ async function fixture(
     source.title = courseTitle;
     data.publishedContent!.find((item) => item.id === source.id)!.title =
       courseTitle;
+  }
+  if (shortCategory) {
+    const source = data.content.find((item) => item.kind === "course")!;
+    const keep = (item: (typeof data.content)[number]) =>
+      item.kind !== "course" || item.category !== source.category || item.id === source.id;
+    data.content = data.content.filter(keep);
+    data.publishedContent = data.publishedContent!.filter(keep);
   }
   if (largeCategory) {
     const source = data.content.find((item) => item.kind === "course")!;
@@ -50,7 +58,7 @@ async function fixture(
   await expect(
     page.getByRole("heading", { name: "Categories", exact: true }),
   ).toBeVisible();
-  return data;
+  return (await saved(page)) as typeof data;
 }
 async function saved(page: Page) {
   return page.evaluate(() =>
@@ -146,17 +154,20 @@ for (const kind of ["course", "brief"] as const) {
 
 for (const large of [false, true]) {
   test(`${large ? "long" : "short"} category item lists let wheel scrolling continue to the page`, async ({ page }) => {
-    const state = await fixture(page, large, 30);
+    const state = await fixture(page, large, 30, undefined, !large);
     const name = state.settings!.contentCategories!.course[0];
     await page.getByRole("button", { name: `Expand ${name}`, exact: true }).click();
     const region = page.getByRole("region", { name: `Items in ${name}`, exact: true });
     const table = page.getByLabel(`Scrollable items in ${name}`, { exact: true });
     const pageScroll = () => table.evaluate((element) => {
-      let owner = element.parentElement;
-      while (owner && !/(auto|scroll)/.test(getComputedStyle(owner).overflowY)) owner = owner.parentElement;
-      return (owner || document.scrollingElement!).scrollTop;
+      let scrollTop = 0;
+      for (let owner = element.parentElement; owner; owner = owner.parentElement)
+        scrollTop += owner.scrollTop;
+      return scrollTop;
     });
     await table.scrollIntoViewIfNeeded();
+    if (!large)
+      expect(await table.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1);
     const before = await pageScroll();
     await table.hover();
     await page.mouse.wheel(0, 250);
@@ -260,6 +271,7 @@ test("legacy initialization keeps the reader category order when a draft placeme
   page,
 }) => {
   const data = withPublishedSnapshots(freshWorkspace());
+  delete data.settings!.contentCategories;
   const course = data.content.find((item) => item.kind === "course")!;
   const readerOrder = [
     ...new Set(

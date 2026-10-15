@@ -1,11 +1,33 @@
 export type ContentLinkContext = "article" | "course";
 
+/** Validate native block links before persistence or direct React rendering. */
+export function isSafeContentLink(href: string): boolean {
+  const value = normalizeContentLink(href);
+  if (!value || /[\u0000-\u001f\u007f]/.test(value)) return false;
+  try {
+    const url = new URL(value, "https://fieldbook.invalid");
+    return ["https:", "http:", "mailto:", "tel:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
 /** Recognizable web addresses may omit HTTPS; authored paths retain their meaning. */
 export function normalizeContentLink(href: string): string {
   const value = href.trim();
-  if (!/^(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+(?:[a-z]{2,63}|xn--[a-z\d-]+)(?::\d{1,5})?(?:[/?#]|$)/i.test(value)) return value;
+  if (
+    !/^(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+(?:[a-z]{2,63}|xn--[a-z\d-]+)(?::\d{1,5})?(?:[/?#]|$)/i.test(
+      value,
+    )
+  )
+    return value;
   // A filename in Markdown is also a valid relative link, not necessarily a host.
-  if (/\.(?:md|mdx|html?|txt|pdf|json|csv|png|jpe?g|gif|webp|svg)(?:[?#]|$)/i.test(value.split("/")[0])) return value;
+  if (
+    /\.(?:md|mdx|html?|txt|pdf|json|csv|png|jpe?g|gif|webp|svg)(?:[?#]|$)/i.test(
+      value.split("/")[0],
+    )
+  )
+    return value;
   try {
     return new URL(`https://${value}`).hostname ? `https://${value}` : value;
   } catch {

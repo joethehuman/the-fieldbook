@@ -1,3 +1,4 @@
+import { canonicalBody } from "./block-document";
 import type { Workspace } from "./store";
 import type { Content } from "./types";
 import { publishedUpdateFeedDate } from "./content-publication";
@@ -60,6 +61,7 @@ export function reconcileDemoPublication(
   after: Workspace,
   renewUpdateId?: string,
 ): Workspace {
+  after = { ...after, content: after.content.map(item => canonicalBody({ ...item, lessons: item.lessons.map(canonicalBody) })) };
   const source = withPublishedSnapshots(before);
   let published = [...source.publishedContent!];
   const content = after.content.map((item) => {

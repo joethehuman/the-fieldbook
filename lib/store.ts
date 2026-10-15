@@ -64,7 +64,7 @@ export function freshWorkspace(day = todayUTC()): Workspace {
       ...defaultSettings,
       ...settings,
       name: "Hoolibook",
-      docCategoryOrder: [...DOC_CATEGORY_ORDER],
+      docCategoryOrder: settings.docSections ? [] : [...DOC_CATEGORY_ORDER],
     },
     content: structuredClone(seedContent).map((item) =>
       withCourseOpeningVideo({ ...item, ...contentOverrides[item.id] }),
@@ -203,6 +203,29 @@ function repairHooliSecurityAssignment(data: Workspace): Workspace {
     publishedContent: data.publishedContent && restore(data.publishedContent),
   };
 }
+function repairRedundantDocOrder(data: Workspace): Workspace {
+  const settings = data.settings;
+  const sections = settings?.docSections;
+  if (!sections || !settings?.docCategoryOrder?.length) return data;
+  const roots = new Set(
+    sections
+      .filter((section) => !section.parentId)
+      .map((section) => section.name),
+  );
+  const ids = new Set(sections.map((section) => section.id));
+  // Preserve legacy placement and unmatched categories. Only remove the old
+  // ordering when it duplicates configured roots and all documents use those IDs.
+  if (
+    !settings.docCategoryOrder.every((name) => roots.has(name)) ||
+    [...data.content, ...(data.publishedContent || [])].some(
+      (item) =>
+        item.kind === "doc" && (!item.sectionId || !ids.has(item.sectionId)),
+    )
+  )
+    return data;
+  return { ...data, settings: { ...settings, docCategoryOrder: [] } };
+}
+
 export function loadWorkspace(): Workspace {
   const raw = localStorage.getItem(KEY);
   if (!raw) {
@@ -250,7 +273,9 @@ export function loadWorkspace(): Workspace {
   const timeline = refreshDemoLearningTimeline(data);
   const upgraded = withPublishedSnapshots(timeline);
   const refreshed = refreshDemoCourseOpeningVideos(upgraded);
-  const repaired = expireDemoDeleted(repairHooliSecurityAssignment(refreshed));
+  const repaired = expireDemoDeleted(
+    repairHooliSecurityAssignment(repairRedundantDocOrder(refreshed)),
+  );
   const legacy = repaired.users.some((p) => !p.learningAssignments)
     ? {
         ...repaired,

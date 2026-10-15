@@ -1,7 +1,9 @@
+import type { BlockDocument } from "./block-document";
 export type Lesson = {
   id: string;
   title: string;
   body: string;
+  bodyDocument?: BlockDocument;
   videoUrl?: string;
 };
 export type Question = {
@@ -24,6 +26,7 @@ export type Content = {
   title: string;
   summary: string;
   body: string;
+  bodyDocument?: BlockDocument;
   category: string;
   folder: string;
   sectionId?: string;

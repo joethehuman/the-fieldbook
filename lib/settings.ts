@@ -1,3 +1,4 @@
+import type { BlockDocument } from "./block-document";
 import { defaultBrandAccent } from "./brand-theme";
 import { accountMenuLinks, type ExternalLink } from "./external-links";
 import { categoryKey } from "./content-categories";
@@ -8,6 +9,7 @@ export type PrivacyDocument = {
   contactEmail: string;
   contactUrl?: string;
   body: string;
+  bodyDocument?: BlockDocument;
   url: string;
 };
 export type PrivacySettings = {

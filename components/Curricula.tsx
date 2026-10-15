@@ -38,7 +38,7 @@ import { OrderedLearning } from "./patterns/ordered-learning";
 import { Button } from "./ui/button";
 import { CardArtEditor } from "./patterns/card-art-editor";
 import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
-import type { UploadMedia } from "./MarkdownEditor";
+import type { UploadMedia } from "@/lib/upload-media";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Plus, GraduationCap, Users } from "lucide-react";
 import { RecordName, RecordValues } from "./patterns/record-row";

@@ -1,3 +1,4 @@
+import { importMarkdownDocument } from "../../lib/block-document";
 import { expect, test, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -178,7 +179,8 @@ for (const profile of [
           });
           await expect(page.locator(".app")).toHaveAttribute("data-mobile-editor", "true");
           const toolbar = page.locator(".editor-mobile-toolbar");
-          await expect(toolbar).toHaveCSS("position", "sticky");
+          await expect(page.locator(".editor-mobile-toolbar-slot")).toHaveCSS("position", "sticky");
+          await expect(toolbar).toHaveCSS("position", "relative");
           await expect(toolbar).toBeInViewport({ ratio: 1 });
           await expect.poll(() => toolbar.evaluate(element => {
             const bounds = element.getBoundingClientRect();
@@ -189,7 +191,7 @@ for (const profile of [
             page.getByRole("button", { name: "Back to content", exact: true }),
           ).toBeInViewport();
           await expect(
-            page.getByRole("button", { name: /^Commands:/ }),
+            page.getByRole("button", { name: "Commands", exact: true }),
           ).toBeHidden();
         }
         await page.screenshot({
@@ -251,11 +253,9 @@ for (const profile of [
         expect(after.settings!.contentCategories![kind]).not.toContain(
           destination,
         );
-        expect(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth <= window.innerWidth,
-          ),
-        ).toBe(true);
+        await expect.poll(() => page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        )).toBe(true);
         await page.screenshot({
           path: info.outputPath("integrated-categories.png"),
           fullPage: true,
@@ -298,8 +298,13 @@ for (const profile of [
           // its source category instead of completing stale removal.
           const concurrent = structuredClone(await readDraft());
           const newerBody = "A newer edit from another client must survive.";
-          if (kind === "course") concurrent.lessons[0].body = newerBody;
-          else concurrent.body = newerBody;
+          if (kind === "course") {
+            concurrent.lessons[0].body = newerBody;
+            concurrent.lessons[0].bodyDocument = importMarkdownDocument(newerBody);
+          } else {
+            concurrent.body = newerBody;
+            concurrent.bodyDocument = importMarkdownDocument(newerBody);
+          }
           const response = await page.request.post("/api/content", {
             headers: { Origin: new URL(page.url()).origin },
             data: {

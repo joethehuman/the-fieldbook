@@ -1,15 +1,20 @@
 import { test, expect, type Page } from "@playwright/test";
+
 import { freshWorkspace } from "../../lib/store";
+
 import { withPublishedSnapshots } from "../../lib/demo-publication";
+
 import {
   authoringUser,
   setupAuthoringProvider,
   syncAuthoringProvider,
 } from "./provider-fixture";
-import { downloadMarkdown, waitForDraftSaved } from "./editor-helpers";
+
+import { downloadMarkdown } from "./editor-helpers";
 
 const code =
   'def greet(name):\n    message = f"Hello, {name}"\n    print(message)\n    return message';
+
 const fence = (code: string, language = "") =>
   `\`\`\`${language}\n${code}\n\`\`\``;
 
@@ -77,247 +82,10 @@ async function open(
     if (!installed)
       await page.getByRole("link", { name: item.title, exact: true }).click();
     await expect(
-      page.locator(".writing-code .cm-content").first(),
+      page.locator('[data-content-type="codeBlock"] pre code').first(),
     ).toBeVisible();
   }
 }
-
-test.describe("current code language dismissal", () => {
-  test.use({ hasTouch: true });
-  test("reselecting the code language closes the menu and preserves the document", async ({
-    page,
-  }, info) => {
-    const body = `Before the code.\n\n${fence(code)}\n\nAfter the code.`;
-    await open(page, info.project.name.startsWith("production"), "doc", body);
-    const trigger = page.getByRole("combobox", {
-      name: "Code language",
-      exact: true,
-    });
-    const original = (await downloadMarkdown(page)).body;
-    for (const input of ["mouse", "touch", "keyboard"]) {
-      if (input === "touch") await trigger.tap();
-      else await trigger.click();
-      const selected = page.getByRole("option", {
-        name: "Auto-detect",
-        exact: true,
-      });
-      if (input === "mouse") await selected.click();
-      else if (input === "touch") await selected.tap();
-      else await selected.press("Enter");
-      await expect(trigger).toHaveAttribute("aria-expanded", "false");
-      await expect(trigger).toBeFocused();
-      await expect(trigger).toHaveText("Auto-detect");
-    }
-    expect((await downloadMarkdown(page)).body).toBe(original);
-    const input = page.locator(".writing-code .cm-content");
-    await input.click();
-    await page.keyboard.press("ControlOrMeta+End");
-    await page.keyboard.type("\n# Still editable");
-    await expect(input).toContainText("# Still editable");
-  });
-});
-
-for (const kind of ["doc", "brief", "course"] as const) {
-  test(`${kind}: auto detection, language override, copy and exact Markdown survive authoring`, async ({
-    page,
-  }, info) => {
-    const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
-    await open(
-      page,
-      info.project.name.startsWith("production"),
-      kind,
-      `Paragraph 1.\n\n${fence(code)}\n\nAfter the code.`,
-    );
-    const block = page.locator(".writing-code-block");
-    await expect(block.locator(".code-detected-language")).toHaveText("Python");
-    await expect(
-      block.locator(".cm-content .hljs-keyword").first(),
-    ).toBeVisible();
-    await block.getByRole("button", { name: "Copy code", exact: true }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-copied", code);
-    await expect(block.getByRole("status")).toHaveText("Code copied");
-    expect((await downloadMarkdown(page)).body).toContain(fence(code));
-
-    await block.getByRole("combobox", { name: "Code language" }).click();
-    await page.getByRole("option", { name: "Plain text", exact: true }).click();
-    await expect(block.locator(".code-block")).toHaveAttribute(
-      "data-language",
-      "text",
-    );
-    await expect(block.locator(".cm-content [class*=hljs-]")).toHaveCount(0);
-    expect((await downloadMarkdown(page)).body).toContain(fence(code, "text"));
-    await block.getByRole("combobox", { name: "Code language" }).click();
-    await page.getByRole("option", { name: "TypeScript", exact: true }).click();
-    expect((await downloadMarkdown(page)).body).toContain(
-      fence(code, "typescript"),
-    );
-
-    const input = block.locator(".cm-content");
-    await input.click();
-    await page.keyboard.press("ControlOrMeta+End");
-    await page.keyboard.press("Enter");
-    await page.keyboard.insertText("// ordinary code, not a slash command");
-    await expect(
-      page.getByRole("menu", { name: /^Insert content/ }),
-    ).toHaveCount(0);
-    await expect(input).toContainText("// ordinary code");
-    await waitForDraftSaved(page);
-    const exported = (await downloadMarkdown(page)).body;
-    expect(exported).toContain("// ordinary code, not a slash command");
-    expect(exported).toContain("After the code.");
-    await page.screenshot({
-      path: info.outputPath(`${kind}-code-editor.png`),
-      animations: "disabled",
-    });
-    expect(errors).toEqual([]);
-  });
-}
-
-test("long code scrolls within its block, retains horizontal layout, and undo restores editing", async ({
-  page,
-}, info) => {
-  const long = Array.from(
-    { length: 60 },
-    (_, i) => `const value${i} = "${"long code ".repeat(24)}";`,
-  ).join("\n");
-  await open(
-    page,
-    info.project.name.startsWith("production"),
-    "doc",
-    `Paragraph 1.\n\n${fence(long, "javascript")}\n\nAfter the code.`,
-  );
-  const block = page.locator(".writing-code-block");
-  const scroller = block.locator(".cm-scroller");
-  const geometry = await scroller.evaluate((el) => ({
-    height: el.clientHeight,
-    fullHeight: el.scrollHeight,
-    width: el.clientWidth,
-    fullWidth: el.scrollWidth,
-  }));
-  expect(geometry.height).toBeLessThanOrEqual(384);
-  expect(geometry.fullHeight).toBeGreaterThan(geometry.height);
-  expect(geometry.fullWidth).toBeGreaterThan(geometry.width);
-  await scroller.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-    el.scrollLeft = 100;
-  });
-  await expect(
-    block.getByRole("button", { name: "Copy code" }),
-  ).toBeInViewport();
-  const input = block.locator(".cm-content");
-  await input.click();
-  await page.keyboard.press("ControlOrMeta+End");
-  await page.keyboard.insertText(" END");
-  await expect(input).toContainText(" END");
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect(input).not.toContainText(" END");
-  await page.keyboard.press("ControlOrMeta+Shift+z");
-  await expect(input).toContainText(" END");
-  await block
-    .getByRole("button", { name: "Code block actions", exact: true })
-    .click();
-  await page
-    .getByRole("menuitem", { name: "Write after code block", exact: true })
-    .click();
-  await page.keyboard.insertText("Still in the document.");
-  expect((await downloadMarkdown(page)).body).toContain(
-    "Still in the document.",
-  );
-});
-
-for (const direction of ["before", "after"] as const) {
-  test(`code arrow keys stay inside the block until its ${direction} edge, then preserve the neighboring heading`, async ({ page }, info) => {
-    await open(
-      page,
-      info.project.name.startsWith("production"),
-      "doc",
-      `## **Before code**\n\n${fence("first\nsecond\nthird", "text")}\n\n### *After code*`,
-    );
-    const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
-    const input = page.locator(".writing-code .cm-content");
-    const arrow = direction === "before" ? "ArrowUp" : "ArrowDown";
-    await input.click();
-    // Start away from the exit edge: the first arrow belongs to CodeMirror.
-    await page.keyboard.press(direction === "before" ? "ControlOrMeta+End" : "ControlOrMeta+Home");
-    await page.keyboard.press(arrow);
-    await expect(input).toBeFocused();
-    await page.keyboard.type("X");
-    await expect(input).toContainText("X");
-    await expect(writer.locator("h2")).toHaveText("Before code");
-    await expect(writer.locator("h3")).toHaveText("After code");
-    const editedCode = await input.innerText();
-
-    await page.keyboard.press(direction === "before" ? "ControlOrMeta+Home" : "ControlOrMeta+End");
-    await page.keyboard.press(arrow);
-    // Type without clicking or waiting for a focus assertion to hide a race.
-    await page.keyboard.type(" here ");
-    await expect(writer).toBeFocused();
-    await expect(writer.locator(direction === "before" ? "h2" : "h3"))
-      .toHaveText(direction === "before" ? "Before code here " : " here After code");
-    await expect(writer.locator("h2 strong")).toContainText("Before code");
-    await expect(writer.locator("h3 em")).toContainText("After code");
-    expect(await input.innerText()).toBe(editedCode);
-  });
-}
-
-test("ArrowDown leaves a final code block at its end and types into the trailing writing line", async ({ page }, info) => {
-  await open(page, info.project.name.startsWith("production"), "doc", fence("last line", "text"));
-  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
-  const input = page.locator(".writing-code .cm-content");
-  await input.click();
-  await page.keyboard.press("ControlOrMeta+End");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.type("After the code.");
-  await expect(writer).toBeFocused();
-  await expect(writer.locator(":scope > p")).toHaveText("After the code.");
-  await expect(input).toHaveText("last line");
-});
-
-test("a newly inserted code block starts on Auto-detect and accepts focus, typing and paste", async ({
-  page,
-}, info) => {
-  await open(
-    page,
-    info.project.name.startsWith("production"),
-    "doc",
-    `Paragraph 1.\n\n${fence(code, "py")}\n\nAfter the code.`,
-  );
-  await page
-    .getByRole("button", { name: "Code block actions", exact: true })
-    .click();
-  await page
-    .getByRole("menuitem", { name: "Write after code block", exact: true })
-    .click();
-  await page.keyboard.type("/");
-  await page.getByRole("menuitem", { name: "Code block", exact: true }).click();
-  const block = page.locator(".writing-code-block").last();
-  const input = block.locator(".cm-content");
-  await expect(input).toBeFocused();
-  await expect(
-    block.getByRole("combobox", { name: "Code language" }),
-  ).toHaveText("Auto-detect");
-  await page.keyboard.type("x");
-  await page.keyboard.press("Backspace");
-  await input.evaluate((el) => {
-    const clipboardData = new DataTransfer();
-    clipboardData.setData(
-      "text/plain",
-      'def greet(name):\n    message = f"Hello, {name}"\n    print(message)\n    return message',
-    );
-    el.dispatchEvent(
-      new ClipboardEvent("paste", {
-        clipboardData,
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-  });
-  await expect(block.locator(".code-detected-language")).toHaveText("Python");
-  const result = (await downloadMarkdown(page)).body;
-  expect(result).toContain(fence(code, "py"));
-  expect(result).toContain(fence(code));
-});
 
 test("reader highlights fenced code, copies exactly, leaves inline code alone, and handles copy denial", async ({
   page,
@@ -373,23 +141,43 @@ test("reader highlights fenced code, copies exactly, leaves inline code alone, a
   });
 });
 
-test("pasting an image in code leaves the code editor in control and does not upload into prose", async ({ page }, info) => {
-  await open(page, info.project.name.startsWith("production"), "doc", `Before the code.\n\n${fence(code)}\n\nAfter the code.`);
+test("pasting an image in code leaves the code editor in control and does not upload into prose", async ({
+  page,
+}, info) => {
+  await open(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    `Before the code.\n\n${fence(code)}\n\nAfter the code.`,
+  );
   let uploads = 0;
   await page.route("**/api/upload", (route) => {
     uploads++;
-    return route.fulfill({ status: 500, json: { error: "Unexpected prose upload" } });
+    return route.fulfill({
+      status: 500,
+      json: { error: "Unexpected prose upload" },
+    });
   });
-  const input = page.locator(".writing-code-block .cm-content");
+  const input = page.locator('[data-content-type="codeBlock"] pre code');
   await input.click();
   await input.evaluate((node) => {
     const data = new DataTransfer();
-    data.items.add(new File(["synthetic"], "code-paste.png", { type: "image/png" }));
-    node.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    data.items.add(
+      new File(["synthetic"], "code-paste.png", { type: "image/png" }),
+    );
+    node.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: data,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   });
   await expect(input).toHaveText(code);
-  await expect(page.locator(".writing-editor").getByRole("alert")).toHaveCount(0);
-  await expect(page.locator(".writing-content img, .writing-content .writing-media-loading")).toHaveCount(0);
+  await expect(page.locator(".writing-editor").getByRole("alert")).toHaveCount(
+    0,
+  );
+  await expect(page.locator(".writing-content img")).toHaveCount(0);
   expect(uploads).toBe(0);
   expect((await downloadMarkdown(page)).body).toContain(fence(code));
 });

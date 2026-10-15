@@ -6,7 +6,7 @@ import {
   feedbackReportInputSchema,
 } from "./mcp-report-schema";
 
-export const MCP_CONTRACT_VERSION = "1.0.0";
+export const MCP_CONTRACT_VERSION = "1.1.0";
 const page = {
   cursor: z.string().max(2000).optional(),
   limit: z.number().int().min(1).max(100).default(50),
@@ -80,7 +80,7 @@ export const mcpContract = {
   ),
   fetch: tool(
     "content:read",
-    "Read the complete current draft, including Markdown, lessons, quiz answer keys, artwork and revision. Preserve unrelated fields before editing. Requires publishing access.",
+    "Read the complete current draft, including bodyDocument blocks, generated Markdown, lessons, quiz answer keys, artwork and revision. Preserve unrelated fields before editing. Requires publishing access.",
     { id: z.uuid() },
   ),
   create_content: tool(
@@ -91,7 +91,7 @@ export const mcpContract = {
   ),
   update_content: tool(
     "content:write",
-    "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. Markdown supports editor formatting, images and links; lessons use videoUrl. Published content stays unchanged. Course audiences use manage_course_assignment; contributors choose existing sections and categories and cannot reorder Docs or create sections or categories.",
+    "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. bodyDocument is authoritative when present; body is its generated Markdown export. Preserve bodyDocument for metadata edits and update its blocks for prose edits. Legacy Markdown-only drafts remain supported; lessons follow the same rule. Published content stays unchanged. Course audiences use manage_course_assignment; contributors choose existing sections and categories and cannot reorder Docs or create sections or categories.",
     {
       content: contentDraftSchema,
       expected_revision: z.number().int().positive(),
@@ -121,7 +121,7 @@ export const mcpContract = {
   ),
   get_authoring_options: tool(
     "content:read",
-    "Discover existing Docs section IDs and paths, separate courseCategories and updateCategories, and supported Markdown/media/quiz formats. Select existing managed categories and sections; category creation and ordering use Categories in Fieldbook settings.",
+    "Discover existing Docs section IDs and paths, separate courseCategories and updateCategories, and supported block/Markdown/media/quiz formats. Select existing managed categories and sections; category creation and ordering use Categories in Fieldbook settings.",
     {},
   ),
   list_media: tool(

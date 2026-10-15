@@ -26,19 +26,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Lexical selection synchronization and Safari visibility
+## BlockNote
 
-The pinned `lexical@0.48.0` dependency includes a narrow selection-synchronization backport from [Lexical PR #8931](https://github.com/facebook/lexical/pull/8931). The [dependency patch](../patches/lexical@0.48.0.patch) records programmatically applied selection endpoints so a stale acknowledgment flag cannot discard a later native cursor move. It includes equivalent source, development and production changes; the unrelated decorator-paint changes are excluded. pnpm applies this patch from the locked workspace configuration for both apps. The same patch corrects the document caret-reveal boundary for WebKit: ordinary client rectangles already include visual-viewport panning, so its offset must not be added to the visible boundary a second time. Non-WebKit offset handling and CSS scroll padding remain in the existing reveal path. When updating the editor dependencies, remove the patch only after verifying both the upstream endpoint guard and the WebKit visibility correction are included, and native-selection and viewport regression checks pass.
-
-Copyright (c) Meta Platforms, Inc. and affiliates. These upstream changes remain under the MIT terms reproduced above, together with Lexical's packaged license; they are not relicensed under ELv2.
-
-## MDXEditor table focus
-
-The pinned `@mdxeditor/editor@4.2.5` dependency includes a [table focus patch](../patches/@mdxeditor__editor@4.2.5.patch). A cell that already owns native focus no longer receives a redundant programmatic focus update; keyboard navigation still focuses newly selected cells. A newly inserted table retains its cell-selection request until its editor mounts. pnpm applies the patch to both apps. When updating MDXEditor, verify insertion into the first cell, native tap placement and keyboard cell navigation before removing it. MDXEditor retains its MIT license and packaged copyright notice.
+Fieldbook bundles the unmodified `@blocknote/core`, `@blocknote/react`, `@blocknote/shadcn` and `@blocknote/code-block` packages at 0.56.0. These packages retain MPL-2.0; Fieldbook's original integration remains ELv2. The complete [MPL-2.0 license](../public/licenses/blocknote-mpl-2.0.txt) ships with both apps at `/licenses/blocknote-mpl-2.0.txt`. Corresponding package source is available in the [BlockNote repository](https://github.com/TypeCellOS/BlockNote/tree/v0.56.0) and the published npm packages. Preserve the dependency licenses and source-availability notices when redistributing bundled software. Fieldbook does not use the separately licensed XL packages or a hosted editor service.
 
 ## Code highlighting
 
-Fieldbook uses [Highlight.js](https://github.com/highlightjs/highlight.js) for automatic language detection and reader syntax highlighting. It retains its BSD 3-Clause license; the complete [copyright notice and license](../public/licenses/highlightjs-bsd-3-clause.txt) ship with both apps at `/licenses/highlightjs-bsd-3-clause.txt`. CodeMirror and Lezer provide code editing and retain their MIT licenses and packaged notices. Preserve these dependency licenses when redistributing bundled software.
+Fieldbook uses [Highlight.js](https://github.com/highlightjs/highlight.js) for automatic language detection and reader syntax highlighting. It retains its BSD 3-Clause license; the complete [copyright notice and license](../public/licenses/highlightjs-bsd-3-clause.txt) ship with both apps at `/licenses/highlightjs-bsd-3-clause.txt`. BlockNote code highlighting uses Shiki. Its MIT copyright notice and license ship with both apps at [`/licenses/shiki-mit.txt`](../public/licenses/shiki-mit.txt). Preserve these dependency licenses when redistributing bundled software.
 
 ## Vercel AI SDK dependencies
 

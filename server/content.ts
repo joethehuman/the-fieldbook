@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  canonicalBody,
+  preserveBlockDocumentWrite,
+  assertBlockDocumentInputLimits,
+} from "@/lib/block-document";
 import { cache } from "react";
 import type { Content, User } from "@/lib/types";
 import { data as dataStore } from "./data";
@@ -90,6 +95,20 @@ export async function saveContent(
   options: PublicationOptions = {},
 ) {
   requirePublisher(user);
+  if (input && typeof input === "object") {
+    const raw = input as {
+      bodyDocument?: unknown;
+      lessons?: { bodyDocument?: unknown }[];
+    };
+    try {
+      assertBlockDocumentInputLimits(raw.bodyDocument);
+      if (Array.isArray(raw.lessons))
+        for (const lesson of raw.lessons)
+          assertBlockDocumentInputLimits(lesson?.bodyDocument);
+    } catch (error) {
+      throw new HttpError(400, (error as Error).message);
+    }
+  }
   const parsed = (publish ? contentSchema : contentDraftSchema).safeParse(
     input,
   );
@@ -98,17 +117,28 @@ export async function saveContent(
       400,
       parsed.error.issues.map((i) => i.message).join(" "),
     );
-  const c = parsed.data;
+  const c = canonicalBody({
+    ...parsed.data,
+    lessons: parsed.data.lessons.map(canonicalBody),
+  });
+  if (
+    c.body.length > 200000 ||
+    c.lessons.some((lesson) => lesson.body.length > 200000)
+  )
+    throw new HttpError(400, "Content is too large.");
   const contributor = user.role === "contributor";
   if (c.kind !== "doc" && c.category.trim()) {
     const config = await dataStore().readSettings();
     if (!config)
       throw new HttpError(503, "Settings are unavailable. Try again.");
-    const existing = contributor && !config.settings.contentCategories
-      ? (await dataStore().listDraftIndex()).map((item) => ({
-          id: item.id, kind: item.kind || "doc", category: item.category || "",
-        }))
-      : undefined;
+    const existing =
+      contributor && !config.settings.contentCategories
+        ? (await dataStore().listDraftIndex()).map((item) => ({
+            id: item.id,
+            kind: item.kind || "doc",
+            category: item.category || "",
+          }))
+        : undefined;
     try {
       assertContentCategory(c, config.settings, existing);
     } catch (error) {
@@ -176,6 +206,19 @@ export async function saveContent(
       "Assigned courses use teams or learning groups and organization windows.",
     );
   const old = await dataStore().findDocument(c.id);
+  try {
+    const protectedBody = preserveBlockDocumentWrite(parsed.data, old?.draft);
+    c.body = protectedBody.body;
+    c.bodyDocument = protectedBody.bodyDocument;
+    c.lessons = parsed.data.lessons.map((lesson) =>
+      preserveBlockDocumentWrite(
+        lesson,
+        old?.draft.lessons.find((previous) => previous.id === lesson.id),
+      ),
+    );
+  } catch (error) {
+    throw new HttpError(400, (error as Error).message);
+  }
   if (
     contributor &&
     c.kind === "brief" &&

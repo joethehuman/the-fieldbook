@@ -168,7 +168,9 @@ for (const signedIn of [false, true]) {
         const response = await client.get(path, { headers });
         expect(response.status()).toBe(200);
         const body = await response.text();
-        expect(body, `${path} (${headers.RSC ? "RSC" : "HTML"})`).toContain("Recommended one");
+        expect(body, `${path} (${headers.RSC ? "RSC" : "HTML"})`).toContain(
+          path === "/courses" ? "Public curriculum" : "Recommended one",
+        );
         expect(body).not.toContain("PRIVATE-");
         expect(body).not.toMatch(/\\?"(?:answer|correctOptionIds)\\?":/);
         expect(body).not.toContain(id(99));

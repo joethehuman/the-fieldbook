@@ -9,10 +9,6 @@ export function useEditorCardsLayout() {
   return useMobileEditorLayout();
 }
 
-export function useWritingControlsLayout() {
-  return useMobileEditorLayout();
-}
-
 // A narrow desktop window is still a desktop editor. Any reported fine pointer
 // (including a tablet trackpad) keeps desktop navigation and contextual formatting.
 export const touchWritingQuery = "(pointer: coarse) and (not (any-pointer: fine))";

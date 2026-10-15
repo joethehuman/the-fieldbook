@@ -18,6 +18,28 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "demo-touch-chromium",
+      testMatch: "blocknote.spec.ts",
+      use: {
+        baseURL: `http://127.0.0.1:${demoPort}`,
+        browserName: "chromium",
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
+      name: "demo-touch-webkit",
+      testMatch: "blocknote.spec.ts",
+      use: {
+        baseURL: `http://127.0.0.1:${demoPort}`,
+        browserName: "webkit",
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
       name: "demo-desktop",
       use: {
         baseURL: `http://127.0.0.1:${demoPort}`,

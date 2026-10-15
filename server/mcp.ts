@@ -45,9 +45,9 @@ type Handlers = {
   ) => Promise<unknown>;
 };
 const editorFormats = {
-  text: "Markdown: headings, bold, italic, lists, links, tables, code and images with alternative text. Arbitrary CSS and custom interactive blocks are not supported.",
+  text: "When bodyDocument is present it is a versioned fieldbook-blocks document and the source of truth; body is a generated Markdown export. Update blocks rather than editing that export. Legacy Markdown: headings, bold, italic, lists, links, tables, code and images with alternative text. Arbitrary CSS and custom interactive blocks are not supported.",
   lessons:
-    "Ordered lesson objects with stable IDs, title, Markdown body and optional videoUrl. Use private /api/media references, supported YouTube/Vimeo/Loom embeds, or HTTPS MP4/WebM files.",
+    "Ordered lesson objects with stable IDs, title, generated Markdown body, optional bodyDocument blocks and optional legacy videoUrl. Use private /api/media references, supported YouTube/Vimeo/Loom embeds, or HTTPS MP4/WebM files.",
   quiz: "Optional multiple-choice final quiz with stable question/option IDs and one or multiple correct answers. requirePassing changes require a new course version.",
   drafts:
     "Unfinished values can be saved; publication checks complete titles, categories, descriptions, lessons, quiz answers and lesson-image alternative text.",

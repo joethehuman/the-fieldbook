@@ -30,7 +30,6 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   data.settings = {
     ...defaultSettings,
     ...data.settings,
-    docSections: [],
   } as typeof data.settings;
   if (production) {
     await setupAuthoringProvider(page, data);

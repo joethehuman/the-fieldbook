@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode, type MouseEventHandler } f
 import { useCompactLayout } from "./use-compact-layout";
 import { useSidebarMotion } from "./use-sidebar-motion";
 import { EditorAppHeaderContext } from "./editor-app-header";
+import { EditorMobileScrollContext } from "./use-editor-layout";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "./brand-theme-sync";
 import { SkipLink } from "./skip-link";
@@ -42,6 +43,7 @@ export function WorkspaceFrame({
 }) {
   const [editorHeader, setEditorHeader] = useState<HTMLDivElement | null>(null);
   const compact = useCompactLayout();
+  const [mobileEditor, setMobileEditor] = useState(false);
   const app = useRef<HTMLDivElement>(null);
   useSidebarMotion(app, collapsed, compact);
   useEffect(() => {
@@ -52,9 +54,11 @@ export function WorkspaceFrame({
   }, [compact, menu, onDismiss]);
   return (
     <EditorAppHeaderContext.Provider value={editorHeader}>
+    <EditorMobileScrollContext.Provider value={setMobileEditor}>
     <div
       ref={app}
-      className={`app ${collapsed ? "sidebar-collapsed" : ""}${learner ? " learner-workspace" : ""}`}
+      className={`app ${collapsed ? "sidebar-collapsed" : ""}${learner ? " learner-workspace" : ""}${mobileEditor ? " bn-scroll-container" : ""}`}
+      data-mobile-editor={mobileEditor || undefined}
       style={brandThemeStyle(accent)}
       onClickCapture={onClickCapture}
     >
@@ -98,6 +102,7 @@ export function WorkspaceFrame({
       </div>
       {overlays}
     </div>
+    </EditorMobileScrollContext.Provider>
     </EditorAppHeaderContext.Provider>
   );
 }

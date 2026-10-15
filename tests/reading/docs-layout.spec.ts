@@ -267,6 +267,8 @@ for (const app of ["demo", "production"] as const) {
       });
       await page.reload();
       await expect(page.locator("article h1")).toHaveText(arranged[0].title);
+      if (info.project.name === "phone")
+        await page.getByRole("button", { name: "Open navigation", exact: true }).click();
       await expect(
         page.getByRole("navigation", { name: "Documents", exact: true })
           .getByRole("link", { name: arranged[0].title, exact: true }),
@@ -689,7 +691,7 @@ test("server navigation is published-only, updates across publication and works 
   await page.goto("http://localhost:3131/docs");
   await expect(page.locator("article h1")).toHaveText(docs[0].title);
   await expect(
-    page.getByRole("navigation", { name: "Documents", exact: true }).getByRole("link", { name: docs[0].title, exact: true }),
+    page.getByRole("navigation", { name: "Documents", exact: true, includeHidden: true }).getByRole("link", { name: docs[0].title, exact: true, includeHidden: true }),
   ).toHaveAttribute("aria-current", "page");
   await page.goto(
     `http://localhost:3131/docs/${docs[39].id}#heading-overview-2`,
@@ -700,6 +702,9 @@ test("server navigation is published-only, updates across publication and works 
       .getByRole("navigation", { name: "Previous and next documents" })
       .getByRole("link", { name: /Next/ }),
   ).toContainText(docs[41].title);
+  await page.getByRole("navigation", { name: "Previous and next documents" })
+    .getByRole("link", { name: /Next/ }).click();
+  await expect(page.locator("article h1")).toHaveText(docs[41].title);
   await page.screenshot({
     animations: "disabled",
     path: info.outputPath("docs-no-js.png"),

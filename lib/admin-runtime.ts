@@ -2,7 +2,7 @@ import { canPublish, canOpenPublishingScope } from "./permissions";
 import { adminScope, type AdminDestination } from "./admin-destination";
 import type { AdminScope } from "./admin-scope";
 import { request, createWorkspaceSaver, RequestError } from "./workspace-save";
-import type { UploadMedia } from "@/components/MarkdownEditor";
+import type { UploadMedia } from "@/lib/upload-media";
 import type { BulkRequest, BulkResult } from "./bulk-actions";
 import type { LearningAction } from "./learning";
 import type { Workspace } from "./store";

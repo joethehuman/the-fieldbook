@@ -105,7 +105,7 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
     .getByRole("searchbox", { name: "Find teams", exact: true })
     .fill("Regional");
   await expect(page.locator('[data-slot="hierarchy-browser"]')).toContainText(
-    "Customer success / Regional customer success with a long descriptive name",
+    "Regional customer success with a long descriptive name",
   );
   await expect(
     page.getByRole("button", { name: "Actions for Sales team", exact: true }),

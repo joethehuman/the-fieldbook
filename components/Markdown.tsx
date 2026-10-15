@@ -1,3 +1,5 @@
+import { blockDocumentSchema, type BlockDocument } from "@/lib/block-document";
+import { BlockDocumentReader } from "./patterns/block-document-reader";
 import { Link2 } from "lucide-react";
 import { remarkHeadingAnchors } from "@/lib/markdown-headings";
 import { ScrollableMarkdownTable } from "./patterns/scrollable-markdown-table";
@@ -7,22 +9,28 @@ import { contentLinkTarget, normalizeContentLink, type ContentLinkContext } from
 import { isInlineVideo } from "@/lib/inline-video";
 import { CourseVideo } from "./patterns/course-video";
 import { Button } from "./ui/button";
-import { readTableWidths, remarkTopLevelTableIndices } from "@/lib/writing-table";
+import { readTableWidths, remarkTopLevelTableIndices } from "@/lib/markdown-table-metadata";
 import { CodeBlock } from "./patterns/code-block";
 
 export default function Markdown({
   children,
+  document,
   headingPrefix,
   linkContext = "article",
   sameSiteOrigins,
   onImageOpen,
 }: {
   children: string;
+  document?: BlockDocument;
   headingPrefix?: string;
   linkContext?: ContentLinkContext;
   sameSiteOrigins?: readonly string[];
   onImageOpen?: (src: string, alt: string) => void;
 }) {
+  if (document) {
+    const parsed = blockDocumentSchema.safeParse(document);
+    if (parsed.success) return <BlockDocumentReader document={parsed.data} headingPrefix={headingPrefix} linkContext={linkContext} sameSiteOrigins={sameSiteOrigins} onImageOpen={onImageOpen} />;
+  }
   const { markdown, widths } = readTableWidths(children);
   return (
     <ReactMarkdown

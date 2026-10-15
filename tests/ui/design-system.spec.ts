@@ -1,13 +1,12 @@
+import { openCatalog } from "../helpers/catalog-ready";
 import { freshWorkspace } from "../../lib/store";
 import { learningUiFixture } from "../fixtures/learning-ui";
 import { test, expect, type Page } from "@playwright/test";
 
 async function noOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
-  ).toBe(true);
+  await expect.poll(() => page.evaluate(
+    () => document.documentElement.scrollWidth <= innerWidth + 1,
+  )).toBe(true);
 }
 async function learner(page: Page) {
   await page.addInitScript(() =>
@@ -39,7 +38,7 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
 }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/ui");
+  await openCatalog(page);
   await expect(
     page.getByRole("heading", { name: "Interface reference" }),
   ).toBeVisible();
@@ -590,7 +589,7 @@ test("manager reporting uses shared filters and scoped people", async ({
 });
 
 test("catalog remains usable with enlarged text", async ({ page }, info) => {
-  await page.goto("/ui");
+  await openCatalog(page);
   await expect(
     page.getByRole("heading", { name: "Interface reference" }),
   ).toBeVisible();
@@ -888,7 +887,7 @@ test("update footers and saved feedback keep text and actions separated", async 
 test("content feedback catalog preserves failed drafts, pending state and keyboard dismissal", async ({
   page,
 }, info) => {
-  await page.goto("/ui#catalog-content-feedback");
+  await openCatalog(page, "/ui#catalog-content-feedback");
   const catalog = page.locator("#catalog-content-feedback");
   await catalog.getByRole("switch").click();
   await catalog
@@ -951,7 +950,7 @@ test("long feedback prompt wraps without crowding rating controls", async ({
   page,
 }, info) => {
   await page.setViewportSize({ width: 320, height: 640 });
-  await page.goto("/ui#catalog-content-feedback");
+  await openCatalog(page, "/ui#catalog-content-feedback");
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });
@@ -998,8 +997,7 @@ test("content feedback keeps fields clear of Send in a short window and on a pho
     { width: 375, height: 667 },
   ]) {
     await page.setViewportSize(viewport);
-    await page.goto("/ui#catalog-content-feedback");
-    await page.waitForLoadState("networkidle");
+    await openCatalog(page, "/ui#catalog-content-feedback");
     const catalog = page.locator("#catalog-content-feedback");
     await catalog
       .getByRole("button", { name: "Did you find this useful?", exact: true })
@@ -1066,7 +1064,7 @@ test("feedback remains usable with enlarged text and branded selection under dar
   page,
 }, info) => {
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
-  await page.goto("/ui#catalog-content-feedback");
+  await openCatalog(page, "/ui#catalog-content-feedback");
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
     document.documentElement.style.setProperty("--brand", "#b42318");

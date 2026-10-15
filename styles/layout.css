@@ -417,111 +417,75 @@
   .editor-controls-surface { display: contents; }
   .editor-publication-details { display: none; }
 
-  /* Mobile editing uses the document's native scroll/focus path. The toolbar
-     is a sibling of the canvas: sticky ancestors would stop CodeMirror's
-     normal scroll walk. Viewport compensation belongs to the toolbar only. */
-  html:has(.app[data-mobile-editor]) {
-    overflow: visible;
-    overscroll-behavior: auto;
-    scroll-padding-block-start: 4rem;
-    scroll-padding-block-end: var(--space-3);
-  }
-  body:has(.app[data-mobile-editor]) { overflow: visible; }
-  .app[data-mobile-editor] {
-    position: relative;
-    inset: auto;
-    height: auto;
-    min-height: 100svh;
-    overflow: visible;
-  }
+  /* BlockNote owns the single mobile scroll viewport and keyboard geometry. */
   .app[data-mobile-editor] .main-shell {
     height: auto;
-    min-height: 100svh;
+    min-height: 100%;
     overflow: visible;
   }
   .app[data-mobile-editor] .main-content {
     display: block;
     overflow: visible;
-    overscroll-behavior: auto;
     scrollbar-gutter: auto;
-    padding-block: 0 var(--space-6);
+    padding: 0;
   }
-  .app[data-mobile-editor] .app-navigation-backdrop { position: fixed; }
-  .app[data-mobile-editor] .topbar { flex-wrap: wrap; }
-  .app[data-mobile-editor] .app-editor-header { flex: 1 1 auto; }
-  .app[data-mobile-editor] .editor-heading-actions { flex-wrap: wrap; max-width: 100%; }
-  .app[data-mobile-editor] .topbar::after { display: none; }
-  .editor-frame[data-mobile] { overflow-anchor: auto; }
-  .editor-frame[data-mobile] .editor-frame-body { display: block; }
-  .editor-frame[data-mobile] .editor-frame-canvas { overflow: visible; }
-  .editor-mobile-toolbar-slot {
+  .app[data-mobile-editor] .topbar {
     position: sticky;
     top: 0;
-    z-index: 14;
   }
-  .editor-mobile-toolbar {
-    position: relative;
-    transform: translateY(var(--editor-toolbar-offset, 0px));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    background: var(--background);
-    border-block-end: 1px solid var(--border);
-  }
-  .editor-mobile-toolbar .editor-frame-controls {
-    position: static;
-    inset: auto;
-    display: flex;
-    justify-content: center;
-    height: auto;
-    min-height: 56px;
-    padding: 4px;
-    pointer-events: auto;
-  }
-  .editor-mobile-toolbar .editor-controls-surface {
-    display: flex;
-    align-items: center;
-  }
-  .editor-mobile-toolbar .editor-panel-toggle {
-    position: relative;
-    inset: auto;
-    flex-shrink: 0;
-    box-shadow: none;
-  }
-  .editor-writing-actions-host { display: flex; min-width: 0; }
-  .editor-mobile-overlays {
-    position: absolute;
-    inset: 100% 0 auto;
-    pointer-events: none;
-  }
-  .editor-mobile-panels { --scroll-fade-depth: var(--scroll-fade-size); }
-  .editor-mobile-panels .editor-frame-panel {
-    position: absolute;
-    top: var(--space-2);
-    inset-inline-start: 50%;
-    transform: translateX(-50%);
-    width: min(320px, 100%);
-    height: auto;
-    max-height: min(32rem, var(--editor-mobile-overlay-height, 70svh));
-    padding: 0;
-    pointer-events: auto;
-  }
-  .editor-mobile-panels :is(.editor-frame-outline, .editor-frame-details) { max-height: inherit; }
-  .editor-mobile-panels .editor-floating-heading { padding-inline: var(--space-4); min-height: 3.5rem; }
-  .editor-mobile-panels .editor-publication-details { display: block; }
-  /* Equal block-action gutters keep Back, titles and writing on one centered column. */
-  .editor-frame[data-cards="true"] {
+  .app[data-mobile-editor] .topbar::after { display: none; }
+  .mobile-editor {
     --editor-content-padding: var(--space-4);
-    --editor-edge-clearance: 44px;
-    --editor-text-inset: max(44px, calc((100cqw - var(--reading-width)) / 2));
+    --editor-text-inset: var(--space-4);
+    overflow-anchor: none;
+  }
+  .mobile-editor-navigation {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+    gap: var(--space-4);
+    padding-inline: var(--space-4);
+    background: var(--background);
+  }
+  .mobile-editor-navigation > [role="tab"] { min-height: 44px; }
+  .mobile-editor-requirements {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    padding-inline: var(--space-1);
+    border-radius: 999px;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .mobile-editor :is(.mobile-editor-writing, .mobile-editor-page) { margin: 0; }
+  /* One native toolbar row belongs to the page, outside the editable document.
+     Reserve it at all times so keyboard opening never inserts canvas space. */
+  .mobile-editor-writing { padding-block-end: calc(3.5rem + env(safe-area-inset-bottom, 0px)); }
+  .mobile-editor [role="tabpanel"][hidden] { display: none; }
+  .mobile-editor-page {
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+  .mobile-editor .editor-publication-details { display: block; }
+  .mobile-editor .course-builder-panel { scroll-margin-block-start: 0; }
+  .app.bn-scroll-container {
+    scroll-padding-block-start: var(--app-bar-height, 0px);
   }
   @media (max-width: 767px) {
     .topbar { gap: var(--space-2); padding-inline: var(--space-3); }
     .app-editor-header, .editor-app-actions { gap: var(--space-2); }
     .app-editor-header .editor-save-status { gap: var(--space-1); }
     .app-editor-header .detail-navigation-label { display: none; }
-    .editor-frame { --editor-content-padding: var(--space-4); }
+    .editor-frame {
+      --editor-content-padding: var(--space-4);
+      /* Retain the normal control gutter without enlarging it with text size. */
+      --editor-edge-clearance: 74px;
+    }
   }
   @media (prefers-reduced-motion: reduce) { .topbar::after, .editor-canvas-navigation::after, .editor-frame-panel { transition: none; } }
   /* Bound the whole task, including its natural-size title and recovery notices. */
@@ -538,7 +502,6 @@
   .editor[data-scroll-layout="workspace"] :is(.editor-frame-outline, .editor-frame-details) {
     max-height: 100%;
   }
-  .editor[data-scroll-layout="workspace"] .editor-frame[data-cards="true"] .editor-frame-canvas { flex: 1 1 0; }
   .editor[data-scroll-layout="workspace"] .editor-frame-canvas:has(.writing-root),
   .editor[data-scroll-layout="workspace"] .course-builder-panel:has(.writing-root) { display: flex; flex-direction: column; }
   .editor[data-scroll-layout="workspace"] .course-builder-panel:has(.writing-root) { flex: 1 1 0; min-height: 0; }
@@ -757,9 +720,7 @@
     height: 100%;
     object-fit: cover;
   }
-  .course-cover-editor,
-  .doc-section-create,
-  .markdown-editor {
+  .doc-section-create {
     display: grid;
     gap: var(--space-3);
   }

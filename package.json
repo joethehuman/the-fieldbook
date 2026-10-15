@@ -31,18 +31,10 @@
   "dependencies": {
     "@ai-sdk/openai-compatible": "3.0.67",
     "@ai-sdk/react": "4.0.129",
-    "@codemirror/commands": "6.11.1",
-    "@codemirror/language": "6.12.4",
-    "@codemirror/language-data": "6.5.2",
-    "@codemirror/state": "6.7.6",
-    "@codemirror/view": "6.43.13",
-    "@lexical/link": "0.48.0",
-    "@lexical/list": "0.48.0",
-    "@lexical/rich-text": "0.48.0",
-    "@lexical/selection": "0.48.0",
-    "@lezer/highlight": "1.2.3",
-    "@mdxeditor/editor": "4.2.5",
-    "@mdxeditor/gurx": "1.2.4",
+    "@blocknote/code-block": "0.56.0",
+    "@blocknote/core": "0.56.0",
+    "@blocknote/react": "0.56.0",
+    "@blocknote/shadcn": "0.56.0",
     "@modelcontextprotocol/sdk": "^1.31.0",
     "@radix-ui/react-alert-dialog": "^1.1.23",
     "@radix-ui/react-avatar": "^1.2.6",
@@ -66,15 +58,14 @@
     "geist": "^1.7.2",
     "highlight.js": "11.11.1",
     "jose": "^6.2.12",
-    "lexical": "0.48.0",
     "lucide-react": "^0.468.0",
     "next": "^16.3.8",
-    "parse5": "7.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
+    "remark-stringify": "11.0.0",
     "server-only": "^0.0.1",
     "streamdown": "2.7.0",
     "tailwind-merge": "^3.7.0",
@@ -101,11 +92,7 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ],
-    "patchedDependencies": {
-      "lexical@0.48.0": "patches/lexical@0.48.0.patch",
-      "@mdxeditor/editor@4.2.5": "patches/@mdxeditor__editor@4.2.5.patch"
-    }
+    ]
   },
   "packageManager": "pnpm@10.17.1",
   "engines": {

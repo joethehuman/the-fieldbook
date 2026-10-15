@@ -66,7 +66,7 @@ export default async function PrivacyPage() {
             </p>
             <p>Last published: {settings.privacy?.publishedAt?.slice(0, 10)}</p>
             <article className="markdown">
-              <Markdown>{policy.body}</Markdown>
+              <Markdown document={policy.bodyDocument}>{policy.body}</Markdown>
             </article>
           </>
         ) : (

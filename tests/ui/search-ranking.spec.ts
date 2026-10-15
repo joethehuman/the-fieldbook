@@ -5,6 +5,7 @@ test("demo search keeps customer titles first while typing, correcting typos and
   page,
 }, info) => {
   const data = freshWorkspace();
+  const customerDoc = data.content.find(item => item.id === "hooli-doc-customer-data-handling")!;
   const titleCount = data.content.filter(
     (item) => item.status === "published" && /\bcustomer\b/i.test(item.title),
   ).length;
@@ -35,17 +36,13 @@ test("demo search keeps customer titles first while typing, correcting typos and
   await expect(region.getByRole("status")).toContainText("for “custome”");
   await region.getByRole("button", { name: "Docs", exact: true }).click();
   await expect(results.first().getByRole("heading")).toHaveText(
-    "Customer Data Handling",
+    customerDoc.title,
   );
-  await expect(results.filter({ hasText: "Customer Escalations" })).toHaveCount(
-    0,
-  );
-  await expect(
-    results.filter({ hasText: "Customer Support Update" }),
-  ).toHaveCount(0);
+  for (const item of data.content.filter(item => item.kind !== "doc" && /customer/i.test(item.title)))
+    await expect(results.getByRole("heading", { name: item.title, exact: true })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("customer-prefix.png") });
-  await region.getByRole("link", { name: /Customer Data Handling/ }).click();
+  await results.filter({ has: page.getByRole("heading", { name: customerDoc.title, exact: true }) }).click();
   await expect(
-    page.getByRole("heading", { name: "Customer Data Handling", exact: true }),
+    page.getByRole("heading", { name: customerDoc.title, exact: true }),
   ).toBeVisible();
 });

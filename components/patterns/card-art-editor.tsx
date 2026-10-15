@@ -19,7 +19,7 @@ import {
   randomArtSeed,
   resolvedCardArt,
 } from "@/lib/card-art";
-import type { UploadMedia } from "@/components/MarkdownEditor";
+import type { UploadMedia } from "@/lib/upload-media";
 
 export function CardArtEditor({
   id,

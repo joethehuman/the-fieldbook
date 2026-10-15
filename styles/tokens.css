@@ -17,6 +17,25 @@
 }
 
 :root {
+  /* Authored content palette, retained independently of installation branding. */
+  --authored-gray-text: #9b9a97;
+  --authored-gray-background: #ebeced;
+  --authored-brown-text: #64473a;
+  --authored-brown-background: #e9e5e3;
+  --authored-red-text: #e03e3e;
+  --authored-red-background: #fbe4e4;
+  --authored-orange-text: #d9730d;
+  --authored-orange-background: #f6e9d9;
+  --authored-yellow-text: #dfab01;
+  --authored-yellow-background: #fbf3db;
+  --authored-green-text: #166534;
+  --authored-green-background: #ddedea;
+  --authored-blue-text: #1d4ed8;
+  --authored-blue-background: #ddebf1;
+  --authored-purple-text: #6940a5;
+  --authored-purple-background: #eae4f2;
+  --authored-pink-text: #ad1a72;
+  --authored-pink-background: #f4dfeb;
   --background: #ffffff;
   --surface: #fafafa;
   --paper: #f8f7f3;
@@ -72,13 +91,25 @@
   --type-copy-leading: 1.375rem;
   --type-page: 2rem;
   --type-page-leading: 2.5rem;
+  --type-authored-heading-1: 1.875rem;
+  --type-authored-heading-1-leading: 2.5rem;
+  --type-authored-heading-2: 1.5rem;
+  --type-authored-heading-2-leading: 1.35;
+  --type-authored-heading-3: 1.25rem;
+  --type-authored-heading-3-leading: 1.4;
+  --type-authored-heading-4: 1rem;
+  --type-authored-heading-4-leading: 1.5;
   --weight-copy: 400;
   --weight-label: 400;
   --weight-medium: var(--weight-label);
   --weight-heading: 500;
   --weight-emphasis: 500;
   --weight-authored-bold: 700;
-  --authored-table-border: color-mix(in srgb, var(--foreground) 32%, var(--background));
+  --authored-table-border: color-mix(
+    in srgb,
+    var(--foreground) 32%,
+    var(--background)
+  );
   --link: #0069ff;
   --brand: #0069ff;
   --overlay: #17171766;
@@ -86,13 +117,16 @@
   --elevation-surface: 0 1px 2px rgb(0 0 0 / 3%);
   --elevation-card-hover: 0 2px 6px rgb(0 0 0 / 5%), 0 6px 16px rgb(0 0 0 / 7%);
   --elevation-floating: 0 4px 8px rgb(0 0 0 / 4%), 0 16px 40px rgb(0 0 0 / 8%);
-  --elevation-editor-panel: 0 2px 4px rgb(0 0 0 / 3%), 0 8px 20px rgb(0 0 0 / 5%);
+  --elevation-editor-panel:
+    0 2px 4px rgb(0 0 0 / 3%), 0 8px 20px rgb(0 0 0 / 5%);
   --scroll-fade-size: 0.5rem;
-  --scroll-fade-overlay: linear-gradient(to bottom,
+  --scroll-fade-overlay: linear-gradient(
+    to bottom,
     var(--background),
     color-mix(in srgb, var(--background) 40%, transparent) 35%,
     color-mix(in srgb, var(--background) 10%, transparent) 65%,
-    transparent);
+    transparent
+  );
   --dialog-workflow-width: 49rem;
   --dialog-workflow-height: 41rem;
   --dialog-workflow-list-height: 52rem;

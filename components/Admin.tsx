@@ -25,6 +25,8 @@ import {
 } from "./patterns/editor-frame";
 import { WritingTitle } from "./patterns/writing-title";
 import { useEditorLayout } from "./patterns/use-editor-layout";
+import { useMobileEditorLayout } from "./patterns/use-editor-cards-layout";
+import { DesktopEditingNotice } from "./patterns/desktop-editing-notice";
 import { useCollapseDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { createLessonImageAltValidator } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
@@ -148,7 +150,7 @@ import {
 } from "lucide-react";
 import { CardArtEditor } from "./patterns/card-art-editor";
 import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
-import { type UploadMedia } from "./MarkdownEditor";
+import { type UploadMedia } from "@/lib/upload-media";
 import { CourseBuilder } from "./CourseBuilder";
 import { requiresPassing, validQuestion } from "@/lib/course-quiz";
 import { canAdminister, canOpenAdminTab, roleLabel } from "@/lib/permissions";
@@ -2164,6 +2166,7 @@ export function Editor({
   ) => void | Promise<void>;
 }) {
   useCollapseDesktopSidebar();
+  const mobileEditor = useMobileEditorLayout();
   const notify = useToast();
   const form = useRef<HTMLFormElement>(null);
   const [savedMessage, setSavedMessage] = useState("");
@@ -2316,7 +2319,7 @@ export function Editor({
     }, 900);
     return () => clearTimeout(timer);
   }, [c, dirty, busy, saving]);
-  useEditorLayout(form);
+  useEditorLayout(form, !mobileEditor);
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (pendingUploads.current || recoveringNow.current) return false;
@@ -3044,6 +3047,15 @@ export function Editor({
       }}
     />
   );
+  // Keep the draft owner and its save/navigation guards mounted if a desktop
+  // session crosses the device boundary. The phone view mounts no editing UI.
+  if (mobileEditor) return (
+    <div className="grid gap-4">
+      {error && <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>}
+      <DesktopEditingNotice onBack={async () => { if (await guard.current()) onCancel(); }} />
+      {needsRecovery && <Button type="button" variant="outline" onClick={downloadDraft}>Download your changes</Button>}
+    </div>
+  );
   return (
     <form
       ref={form}
@@ -3201,7 +3213,8 @@ export function Editor({
                     />
                 }
                 value={c.body}
-                onChange={(value) => set("body", value)}
+                bodyDocument={c.bodyDocument}
+                onChange={(body, bodyDocument) => setC(current => ({ ...current, body, bodyDocument }))}
                 onUpload={upload}
                 disabled={busy}
               />

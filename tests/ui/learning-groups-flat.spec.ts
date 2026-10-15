@@ -368,6 +368,10 @@ test("group workspace starts with people and clearly separates assigned content 
     exact: true,
   });
   await courseSearch.fill("Foundation two");
+  // Assigned-item discovery matches the displayed curriculum title, not its
+  // nested courses. Searching an inner course must not revive that group.
+  await expect(page.getByRole("button", { name: "Actions for GTM foundation", exact: true })).toHaveCount(0);
+  await courseSearch.fill("GTM foundation");
   await expect(
     page.getByRole("button", { name: "Actions for GTM foundation", exact: true }),
   ).toBeEnabled();

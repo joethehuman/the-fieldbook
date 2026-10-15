@@ -1,4 +1,5 @@
 @source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@blocknote/shadcn/src";
 @import "tailwindcss";
 @import "streamdown/styles.css" layer(base);
 @import "./tokens.css";

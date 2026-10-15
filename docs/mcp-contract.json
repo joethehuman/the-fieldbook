@@ -1,5 +1,5 @@
 {
-  "contractVersion": "1.0.0",
+  "contractVersion": "1.1.0",
   "transport": {
     "path": "/api/mcp",
     "protocol": "MCP Streamable HTTP",
@@ -371,7 +371,7 @@
     },
     {
       "name": "fetch",
-      "description": "Read the complete current draft, including Markdown, lessons, quiz answer keys, artwork and revision. Preserve unrelated fields before editing. Requires publishing access.",
+      "description": "Read the complete current draft, including bodyDocument blocks, generated Markdown, lessons, quiz answer keys, artwork and revision. Preserve unrelated fields before editing. Requires publishing access.",
       "capability": "content:read",
       "annotations": {
         "readOnlyHint": true,
@@ -472,6 +472,33 @@
                 "default": "",
                 "type": "string",
                 "maxLength": 200000
+              },
+              "bodyDocument": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "const": "fieldbook-blocks"
+                  },
+                  "version": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "blocks": {
+                    "minItems": 1,
+                    "maxItems": 10000,
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  }
+                },
+                "required": [
+                  "format",
+                  "version",
+                  "blocks"
+                ],
+                "additionalProperties": false
               },
               "category": {
                 "default": "",
@@ -601,6 +628,33 @@
                     "body": {
                       "type": "string",
                       "maxLength": 200000
+                    },
+                    "bodyDocument": {
+                      "type": "object",
+                      "properties": {
+                        "format": {
+                          "type": "string",
+                          "const": "fieldbook-blocks"
+                        },
+                        "version": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "blocks": {
+                          "minItems": 1,
+                          "maxItems": 10000,
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "version",
+                        "blocks"
+                      ],
+                      "additionalProperties": false
                     },
                     "videoUrl": {
                       "type": "string",
@@ -770,7 +824,616 @@
         "required": [
           "content"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "paragraph",
+                  "heading",
+                  "bulletListItem",
+                  "numberedListItem",
+                  "checkListItem",
+                  "toggleListItem",
+                  "quote",
+                  "divider",
+                  "codeBlock",
+                  "table",
+                  "image",
+                  "video",
+                  "videoEmbed"
+                ]
+              },
+              "props": {
+                "type": "object",
+                "properties": {
+                  "textColor": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "backgroundColor": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "textAlignment": {
+                    "type": "string",
+                    "enum": [
+                      "left",
+                      "center",
+                      "right",
+                      "justify"
+                    ]
+                  },
+                  "level": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 6
+                  },
+                  "isToggleable": {
+                    "type": "boolean"
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "pattern": "^[^\\s`]+$"
+                  },
+                  "start": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "caption": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "showPreview": {
+                    "type": "boolean"
+                  },
+                  "previewWidth": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 16384
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "additionalProperties": false
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "maxItems": 10000,
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string",
+                              "maxLength": 200000
+                            },
+                            "styles": {
+                              "type": "object",
+                              "properties": {
+                                "bold": {
+                                  "type": "boolean"
+                                },
+                                "italic": {
+                                  "type": "boolean"
+                                },
+                                "strike": {
+                                  "type": "boolean"
+                                },
+                                "code": {
+                                  "type": "boolean"
+                                },
+                                "underline": {
+                                  "type": "boolean"
+                                },
+                                "textColor": {
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "backgroundColor": {
+                                  "type": "string",
+                                  "maxLength": 100
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "text",
+                            "styles"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "link"
+                            },
+                            "href": {
+                              "type": "string",
+                              "maxLength": 2000
+                            },
+                            "content": {
+                              "maxItems": 10000,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "text"
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "maxLength": 200000
+                                  },
+                                  "styles": {
+                                    "type": "object",
+                                    "properties": {
+                                      "bold": {
+                                        "type": "boolean"
+                                      },
+                                      "italic": {
+                                        "type": "boolean"
+                                      },
+                                      "strike": {
+                                        "type": "boolean"
+                                      },
+                                      "code": {
+                                        "type": "boolean"
+                                      },
+                                      "underline": {
+                                        "type": "boolean"
+                                      },
+                                      "textColor": {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      },
+                                      "backgroundColor": {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "text",
+                                  "styles"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "href",
+                            "content"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "tableContent"
+                      },
+                      "columnWidths": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 1,
+                              "maximum": 16384
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "headerRows": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "headerCols": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "rows": {
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "cells": {
+                              "minItems": 1,
+                              "maxItems": 100,
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "const": "tableCell"
+                                      },
+                                      "props": {
+                                        "type": "object",
+                                        "properties": {
+                                          "backgroundColor": {
+                                            "type": "string",
+                                            "maxLength": 100
+                                          },
+                                          "textColor": {
+                                            "type": "string",
+                                            "maxLength": 100
+                                          },
+                                          "textAlignment": {
+                                            "type": "string",
+                                            "enum": [
+                                              "left",
+                                              "center",
+                                              "right",
+                                              "justify"
+                                            ]
+                                          },
+                                          "colspan": {
+                                            "type": "number",
+                                            "const": 1
+                                          },
+                                          "rowspan": {
+                                            "type": "number",
+                                            "const": 1
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "content": {
+                                        "maxItems": 10000,
+                                        "type": "array",
+                                        "items": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "text"
+                                                },
+                                                "text": {
+                                                  "type": "string",
+                                                  "maxLength": 200000
+                                                },
+                                                "styles": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "bold": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "italic": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "strike": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "code": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "underline": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "textColor": {
+                                                      "type": "string",
+                                                      "maxLength": 100
+                                                    },
+                                                    "backgroundColor": {
+                                                      "type": "string",
+                                                      "maxLength": 100
+                                                    }
+                                                  },
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "text",
+                                                "styles"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "link"
+                                                },
+                                                "href": {
+                                                  "type": "string",
+                                                  "maxLength": 2000
+                                                },
+                                                "content": {
+                                                  "maxItems": 10000,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "type": {
+                                                        "type": "string",
+                                                        "const": "text"
+                                                      },
+                                                      "text": {
+                                                        "type": "string",
+                                                        "maxLength": 200000
+                                                      },
+                                                      "styles": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "bold": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "italic": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "strike": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "code": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "underline": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "textColor": {
+                                                            "type": "string",
+                                                            "maxLength": 100
+                                                          },
+                                                          "backgroundColor": {
+                                                            "type": "string",
+                                                            "maxLength": 100
+                                                          }
+                                                        },
+                                                        "additionalProperties": false
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "type",
+                                                      "text",
+                                                      "styles"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "href",
+                                                "content"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "props",
+                                      "content"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "string",
+                                              "const": "text"
+                                            },
+                                            "text": {
+                                              "type": "string",
+                                              "maxLength": 200000
+                                            },
+                                            "styles": {
+                                              "type": "object",
+                                              "properties": {
+                                                "bold": {
+                                                  "type": "boolean"
+                                                },
+                                                "italic": {
+                                                  "type": "boolean"
+                                                },
+                                                "strike": {
+                                                  "type": "boolean"
+                                                },
+                                                "code": {
+                                                  "type": "boolean"
+                                                },
+                                                "underline": {
+                                                  "type": "boolean"
+                                                },
+                                                "textColor": {
+                                                  "type": "string",
+                                                  "maxLength": 100
+                                                },
+                                                "backgroundColor": {
+                                                  "type": "string",
+                                                  "maxLength": 100
+                                                }
+                                              },
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "text",
+                                            "styles"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "string",
+                                              "const": "link"
+                                            },
+                                            "href": {
+                                              "type": "string",
+                                              "maxLength": 2000
+                                            },
+                                            "content": {
+                                              "maxItems": 10000,
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "const": "text"
+                                                  },
+                                                  "text": {
+                                                    "type": "string",
+                                                    "maxLength": 200000
+                                                  },
+                                                  "styles": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "bold": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "italic": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "strike": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "code": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "underline": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "textColor": {
+                                                        "type": "string",
+                                                        "maxLength": 100
+                                                      },
+                                                      "backgroundColor": {
+                                                        "type": "string",
+                                                        "maxLength": 100
+                                                      }
+                                                    },
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type",
+                                                  "text",
+                                                  "styles"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "href",
+                                            "content"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "cells"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "rows"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "children": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "props",
+              "children"
+            ],
+            "additionalProperties": false
+          }
+        }
       },
       "outputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -823,7 +1486,7 @@
     },
     {
       "name": "update_content",
-      "description": "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. Markdown supports editor formatting, images and links; lessons use videoUrl. Published content stays unchanged. Course audiences use manage_course_assignment; contributors choose existing sections and categories and cannot reorder Docs or create sections or categories.",
+      "description": "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. bodyDocument is authoritative when present; body is its generated Markdown export. Preserve bodyDocument for metadata edits and update its blocks for prose edits. Legacy Markdown-only drafts remain supported; lessons follow the same rule. Published content stays unchanged. Course audiences use manage_course_assignment; contributors choose existing sections and categories and cannot reorder Docs or create sections or categories.",
       "capability": "content:write",
       "annotations": {
         "readOnlyHint": false,
@@ -861,6 +1524,33 @@
               "body": {
                 "type": "string",
                 "maxLength": 200000
+              },
+              "bodyDocument": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "const": "fieldbook-blocks"
+                  },
+                  "version": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "blocks": {
+                    "minItems": 1,
+                    "maxItems": 10000,
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  }
+                },
+                "required": [
+                  "format",
+                  "version",
+                  "blocks"
+                ],
+                "additionalProperties": false
               },
               "category": {
                 "type": "string",
@@ -997,6 +1687,33 @@
                     "body": {
                       "type": "string",
                       "maxLength": 200000
+                    },
+                    "bodyDocument": {
+                      "type": "object",
+                      "properties": {
+                        "format": {
+                          "type": "string",
+                          "const": "fieldbook-blocks"
+                        },
+                        "version": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "blocks": {
+                          "minItems": 1,
+                          "maxItems": 10000,
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "version",
+                        "blocks"
+                      ],
+                      "additionalProperties": false
                     },
                     "videoUrl": {
                       "type": "string",
@@ -1211,7 +1928,616 @@
           "content",
           "expected_revision"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "paragraph",
+                  "heading",
+                  "bulletListItem",
+                  "numberedListItem",
+                  "checkListItem",
+                  "toggleListItem",
+                  "quote",
+                  "divider",
+                  "codeBlock",
+                  "table",
+                  "image",
+                  "video",
+                  "videoEmbed"
+                ]
+              },
+              "props": {
+                "type": "object",
+                "properties": {
+                  "textColor": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "backgroundColor": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "textAlignment": {
+                    "type": "string",
+                    "enum": [
+                      "left",
+                      "center",
+                      "right",
+                      "justify"
+                    ]
+                  },
+                  "level": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 6
+                  },
+                  "isToggleable": {
+                    "type": "boolean"
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "pattern": "^[^\\s`]+$"
+                  },
+                  "start": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "caption": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "showPreview": {
+                    "type": "boolean"
+                  },
+                  "previewWidth": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 16384
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "additionalProperties": false
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "maxItems": 10000,
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string",
+                              "maxLength": 200000
+                            },
+                            "styles": {
+                              "type": "object",
+                              "properties": {
+                                "bold": {
+                                  "type": "boolean"
+                                },
+                                "italic": {
+                                  "type": "boolean"
+                                },
+                                "strike": {
+                                  "type": "boolean"
+                                },
+                                "code": {
+                                  "type": "boolean"
+                                },
+                                "underline": {
+                                  "type": "boolean"
+                                },
+                                "textColor": {
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "backgroundColor": {
+                                  "type": "string",
+                                  "maxLength": 100
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "text",
+                            "styles"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "link"
+                            },
+                            "href": {
+                              "type": "string",
+                              "maxLength": 2000
+                            },
+                            "content": {
+                              "maxItems": 10000,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "text"
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "maxLength": 200000
+                                  },
+                                  "styles": {
+                                    "type": "object",
+                                    "properties": {
+                                      "bold": {
+                                        "type": "boolean"
+                                      },
+                                      "italic": {
+                                        "type": "boolean"
+                                      },
+                                      "strike": {
+                                        "type": "boolean"
+                                      },
+                                      "code": {
+                                        "type": "boolean"
+                                      },
+                                      "underline": {
+                                        "type": "boolean"
+                                      },
+                                      "textColor": {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      },
+                                      "backgroundColor": {
+                                        "type": "string",
+                                        "maxLength": 100
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "text",
+                                  "styles"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "href",
+                            "content"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "tableContent"
+                      },
+                      "columnWidths": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 1,
+                              "maximum": 16384
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "headerRows": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "headerCols": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "rows": {
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "cells": {
+                              "minItems": 1,
+                              "maxItems": 100,
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "const": "tableCell"
+                                      },
+                                      "props": {
+                                        "type": "object",
+                                        "properties": {
+                                          "backgroundColor": {
+                                            "type": "string",
+                                            "maxLength": 100
+                                          },
+                                          "textColor": {
+                                            "type": "string",
+                                            "maxLength": 100
+                                          },
+                                          "textAlignment": {
+                                            "type": "string",
+                                            "enum": [
+                                              "left",
+                                              "center",
+                                              "right",
+                                              "justify"
+                                            ]
+                                          },
+                                          "colspan": {
+                                            "type": "number",
+                                            "const": 1
+                                          },
+                                          "rowspan": {
+                                            "type": "number",
+                                            "const": 1
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "content": {
+                                        "maxItems": 10000,
+                                        "type": "array",
+                                        "items": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "text"
+                                                },
+                                                "text": {
+                                                  "type": "string",
+                                                  "maxLength": 200000
+                                                },
+                                                "styles": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "bold": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "italic": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "strike": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "code": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "underline": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "textColor": {
+                                                      "type": "string",
+                                                      "maxLength": 100
+                                                    },
+                                                    "backgroundColor": {
+                                                      "type": "string",
+                                                      "maxLength": 100
+                                                    }
+                                                  },
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "text",
+                                                "styles"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "type": {
+                                                  "type": "string",
+                                                  "const": "link"
+                                                },
+                                                "href": {
+                                                  "type": "string",
+                                                  "maxLength": 2000
+                                                },
+                                                "content": {
+                                                  "maxItems": 10000,
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "type": {
+                                                        "type": "string",
+                                                        "const": "text"
+                                                      },
+                                                      "text": {
+                                                        "type": "string",
+                                                        "maxLength": 200000
+                                                      },
+                                                      "styles": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "bold": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "italic": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "strike": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "code": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "underline": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "textColor": {
+                                                            "type": "string",
+                                                            "maxLength": 100
+                                                          },
+                                                          "backgroundColor": {
+                                                            "type": "string",
+                                                            "maxLength": 100
+                                                          }
+                                                        },
+                                                        "additionalProperties": false
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "type",
+                                                      "text",
+                                                      "styles"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "type",
+                                                "href",
+                                                "content"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "props",
+                                      "content"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "string",
+                                              "const": "text"
+                                            },
+                                            "text": {
+                                              "type": "string",
+                                              "maxLength": 200000
+                                            },
+                                            "styles": {
+                                              "type": "object",
+                                              "properties": {
+                                                "bold": {
+                                                  "type": "boolean"
+                                                },
+                                                "italic": {
+                                                  "type": "boolean"
+                                                },
+                                                "strike": {
+                                                  "type": "boolean"
+                                                },
+                                                "code": {
+                                                  "type": "boolean"
+                                                },
+                                                "underline": {
+                                                  "type": "boolean"
+                                                },
+                                                "textColor": {
+                                                  "type": "string",
+                                                  "maxLength": 100
+                                                },
+                                                "backgroundColor": {
+                                                  "type": "string",
+                                                  "maxLength": 100
+                                                }
+                                              },
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "text",
+                                            "styles"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "type": "string",
+                                              "const": "link"
+                                            },
+                                            "href": {
+                                              "type": "string",
+                                              "maxLength": 2000
+                                            },
+                                            "content": {
+                                              "maxItems": 10000,
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "const": "text"
+                                                  },
+                                                  "text": {
+                                                    "type": "string",
+                                                    "maxLength": 200000
+                                                  },
+                                                  "styles": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "bold": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "italic": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "strike": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "code": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "underline": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "textColor": {
+                                                        "type": "string",
+                                                        "maxLength": 100
+                                                      },
+                                                      "backgroundColor": {
+                                                        "type": "string",
+                                                        "maxLength": 100
+                                                      }
+                                                    },
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type",
+                                                  "text",
+                                                  "styles"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            }
+                                          },
+                                          "required": [
+                                            "type",
+                                            "href",
+                                            "content"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "cells"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "rows"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "children": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "props",
+              "children"
+            ],
+            "additionalProperties": false
+          }
+        }
       },
       "outputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1516,7 +2842,7 @@
     },
     {
       "name": "get_authoring_options",
-      "description": "Discover existing Docs section IDs and paths, separate courseCategories and updateCategories, and supported Markdown/media/quiz formats. Select existing managed categories and sections; category creation and ordering use Categories in Fieldbook settings.",
+      "description": "Discover existing Docs section IDs and paths, separate courseCategories and updateCategories, and supported block/Markdown/media/quiz formats. Select existing managed categories and sections; category creation and ordering use Categories in Fieldbook settings.",
       "capability": "content:read",
       "annotations": {
         "readOnlyHint": true,

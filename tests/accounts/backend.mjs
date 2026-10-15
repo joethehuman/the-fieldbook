@@ -145,7 +145,13 @@ createServer(async (req, res) => {
     configuredCurricula = change.curricula || [];
     configuredProgress = change.progress || [];
     configuredFeedback = change.feedback || [];
-    configuredUsers = change.users || [];
+    // Legacy fixtures describe linked users with an ID alone. Keep the row
+    // returned from subject lookup consistent with that convention; explicit
+    // null or registered=false still models a preregistered person.
+    configuredUsers = (change.users || []).map((person) => ({
+      ...person,
+      auth_user_id: person.auth_user_id === undefined ? (person.registered === false ? null : person.id) : person.auth_user_id,
+    }));
     // Model a migrated installation: Organization is the sole root. Supplied
     // ordinary team fixtures remain descendants without changing their IDs.
     const supplied = change.teams || [];

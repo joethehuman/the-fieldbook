@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  preserveBlockDocumentWrite,
+  assertBlockDocumentInputLimits,
+} from "@/lib/block-document";
 import type { User, Content } from "@/lib/types";
 import { requireAdmin, HttpError } from "./auth";
 import { data as dataStore } from "./data";
@@ -19,6 +23,18 @@ export async function saveSettings(
   a: { settings: unknown; expected: number },
 ) {
   requireAdmin(user);
+  const incoming = a.settings as {
+    privacy?: {
+      draft?: { bodyDocument?: unknown };
+      published?: { bodyDocument?: unknown };
+    };
+  } | null;
+  try {
+    assertBlockDocumentInputLimits(incoming?.privacy?.draft?.bodyDocument);
+    assertBlockDocumentInputLimits(incoming?.privacy?.published?.bodyDocument);
+  } catch (error) {
+    throw new HttpError(400, (error as Error).message);
+  }
   const parsed = settingsSchema.safeParse(a.settings);
   if (!parsed.success)
     throw new HttpError(
@@ -29,6 +45,26 @@ export async function saveSettings(
     throw new HttpError(400, "A settings revision is required.");
   const config = await dataStore().readSettingsContext();
   if (!config) throw new HttpError(503, "Settings are unavailable. Try again.");
+  if (parsed.data.privacy) {
+    try {
+      parsed.data.privacy.draft = preserveBlockDocumentWrite(
+        parsed.data.privacy.draft,
+        config.settings.privacy?.draft,
+      );
+      if (parsed.data.privacy.published)
+        parsed.data.privacy.published = preserveBlockDocumentWrite(
+          parsed.data.privacy.published,
+          config.settings.privacy?.published ?? undefined,
+        );
+      if (
+        parsed.data.privacy.draft.body.length > 100000 ||
+        (parsed.data.privacy.published?.body.length || 0) > 100000
+      )
+        throw new Error("Privacy content exceeds its size limit.");
+    } catch (error) {
+      throw new HttpError(400, (error as Error).message);
+    }
+  }
   const previousAi = config.settings.askAi ?? defaultAskAiSettings;
   let nextAi = parsed.data.askAi;
   const provider = nextAi?.enabled ? ai() : null;

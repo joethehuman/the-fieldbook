@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { IdentityPresentation } from "../../components/IdentityPresentation";
 import { TooltipProvider } from "../../components/ui/tooltip";
 import { ToastProvider } from "../../components/ui/toast";
@@ -75,3 +76,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, interactiveWidget: "resizes-content" };

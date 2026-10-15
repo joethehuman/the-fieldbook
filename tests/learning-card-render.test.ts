@@ -196,7 +196,7 @@ test("uploaded course covers retain type, category and relevance once", () => {
   const { course } = fixture();
   const html = renderToStaticMarkup(
     createElement(CourseCard, {
-      course: { ...course, coverImageUrl: "/api/media/example.png" },
+      course: { ...course, cardArt: undefined, coverImageUrl: "/api/media/example.png" },
       status: courseProgress(course, []),
       assignmentLabel: "Assigned",
       pastDue: true,

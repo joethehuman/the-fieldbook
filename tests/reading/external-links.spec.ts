@@ -150,7 +150,7 @@ test("external links: long labels and keyboard links fit at enlarged text", asyn
       (element) => element.scrollWidth <= element.clientWidth + 1,
     ),
   ).toBe(true);
-  expect(await menu.evaluate(element => {
+  await expect.poll(() => menu.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     return bounds.left >= 0 && bounds.right <= innerWidth + 1;
   })).toBe(true);

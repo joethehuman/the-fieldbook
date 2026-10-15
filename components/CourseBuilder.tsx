@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronUp, Copy, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { lessonWritingDocument } from "@/lib/block-document";
 import type { Content, Question } from "@/lib/types";
 import { correctOptionIds, optionIds } from "@/lib/course-quiz";
-import type { UploadMedia } from "./MarkdownEditor";
+import type { UploadMedia } from "@/lib/upload-media";
 import { WritingTitle, WritingTitleEnterContext } from "./patterns/writing-title";
 import { WritingEditor } from "./patterns/writing-editor";
 import { EditorFrame, type DetailsReveal } from "./patterns/editor-frame";
@@ -124,7 +125,8 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         surface?.focus({ preventScroll: true });
       };
       if (surface?.closest('.app[data-mobile-editor]')) {
-        surface.scrollIntoView({ block: "start", behavior: "instant" });
+        const owner = surface.closest<HTMLElement>(".bn-scroll-container");
+        if (owner) owner.scrollTop = 0;
         finish();
         return;
       }
@@ -268,7 +270,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     disabled={disabled}
   >
     <div className="course-builder-panel" ref={panel} tabIndex={-1} role="region" aria-label="Course lessons and quiz">
-      {selectedLesson ? <WritingEditor canvas introduction={introduction && <WritingTitleEnterContext.Provider value={() => lessonTitle.current?.focus()}>{introduction}</WritingTitleEnterContext.Provider>} key={selectedLesson.id} label="Lesson content" downloadName={selectedLesson.title} title={<><span className="eyebrow">Lesson {course.lessons.indexOf(selectedLesson) + 1} of {course.lessons.length}</span><WritingTitle ref={lessonTitle} aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value.replace(/\n/g, " ") }))} /></>} value={selectedLesson.videoUrl ? `[Video](${selectedLesson.videoUrl})\n\n${selectedLesson.body}` : selectedLesson.body} onChange={(body) => editLesson((lesson) => ({ ...lesson, body, videoUrl: undefined }))} onUpload={onUpload} disabled={disabled} /> : selected === "quiz" && course.questions.length ? <div className="course-quiz-canvas">
+      {selectedLesson ? <WritingEditor canvas introduction={introduction && <WritingTitleEnterContext.Provider value={() => lessonTitle.current?.focus()}>{introduction}</WritingTitleEnterContext.Provider>} key={selectedLesson.id} label="Lesson content" downloadName={selectedLesson.title} title={<><span className="eyebrow">Lesson {course.lessons.indexOf(selectedLesson) + 1} of {course.lessons.length}</span><WritingTitle ref={lessonTitle} aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value.replace(/\n/g, " ") }))} /></>} value={selectedLesson.videoUrl ? `[Video](${selectedLesson.videoUrl})\n\n${selectedLesson.body}` : selectedLesson.body} bodyDocument={lessonWritingDocument(selectedLesson)} onChange={(body, bodyDocument) => editLesson((lesson) => ({ ...lesson, body, bodyDocument, videoUrl: undefined }))} onUpload={onUpload} disabled={disabled} /> : selected === "quiz" && course.questions.length ? <div className="course-quiz-canvas">
         <div className="writing-course-heading">{introduction}</div>
         <div className="writing-document-heading"><h2 className="document-title">Quiz</h2></div>
         <div className="course-quiz-content grid gap-5">

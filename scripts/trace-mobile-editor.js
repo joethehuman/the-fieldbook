@@ -7,8 +7,8 @@
  * returned JSON string. Re-pasting or calling fieldbookEditorTrace.dispose()
  * restores every patched browser API.
  *
- * Records geometry and native/model selection ownership only: no text, values,
- * Lexical node keys, keyboard keys, labels,
+ * Records geometry and native selection ownership only: no text, values,
+ * editor node keys, keyboard keys, labels,
  * element IDs, attributes containing content, page URLs, or source URLs.
  * Instrumentation can affect timing; compare with an uninstrumented recording.
  */
@@ -17,7 +17,7 @@
   window.fieldbookEditorTrace?.dispose();
 
   const surfaces = [
-    ["code", ".cm-content"],
+    ["code", ".bn-block-content[data-content-type=codeBlock] pre code"],
     ["source", "textarea.writing-source"],
     ["title", "textarea.document-title"],
     ["table-cell", "td [contenteditable], th [contenteditable]"],
@@ -102,51 +102,13 @@
       return { basis: point.basis, x: number(point.x), y: number(point.y), withinVisualSize: point.x >= 0 && point.y >= 0 && point.x < view.width && point.y < view.height, matches: !!found && (found === target || target.contains(found)), hit: describe(found) };
     }) };
   }
-  function models(active, native) {
-    const output = [];
-    const seen = new Set();
-    const seeds = [active, native?.anchorNode, native?.focusNode];
-    for (const seed of seeds) {
-      const code = element(seed)?.closest(".cm-content");
-      if (code && !seen.has(code)) {
-        seen.add(code);
-        try {
-          // Installed CodeMirror attaches a tile to contentDOM. The root getter
-          // only walks its parents; domAtPos only reads the rendered tile tree.
-          const view = code.cmTile?.root?.view;
-          if (!view?.state?.selection?.main || typeof view.domAtPos !== "function") throw new Error();
-          const range = view.state.selection.main;
-          const point = (position, nativeNode, nativeOffset) => {
-            if (view.state.doc.length && !view.visibleRanges?.some(value => position >= value.from && position <= value.to)) return { available: false };
-            const mapped = view.domAtPos(position);
-            return { available: true, node: describe(mapped.node), offset: number(mapped.offset), matchesNative: mapped.node === nativeNode && mapped.offset === nativeOffset };
-          };
-          output.push({ family: "codemirror", available: true, root: describe(code), focused: active === code, kind: range.anchor === range.head ? "cursor" : "range", anchor: number(range.anchor), head: number(range.head), rangeCount: view.state.selection.ranges.length, anchorDOM: point(range.anchor, native?.anchorNode, native?.anchorOffset), focusDOM: point(range.head, native?.focusNode, native?.focusOffset) });
-        } catch { output.push({ family: "codemirror", available: false, root: describe(code) }); }
-      }
-      for (let root = element(seed); root; root = root.parentElement) {
-        const editor = root.__lexicalEditor;
-        if (!editor || seen.has(editor)) continue;
-        seen.add(editor);
-        try {
-          // Read the already committed selection/map directly. Calling read(),
-          // update(), or serialization is unnecessary and could flush work.
-          if (!editor._editorState || !editor._keyToDOMMap?.get) throw new Error();
-          const current = editor._editorState._selection;
-          const point = (value, nativeNode) => {
-            const mapped = editor._keyToDOMMap.get(value.key);
-            return { type: value.type === "text" || value.type === "element" ? value.type : "unknown", offset: number(value.offset), node: describe(mapped), containsNative: !!mapped && !!nativeNode && (mapped === nativeNode || mapped.contains(nativeNode)) };
-          };
-          const details = current === null ? { kind: "none" }
-            : current?.anchor && current?.focus ? { kind: "range", collapsed: current.anchor.key === current.focus.key && current.anchor.offset === current.focus.offset, anchor: point(current.anchor, native?.anchorNode), focus: point(current.focus, native?.focusNode) }
-              : current?._nodes instanceof Set ? { kind: "node", count: current._nodes.size, nodes: Array.from(current._nodes).slice(0, 16).map(key => describe(editor._keyToDOMMap.get(key))) }
-                : { kind: "unknown" };
-          output.push({ family: "lexical", available: true, root: describe(root), focused: active === root, ...details });
-        } catch { output.push({ family: "lexical", available: false, root: describe(root) }); }
-      }
-    }
-    for (const family of ["codemirror", "lexical"]) if (!output.some(value => value.family === family)) output.push({ family, available: false });
-    return output;
+  function surfacesForSelection(active, native) {
+    const roots = [...new Set([active, native?.anchorNode, native?.focusNode]
+      .map(seed => element(seed)?.closest(".bn-editor")).filter(Boolean))];
+    return roots.map(root => ({ family: "blocknote", root: describe(root),
+      focused: root === active || root.contains(active),
+      anchorBlock: describe(element(native?.anchorNode)?.closest(".bn-block-content")),
+      focusBlock: describe(element(native?.focusNode)?.closest(".bn-block-content")) }));
   }
   function selection() {
     const native = window.getSelection();
@@ -166,7 +128,7 @@
         focusBounds = Array.from(range.getClientRects()).filter(value => value.height > 0).slice(0, 2).map(rect);
       } catch { /* Selection changed between reads. */ }
     }
-    return { active: describe(active), activeEditable: describe(editable(active)), fieldSelection, rangeCount: native?.rangeCount ?? 0, collapsed: native?.isCollapsed ?? null, anchor: describe(native?.anchorNode), anchorOffset: native?.anchorOffset ?? null, focus: describe(native?.focusNode), focusOffset: native?.focusOffset ?? null, anchorEditable: describe(editable(native?.anchorNode)), focusEditable: describe(editable(native?.focusNode)), focusBelongsToActiveEditable: !!native?.focusNode && editable(native.focusNode) === active, focusBounds, models: models(active, native) };
+    return { active: describe(active), activeEditable: describe(editable(active)), fieldSelection, rangeCount: native?.rangeCount ?? 0, collapsed: native?.isCollapsed ?? null, anchor: describe(native?.anchorNode), anchorOffset: native?.anchorOffset ?? null, focus: describe(native?.focusNode), focusOffset: native?.focusOffset ?? null, anchorEditable: describe(editable(native?.anchorNode)), focusEditable: describe(editable(native?.focusNode)), focusBelongsToActiveEditable: !!native?.focusNode && editable(native.focusNode) === active, focusBounds, editorSurfaces: surfacesForSelection(active, native) };
   }
   function snapshot(reason) {
     const view = viewport();
