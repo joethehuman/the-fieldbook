@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useVirtualKeyboard } from "@blocknote/react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { MarkdownDownloadButton } from "./markdown-download";
 import { revealEditorTarget } from "./reveal-editor-target";
@@ -14,6 +15,9 @@ export function MobileEditorFrame({
   requirementsCount = 0, revealDetails, revealCanvas, revealOutline,
   disabled = false, children,
 }: EditorFrameProps) {
+  // Keep BlockNote's viewport publisher alive for quiz/source-recovery views
+  // too, when there may be no mounted rich-text toolbar controller.
+  useVirtualKeyboard();
   const frame = useRef<HTMLElement>(null);
   const [view, setView] = useState<View>("write");
   const hasOutline = !!outline;
