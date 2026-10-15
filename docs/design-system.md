@@ -61,7 +61,7 @@ Respect reduced-motion preferences. Animate transitions only when they clarify a
 
 Use the shared workspace shell across learner, management and authoring routes. Preserve its header, navigation, search and page insets instead of recreating them within individual features. Reading surfaces keep a comfortable text measure; controls and metadata must remain usable with long content and enlarged text.
 
-Choose layouts according to available space and input capabilities. A narrow desktop window does not automatically require touch-editor behavior. Use the existing layout hooks and matching CSS rules rather than introducing competing breakpoints.
+Choose layouts according to available space and input capabilities. A narrow mouse-driven window retains desktop editing. Use the existing layout hooks and matching CSS rules rather than introducing competing breakpoints.
 
 Keep scroll ownership explicit. The workspace normally owns page scrolling; bounded lists and desktop writing surfaces may have their own scroll areas. Preserve vertical scroll chaining, contain wide tables horizontally, and keep controls reachable on short screens. Avoid global overflow locks and competing wheel, focus or viewport correction mechanisms. Use the shared scroll-fade treatment only where content actually overflows.
 
@@ -69,7 +69,7 @@ Keep scroll ownership explicit. The workspace normally owns page scrolling; boun
 
 Docs, Updates and Course lessons share the BlockNote writing editor. Preserve the desktop composition of title, writing column, Outline, Details, save status and publication actions. Use BlockNote’s supported APIs and component slots for native editing, selection, menus, tables, code and media. Scope theme adaptations to the editor; keep its own menu primitives and focus behavior intact.
 
-Use the existing [compact-touch layout boundary](../components/patterns/use-editor-cards-layout.ts) to determine when desktop editing is required. Restricted layouts show the shared desktop-editing notice. Reading and ordinary administration remain available, and narrow mouse-driven windows retain editing. Preserve draft ownership, pending saves and recovery when an open editor crosses that boundary.
+Use the existing [compact-touch layout boundary](../components/patterns/use-desktop-editing-required.ts) to determine when desktop editing is required. Restricted layouts show the shared desktop-editing notice. Reading and ordinary administration remain available, and narrow mouse-driven windows retain editing. Preserve draft ownership, pending saves and recovery when an open editor crosses that boundary.
 
 Treat saved writing as user data. Preserve text, block properties, media references, image descriptions and draft/publication separation through edits, paste and undo. Opening an editor or menu must not save a conversion. Structured blocks are authoritative when present; generated Markdown is an export. See [editor compatibility and upgrades](upgrading.md#block-documents-and-editor-compatibility) for storage, export and rollback guidance.
 

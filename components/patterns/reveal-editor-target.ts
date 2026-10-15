@@ -12,34 +12,6 @@ export function revealEditorTarget(target: HTMLElement, {
 }: { container?: HTMLElement | null; context?: HTMLElement; focus?: boolean; highlight?: boolean } = {}) {
   // Canvas title attention is explicit; ordinary clicks and keyboard focus stay quiet.
   if (focus && highlight && target.matches(".document-title")) target.dataset.revealFocus = "true";
-  if (target.closest('.app[data-mobile-editor]')) {
-    // Explicit navigation only. Everyday focus and keyboard movement belong
-    // to the browser and editor libraries, with no follow-up correction loop.
-    let anchor = context;
-    if (focus) {
-      if (target.isContentEditable) {
-        const first = Array.from(target.querySelectorAll<HTMLElement>("p, h1, h2, h3, h4, h5, h6, blockquote, li"))
-          .find(block => block.isContentEditable) || target;
-        const range = document.createRange();
-        range.selectNodeContents(first);
-        range.collapse(true);
-        const reveal = new CustomEvent("fieldbook:writing-reveal", { detail: range, cancelable: true });
-        target.dispatchEvent(reveal);
-        if (!reveal.defaultPrevented) {
-          target.focus();
-          const selection = window.getSelection();
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-        }
-        anchor = first;
-      } else {
-        target.focus();
-        if (target instanceof HTMLTextAreaElement && target.matches('textarea[aria-label$=" Markdown"]')) target.setSelectionRange(0, 0);
-      }
-    }
-    anchor.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
-    return () => {};
-  }
   const owner = target.closest<HTMLElement>(".main-content") || container;
   const bounded = !!target.closest('.editor[data-scroll-layout="workspace"], .editor-floating-body, [data-slot="dialog-content"]');
   // Stacked panels and the natural writing body belong to the page. A native

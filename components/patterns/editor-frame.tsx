@@ -7,8 +7,6 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { useEditorCardsLayout } from "./use-editor-cards-layout";
-import { MobileEditorFrame } from "./mobile-editor-frame";
 
 export type DetailsReveal = { request: number; field?: string };
 
@@ -40,14 +38,8 @@ export type EditorFrameProps = {
   children: ReactNode;
 };
 
-/** Touch writing has its own simple composition; desktop keeps its panels. */
-export function EditorFrame(props: EditorFrameProps) {
-  const mobile = useEditorCardsLayout();
-  return mobile ? <MobileEditorFrame {...props} /> : <DesktopEditorFrame {...props} />;
-}
-
 /** One desktop writing canvas with optional in-page navigation and details. */
-function DesktopEditorFrame({
+export function EditorFrame({
   navigation, outline, outlineContext, details, download, recovery, deleteAction,
   requirementsCount = 0, revealDetails, revealCanvas, revealOutline,
   disabled = false, children,

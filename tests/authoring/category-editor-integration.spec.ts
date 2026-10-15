@@ -134,6 +134,13 @@ for (const profile of [
         );
         await section(page, "Content");
         await page.getByRole("link", { name: item.title, exact: true }).click();
+        if (profile.touch) {
+          await expect(page.getByRole("note", { name: "Desktop editing required" })).toBeVisible();
+          await expect(page.locator('.writing-content[contenteditable="true"]')).toHaveCount(0);
+          // The existing landscape boundary permits the desktop editor. Category
+          // administration below is exercised back in the restricted portrait view.
+          await page.setViewportSize({ width: profile.height, height: profile.width });
+        }
         const writer = page.locator('.writing-content[contenteditable="true"]');
         await expect(writer).toContainText(originalPublishedBody);
         const details = await openContentSettings(page);
@@ -169,41 +176,16 @@ for (const profile of [
           expect(published.category).toBe(originalCategory);
           expect(body(published)).toBe(originalPublishedBody);
         }
-        if (profile.touch) {
-          await writer.locator("p").first().tap();
-          // Resize the rendered browser while retaining portrait eligibility;
-          // this checks layout, not an emulated OS keyboard transition.
-          await page.setViewportSize({
-            width: profile.width,
-            height: Math.max(profile.width + 1, profile.height - 240),
-          });
-          await expect(page.locator(".app")).toHaveAttribute("data-mobile-editor", "true");
-          const toolbar = page.locator(".editor-mobile-toolbar");
-          await expect(page.locator(".editor-mobile-toolbar-slot")).toHaveCSS("position", "sticky");
-          await expect(toolbar).toHaveCSS("position", "relative");
-          await expect(toolbar).toBeInViewport({ ratio: 1 });
-          await expect.poll(() => toolbar.evaluate(element => {
-            const bounds = element.getBoundingClientRect();
-            return bounds.top >= 0 && bounds.bottom <= innerHeight;
-          })).toBe(true);
-        } else {
-          await expect(
-            page.getByRole("button", { name: "Back to content", exact: true }),
-          ).toBeInViewport();
-          await expect(
-            page.getByRole("button", { name: "Commands", exact: true }),
-          ).toBeHidden();
-        }
+        await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeInViewport();
         await page.screenshot({
           path: info.outputPath("integrated-editor.png"),
         });
         await returnToContent(page);
+        if (profile.touch) await page.setViewportSize({ width: profile.width, height: profile.height });
         await section(page, "Categories");
         await expect(
           page.getByRole("heading", { name: "Categories", exact: true }),
         ).toBeVisible();
-        await expect(page.locator(".app")).not.toHaveAttribute("data-mobile-editor", "true");
-        await expect(page.locator(".editor-mobile-toolbar")).toHaveCount(0);
         if (kind === "brief")
           await page.getByRole("tab", { name: "Updates", exact: true }).click();
         await page
@@ -262,6 +244,13 @@ for (const profile of [
         });
         await section(page, "Content");
         await page.getByRole("link", { name: item.title, exact: true }).click();
+        if (profile.touch) {
+          await expect(page.getByRole("note", { name: "Desktop editing required" })).toBeVisible();
+          await expect(page.locator('.writing-content[contenteditable="true"]')).toHaveCount(0);
+          // The existing landscape boundary permits the desktop editor. Category
+          // administration below is exercised back in the restricted portrait view.
+          await page.setViewportSize({ width: profile.height, height: profile.width });
+        }
         await expect(writer).toContainText(
           "An independently saved draft survives category management.",
         );
@@ -272,6 +261,7 @@ for (const profile of [
         if (installed) {
           await closeContentSettings(page);
           await returnToContent(page);
+          if (profile.touch) await page.setViewportSize({ width: profile.width, height: profile.height });
           await section(page, "Categories");
           if (kind === "brief")
             await page

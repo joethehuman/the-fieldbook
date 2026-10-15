@@ -14,7 +14,6 @@ import {
   SuggestionMenuController,
   FormattingToolbarController,
   FormattingToolbar,
-  getFormattingToolbarItems,
   BlockTypeSelect,
   BasicTextStyleButton,
   CreateLinkButton,
@@ -36,7 +35,6 @@ import {
   type SideMenuProps,
   type FloatingUIOptions,
   useBlockNoteEditor,
-  useComponentsContext,
 } from "@blocknote/react";
 import {
   filterSuggestionItems,
@@ -46,7 +44,6 @@ import {
   FilePanelExtension,
   getDefaultSlashMenuItems,
   SideMenuExtension,
-  SuggestionMenu,
 } from "@blocknote/core/extensions";
 import { syntaxHighlighter } from "@blocknote/code-block";
 import {
@@ -85,7 +82,6 @@ import {
   WritingIntroductionContext,
   WritingTitleEnterContext,
 } from "./writing-title";
-import { useEditorCardsLayout } from "./use-editor-cards-layout";
 import { useScrollFade } from "./use-scroll-fade";
 import type { WritingEditorProps } from "./writing-editor";
 
@@ -275,22 +271,6 @@ function WritingFormattingToolbar() {
   );
 }
 
-/** Native toolbar and command menu, without hover controls on the canvas. */
-function MobileWritingFormattingToolbar() {
-  const editor = useBlockNoteEditor();
-  const Components = useComponentsContext()!;
-  return (
-    <FormattingToolbar>
-      <Components.FormattingToolbar.Button
-        mainTooltip="Insert block"
-        label="Insert block"
-        icon={<Plus size={18} />}
-        onClick={() => editor.getExtension(SuggestionMenu)?.openSuggestionMenu("/", { ignoreQueryLength: true })}
-      />
-      {getFormattingToolbarItems()}
-    </FormattingToolbar>
-  );
-}
 export default function WritingEditorEngine({
   initialDocument,
   value,
@@ -303,7 +283,6 @@ export default function WritingEditorEngine({
 }: EditorProps) {
   const title = useContext(WritingTitleContext);
   const introduction = useContext(WritingIntroductionContext);
-  const mobile = useEditorCardsLayout();
   const latest = useRef({ onChange, onUpload });
   latest.current = { onChange, onUpload };
   const [error, setError] = useState("");
@@ -536,11 +515,9 @@ export default function WritingEditorEngine({
                 }}
               />
               <FormattingToolbarController
-                formattingToolbar={
-                  mobile ? MobileWritingFormattingToolbar : WritingFormattingToolbar
-                }
+                formattingToolbar={WritingFormattingToolbar}
               />
-              {!mobile && <WritingSideMenuController />}
+              <WritingSideMenuController />
               <TableHandlesController tableHandle={WritingTableHandle} />
               <FilePanelController filePanel={WritingFilePanel} />
               <WritingCodeHeaders languages={languages} disabled={disabled} />

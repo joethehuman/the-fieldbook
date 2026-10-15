@@ -27,7 +27,7 @@ import {
 } from "./writing-title";
 import { useScrollFade } from "./use-scroll-fade";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { useMobileEditorLayout } from "./use-editor-cards-layout";
+import { useDesktopEditingRequired } from "./use-desktop-editing-required";
 import { DesktopEditingNotice } from "./desktop-editing-notice";
 // The scroll-container styles must exist even during loading/source recovery.
 import "@blocknote/shadcn/style.css";
@@ -108,7 +108,7 @@ export function WritingEditor({
   downloadName = label,
   ...props
 }: WritingEditorProps) {
-  const mobileEditor = useMobileEditorLayout();
+  const desktopEditingRequired = useDesktopEditingRequired();
   const root = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const element = root.current;
@@ -135,7 +135,7 @@ export function WritingEditor({
       resize.disconnect();
       mutations.disconnect();
     };
-  }, [mobileEditor]);
+  }, [desktopEditingRequired]);
   const [initial, setInitial] = useState(() => {
     try {
       return {
@@ -155,7 +155,7 @@ export function WritingEditor({
   const [mode, setMode] = useState(initial.document ? "write" : "source");
   const [issue, setIssue] = useState(initial.issue);
   const [failureDetail, setFailureDetail] = useState("");
-  const sourceFade = useScrollFade<HTMLTextAreaElement>(mode === "source" && !mobileEditor);
+  const sourceFade = useScrollFade<HTMLTextAreaElement>(mode === "source" && !desktopEditingRequired);
   useLayoutEffect(() => {
     sourceFade.measure();
   }, [mode, props.value, sourceFade.measure]);
@@ -164,7 +164,7 @@ export function WritingEditor({
     () => (canvas ? null : <StandaloneMarkdownDownload />),
     [canvas],
   );
-  if (mobileEditor) return <DesktopEditingNotice />;
+  if (desktopEditingRequired) return <DesktopEditingNotice />;
   return (
     <MarkdownDownloadContext.Provider
       value={{ value: props.value, name: downloadName }}

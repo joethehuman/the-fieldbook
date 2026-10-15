@@ -44,7 +44,7 @@ async function setup(page: Page, production: boolean, role: "contributor" | "adm
   await page.goto("/");
 }
 
-test("contributors share publishing editors with four permitted destinations on desktop and phone", async ({ page }, info) => {
+test("contributors share publishing editors with four permitted destinations on desktop and narrow mouse windows", async ({ page }, info) => {
   const production = info.project.name.startsWith("production");
   await setup(page, production, "contributor", false);
   await openMenu(page);

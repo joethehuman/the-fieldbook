@@ -96,7 +96,7 @@ export function WritingExamples() {
     <section id="writing" className="grid gap-6">
       <SectionHeader
         title={<h2>Visual writing</h2>}
-        description="Docs, Updates and course lessons share block editing with Markdown export. Use Commands or type / at the start of a line to add content. On phones, formatting appears above the keyboard; on desktop, select text to format it. Web links such as example.com use HTTPS. Unsupported formatting falls back to source without discarding text."
+        description="Docs, Updates and course lessons share desktop block editing with Markdown export. Type / at the start of a line to add content, or select text to format it. Compact touch layouts show the desktop-editing notice. Web links such as example.com use HTTPS. Unsupported formatting falls back to source without discarding text."
       />
       <Field orientation="horizontal">
         <Checkbox
