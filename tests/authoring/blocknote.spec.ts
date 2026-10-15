@@ -570,8 +570,9 @@ for (const orientation of ["row", "column"] as const) {
     page,
   }, info) => {
     test.skip(
-      info.project.use.hasTouch === true,
-      "HTML drag-and-drop is checked with a desktop pointer; touch taps are covered separately.",
+      info.project.use.hasTouch === true ||
+        (orientation === "column" && Number(info.project.use.viewport?.width) < 768),
+      "HTML column drop targets must fit in view; desktop dragging and compact touch activation are covered separately.",
     );
     const { editor, read } = await setup(
       page,

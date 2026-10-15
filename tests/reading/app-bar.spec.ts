@@ -85,8 +85,11 @@ for (const app of ["demo", "production"]) {
           ),
         )
         .toBe(true);
+      const search = page.getByRole("textbox", { name: "Search all content" });
       await expect(
-        page.getByRole("textbox", { name: "Search all content" }),
+        (await search.isVisible())
+          ? search
+          : page.getByRole("button", { name: "Open search", exact: true }),
       ).toBeInViewport();
       await page.screenshot({
         path: info.outputPath(`${app}-${kind}-enlarged.png`),
