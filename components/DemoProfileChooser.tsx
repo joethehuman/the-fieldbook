@@ -34,14 +34,8 @@ export function DemoProfileChooser({
         </div>
         <div className="demo-picker-about">
           <p>
-            <span className="min-[801px]:hidden">
-              A demo of The Fieldbook: free, source-available (ELv2) learning
-              and knowledge management.
-            </span>
-            <span className="hidden min-[801px]:inline">
-              A static, interactive demo of The Fieldbook, a free,
-              source-available (ELv2) learning and knowledge management system.
-            </span>
+            An interactive demo of The Fieldbook, a free, source-available
+            learning and knowledge management system.
           </p>
           <nav aria-label="About The Fieldbook" className="demo-picker-links">
             <a href="https://thefieldbook.org" target="_blank" rel="noreferrer">
