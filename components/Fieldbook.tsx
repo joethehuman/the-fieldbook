@@ -425,10 +425,10 @@ export default function Fieldbook() {
                   <strong>{u.name}</strong>
                   <small>
                     {u.role === "admin"
-                      ? "Admin · Org Admin"
+                      ? "Admin"
                       : u.role === "contributor" ? "Contributor" : u.role === "manager"
-                        ? "Manager · Sales Director"
-                        : "User · Account Executive"}
+                        ? "Manager"
+                        : "User"}
                   </small>
                 </span>
                 <ArrowRight size={18} />
