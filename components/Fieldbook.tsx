@@ -18,7 +18,7 @@ import { ReportAvailability } from "./patterns/csv-export";
 import { SearchExperience } from "./SearchExperience";
 import { searchSuggestions } from "@/lib/search-suggestions";
 import { InitialsAvatar } from "./ui/initials-avatar";
-import { BrandedAccount } from "./patterns/branded-account";
+import { DemoProfileChooser } from "./DemoProfileChooser";
 import {
   SidebarHeading,
   sidebarPrimaryLinkClassName,
@@ -26,7 +26,7 @@ import {
 import { useDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { brandingFromSettings } from "@/lib/branding";
 import { CurriculumPage } from "./CurriculumPage";
-import { Badge, CountBadge } from "@/components/ui/badge";
+import { CountBadge } from "@/components/ui/badge";
 import { canPublish } from "@/lib/permissions";
 import { AccountMenu } from "./patterns/account-menu";
 import { NavigationButton } from "./patterns/navigation-button";
@@ -394,9 +394,7 @@ export default function Fieldbook() {
   const policyHref = privacyHref(branding);
   if (!restored || !data || !user) {
     const picker = (
-      <BrandedAccount branding={brandingFromSettings(branding)} centered>
-        <Badge variant="default">INTERACTIVE DEMO</Badge>
-        <h1>Choose a demo profile</h1>
+      <DemoProfileChooser branding={brandingFromSettings(branding)}>
         {restored && !data && (
           <>
             {error && <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
@@ -416,13 +414,14 @@ export default function Fieldbook() {
             )
             .map((u) => (
               <NavigationButton
-                variant="ghost"
+                variant="outline"
+                className="min-h-18 [&>span]:w-full [&>span]:justify-start [&>span]:gap-3"
                 key={u.id}
                 aria-disabled={!data}
                 onClick={data ? () => login(u.id) : undefined}
               >
                 <InitialsAvatar initials={initials(u.name)} />
-                <span>
+                <span className="min-w-0 flex-1">
                   <strong>{u.name}</strong>
                   <small>
                     {u.role === "admin"
@@ -436,13 +435,7 @@ export default function Fieldbook() {
               </NavigationButton>
             ))}
         </div>
-        <div className="demo-note">
-          <p>
-            Changes stay in this browser. Demo profiles are not secure accounts,
-            and data is not shared between devices. Use sample content only.
-          </p>
-        </div>
-      </BrandedAccount>
+      </DemoProfileChooser>
     );
     return restored ? picker : (
       <DemoStartup name={branding.name} accent={branding.accent} picker={picker} />
