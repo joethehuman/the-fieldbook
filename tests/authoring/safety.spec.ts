@@ -287,7 +287,7 @@ test("failed autosave preserves edits through search, canceled navigation and re
   await expect(
     page.getByRole("region", { name: "Search results" }),
   ).toBeVisible();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep these edits",
   );
