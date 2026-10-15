@@ -529,8 +529,7 @@ test("course: floating panels, pinned lesson and working lesson navigation", asy
   page,
 }, info) => {
   await open(page, info.project.name.startsWith("production"), "course");
-  const compact =
-    (await page.locator(".editor-frame").getAttribute("data-cards")) === "true";
+  const compact = (page.viewportSize()?.width ?? 1600) < 1280;
   const outline = page.getByRole("button", { name: "Outline", exact: true });
   const details = page.getByRole("button", { name: "Details", exact: true });
   await expect(outline).toHaveAttribute(
@@ -601,7 +600,7 @@ test("lesson actions return keyboard focus without a sticky pointer ring", async
       page.locator('.writing-content[contenteditable="true"]'),
     ).toBeVisible();
     if (
-      (await page.locator(".editor-frame").getAttribute("data-cards")) ===
+      (await page.getByRole("button", { name: "Outline", exact: true }).getAttribute("aria-expanded")) !==
       "true"
     )
       await page.getByRole("button", { name: "Outline", exact: true }).click();
