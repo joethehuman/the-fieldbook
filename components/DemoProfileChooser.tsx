@@ -34,7 +34,7 @@ export function DemoProfileChooser({
         </div>
         <div className="demo-picker-about">
           <p>
-            An interactive demo of The Fieldbook, a free, source-available
+            An interactive demo of The Fieldbook: a free, source-available
             learning and knowledge management system.
           </p>
           <nav aria-label="About The Fieldbook" className="demo-picker-links">
