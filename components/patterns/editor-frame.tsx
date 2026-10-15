@@ -8,6 +8,7 @@ import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
 import { useEditorCardsLayout } from "./use-editor-cards-layout";
+import { MobileEditorFrame } from "./mobile-editor-frame";
 
 export type DetailsReveal = { request: number; field?: string };
 
@@ -23,22 +24,7 @@ function usePanelPresence(open: boolean) {
   return open || present;
 }
 
-/** One writing canvas with optional in-page navigation and content details. */
-export function EditorFrame({
-  navigation,
-  outline,
-  outlineContext,
-  details,
-  download,
-  recovery,
-  deleteAction,
-  requirementsCount = 0,
-  revealDetails,
-  revealCanvas,
-  revealOutline,
-  disabled = false,
-  children,
-}: {
+export type EditorFrameProps = {
   navigation?: ReactNode;
   outline?: ReactNode;
   outlineContext?: string;
@@ -52,14 +38,24 @@ export function EditorFrame({
   revealOutline?: number;
   disabled?: boolean;
   children: ReactNode;
-}) {
-  const phone = useEditorCardsLayout();
+};
+
+/** Touch writing has its own simple composition; desktop keeps its panels. */
+export function EditorFrame(props: EditorFrameProps) {
+  const mobile = useEditorCardsLayout();
+  return mobile ? <MobileEditorFrame {...props} /> : <DesktopEditorFrame {...props} />;
+}
+
+/** One desktop writing canvas with optional in-page navigation and details. */
+function DesktopEditorFrame({
+  navigation, outline, outlineContext, details, download, recovery, deleteAction,
+  requirementsCount = 0, revealDetails, revealCanvas, revealOutline,
+  disabled = false, children,
+}: EditorFrameProps) {
   const frame = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const hasNavigation = !!navigation;
   const [panels, setPanels] = useState({ outline: false, details: false });
-  const panelState = useRef(panels);
-  panelState.current = panels;
   function returnToToggle(toggle: HTMLButtonElement | null) {
     // Closing a panel returns to its button. A later writing tap chooses
     // the caret and opens the keyboard through the browser's normal path.
@@ -67,18 +63,11 @@ export function EditorFrame({
   }
   function togglePanel(side: "outline" | "details") {
     defaultsApplied.current = true;
-    const closing = panelState.current[side];
-    if (!closing && phone && document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setPanels((current) => side === "outline"
       ? { outline: !current.outline, details: wide.current ? current.details : false }
       : { outline: wide.current ? current.outline : false, details: !current.details });
-    if (closing && phone) returnToToggle(side === "outline" ? outlineToggle.current : detailsToggle.current);
   }
   useLayoutEffect(() => {
-    if (phone) {
-      frame.current?.style.setProperty("--editor-navigation-height", "0px");
-      return;
-    }
     const element = canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
     const owner = frame.current?.closest<HTMLElement>(".main-content");
     if (!element) return;
@@ -95,30 +84,8 @@ export function EditorFrame({
       owner?.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
     };
-  }, [hasNavigation, phone]);
+  }, [hasNavigation]);
 
-  useEffect(() => {
-    if (!phone || !panels.outline && !panels.details) return;
-    const dismiss = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element) || target.closest('.editor-mobile-gutter, [data-radix-popper-content-wrapper], [data-slot="dialog-content"]')) return;
-      setPanels({ outline: false, details: false });
-    };
-    document.addEventListener("pointerdown", dismiss);
-    return () => document.removeEventListener("pointerdown", dismiss);
-  }, [phone, panels.outline, panels.details]);
-  useEffect(() => {
-    if (!phone || !panels.outline && !panels.details) return;
-    const cancel = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
-      event.preventDefault(); event.stopPropagation();
-      setPanels({ outline: false, details: false });
-      returnToToggle(panels.outline ? outlineToggle.current : detailsToggle.current);
-    };
-    // Let fields and portaled pickers consume Escape before closing the panel.
-    document.addEventListener("keydown", cancel);
-    return () => document.removeEventListener("keydown", cancel);
-  }, [phone, panels.outline, panels.details]);
   const wide = useRef(false);
   const narrow = useRef(false);
   const outlineToggle = useRef<HTMLButtonElement>(null);
@@ -134,12 +101,6 @@ export function EditorFrame({
     const target = frame.current;
     const surface = canvas.current;
     if (!target || !surface) return;
-    if (phone) {
-      wide.current = false;
-      narrow.current = true;
-      setPanels({ outline: false, details: false });
-      return;
-    }
     let active = true;
     let request = 0;
     let waitingForLayout = false;
@@ -158,11 +119,11 @@ export function EditorFrame({
         outline: column.left - bounds.left >= panelWidth + gap,
         details: bounds.right - column.right >= panelWidth + gap,
       };
-      wide.current = !phone && bounds.width >= 2 * panelWidth + 16;
-      narrow.current = phone || !clearance.outline || !clearance.details;
+      wide.current = bounds.width >= 2 * panelWidth + 16;
+      narrow.current = !clearance.outline || !clearance.details;
       if (!defaultsApplied.current) {
         const app = target.closest(".app");
-        if (!phone && target.closest(".editor") && app?.querySelector(".sidebar") && !app.classList.contains("sidebar-collapsed")) return;
+        if (target.closest(".editor") && app?.querySelector(".sidebar") && !app.classList.contains("sidebar-collapsed")) return;
         const animations = target.closest(".main-shell")?.getAnimations().filter((animation) => animation.playState === "running") || [];
         if (animations.length) {
           if (!waitingForLayout) {
@@ -197,7 +158,7 @@ export function EditorFrame({
     });
     mutations.observe(surface, { childList: true, subtree: true });
     return () => { active = false; cancelAnimationFrame(request); observer.disconnect(); mutations.disconnect(); };
-  }, [phone, hasOutline]);
+  }, [hasOutline]);
 
   useEffect(() => {
     if (!revealDetails) return;
@@ -221,7 +182,7 @@ export function EditorFrame({
       });
     });
     return () => { cancelAnimationFrame(request); cancelReveal?.(); };
-  }, [revealDetails, detailsId, phone]);
+  }, [revealDetails, detailsId]);
 
   useLayoutEffect(() => {
     if (!revealCanvas) return;
@@ -268,22 +229,20 @@ export function EditorFrame({
     </div>
   </EditorDetailsGroup>;
   const panelControls = (
-      <div className="editor-frame-controls" data-cards={phone || undefined} role={phone ? "group" : undefined} aria-label={phone ? "Editor controls" : undefined}>
+      <div className="editor-frame-controls">
       <div className="editor-controls-surface">
         {outline && (
-          <Button ref={outlineToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={phone ? "editor-gutter-toggle relative size-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "editor-panel-toggle absolute size-11 rounded-full"} data-side="outline"
+          <Button ref={outlineToggle} type="button" variant="outline" size="icon" className="editor-panel-toggle absolute size-11 rounded-full" data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
-            onMouseDown={(event) => { if (phone) event.preventDefault(); }}
             onClick={() => togglePanel("outline")}>
             {panels.outline ? <X aria-hidden="true" /> : <ListTree aria-hidden="true" />}
           </Button>
         )}
-        <Button ref={detailsToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={phone ? "editor-gutter-toggle relative size-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "editor-panel-toggle absolute size-11 rounded-full"} data-side="details"
+        <Button ref={detailsToggle} type="button" variant="outline" size="icon" className="editor-panel-toggle absolute size-11 rounded-full" data-side="details"
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
-          onMouseDown={(event) => { if (phone) event.preventDefault(); }}
           onClick={() => togglePanel("details")}>
           {panels.details ? <X aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}
           {requirementsCount > 0 && <span className="editor-requirements-badge" aria-hidden="true">{requirementsCount}</span>}
@@ -320,15 +279,11 @@ export function EditorFrame({
         </div>}
   </>;
   return (
-    <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-mobile={phone || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
-      {!phone && panelControls}
-      {phone && <div className="editor-mobile-gutter">
-        {panelControls}
-        <div className="editor-mobile-panels">{panelSurfaces}</div>
-      </div>}
+    <section ref={frame} className="editor-frame" data-panels={open} data-outline={!!outline || undefined} aria-label="Writing workspace">
+      {panelControls}
       <div className="editor-frame-body">
-        {!phone && panelSurfaces}
-        <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!phone && navigation && <div className="editor-canvas-navigation">{navigation}</div>}{children}</div>
+        {panelSurfaces}
+        <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{navigation && <div className="editor-canvas-navigation">{navigation}</div>}{children}</div>
       </div>
     </section>
   );

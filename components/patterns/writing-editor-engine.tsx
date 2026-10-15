@@ -14,6 +14,7 @@ import {
   SuggestionMenuController,
   FormattingToolbarController,
   FormattingToolbar,
+  getFormattingToolbarItems,
   BlockTypeSelect,
   BasicTextStyleButton,
   CreateLinkButton,
@@ -35,7 +36,7 @@ import {
   type SideMenuProps,
   type FloatingUIOptions,
   useBlockNoteEditor,
-  useEditorFocus,
+  useComponentsContext,
 } from "@blocknote/react";
 import {
   filterSuggestionItems,
@@ -45,6 +46,7 @@ import {
   FilePanelExtension,
   getDefaultSlashMenuItems,
   SideMenuExtension,
+  SuggestionMenu,
 } from "@blocknote/core/extensions";
 import { syntaxHighlighter } from "@blocknote/code-block";
 import {
@@ -181,8 +183,6 @@ function WritingSideMenu(props: SideMenuProps) {
 }
 function WritingSideMenuController() {
   const editor = useBlockNoteEditor();
-  const mobile = useEditorCardsLayout();
-  const focused = useEditorFocus({ includeEditorUI: true });
   const floatingUIOptions = useMemo<FloatingUIOptions>(
     () => ({
       // Keep native block controls beneath the pinned title (12) and Back
@@ -203,7 +203,6 @@ function WritingSideMenuController() {
                     : undefined;
               if (
                 block?.type === "heading" &&
-                !mobile &&
                 reference instanceof HTMLElement
               ) {
                 const inline =
@@ -245,11 +244,8 @@ function WritingSideMenuController() {
         ],
       },
     }),
-    [editor, mobile],
+    [editor],
   );
-  // Safari can treat a hover-revealed control as the first tap. Wait for native
-  // focus on touch, then retain the full native block menu and dragging controls.
-  if (mobile && !focused) return null;
   return (
     <SideMenuController
       sideMenu={WritingSideMenu}
@@ -275,6 +271,23 @@ function WritingFormattingToolbar() {
       <UnnestBlockButton />
       <FileCaptionButton />
       <FileReplaceButton />
+    </FormattingToolbar>
+  );
+}
+
+/** Native toolbar and command menu, without hover controls on the canvas. */
+function MobileWritingFormattingToolbar() {
+  const editor = useBlockNoteEditor();
+  const Components = useComponentsContext()!;
+  return (
+    <FormattingToolbar>
+      <Components.FormattingToolbar.Button
+        mainTooltip="Insert block"
+        label="Insert block"
+        icon={<Plus size={18} />}
+        onClick={() => editor.getExtension(SuggestionMenu)?.openSuggestionMenu("/", { ignoreQueryLength: true })}
+      />
+      {getFormattingToolbarItems()}
     </FormattingToolbar>
   );
 }
@@ -524,10 +537,10 @@ export default function WritingEditorEngine({
               />
               <FormattingToolbarController
                 formattingToolbar={
-                  mobile ? undefined : WritingFormattingToolbar
+                  mobile ? MobileWritingFormattingToolbar : WritingFormattingToolbar
                 }
               />
-              <WritingSideMenuController />
+              {!mobile && <WritingSideMenuController />}
               <TableHandlesController tableHandle={WritingTableHandle} />
               <FilePanelController filePanel={WritingFilePanel} />
               <WritingCodeHeaders languages={languages} disabled={disabled} />

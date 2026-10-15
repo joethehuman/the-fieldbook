@@ -125,7 +125,8 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         surface?.focus({ preventScroll: true });
       };
       if (surface?.closest('.app[data-mobile-editor]')) {
-        surface.scrollIntoView({ block: "start", behavior: "instant" });
+        const owner = surface.closest<HTMLElement>(".bn-scroll-container");
+        if (owner) owner.scrollTop = 0;
         finish();
         return;
       }

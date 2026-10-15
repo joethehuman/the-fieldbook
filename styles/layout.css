@@ -417,10 +417,7 @@
   .editor-controls-surface { display: contents; }
   .editor-publication-details { display: none; }
 
-  /* One native BlockNote scroll container; the header and canvas stay in flow. */
-  html:has(.app[data-mobile-editor]),
-  body:has(.app[data-mobile-editor]) { overflow: visible; }
-  body:has(.app[data-mobile-editor]) { --editor-mobile-gutter: 52px; }
+  /* BlockNote owns the single mobile scroll viewport and keyboard geometry. */
   .app[data-mobile-editor] .main-shell {
     height: auto;
     min-height: 100%;
@@ -429,57 +426,56 @@
   .app[data-mobile-editor] .main-content {
     display: block;
     overflow: visible;
-    overscroll-behavior: auto;
     scrollbar-gutter: auto;
-    padding: 0 0 var(--space-6);
-  }
-  .app[data-mobile-editor] .app-navigation-backdrop { position: fixed; }
-  .app[data-mobile-editor] .topbar { flex-wrap: wrap; }
-  .app[data-mobile-editor] .app-editor-header { flex: 1 1 auto; }
-  .app[data-mobile-editor] .editor-heading-actions { flex-wrap: wrap; max-width: 100%; }
-  .app[data-mobile-editor] .topbar::after { display: none; }
-  .editor-frame[data-mobile] {
-    --editor-content-padding: var(--editor-mobile-gutter);
-    --editor-text-inset: var(--editor-mobile-gutter);
-    overflow-anchor: auto;
-  }
-  .editor-frame[data-mobile] .editor-frame-body { display: block; }
-  .editor-frame[data-mobile] .editor-frame-canvas { overflow: visible; }
-  .editor-mobile-gutter { position: relative; }
-  .editor-mobile-gutter .editor-frame-controls {
-    position: static;
-    height: auto;
-    pointer-events: auto;
-  }
-  .editor-mobile-gutter .editor-controls-surface {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 44px;
-    padding-inline: calc((var(--editor-mobile-gutter) - 44px) / 2);
-  }
-  .editor-mobile-gutter .editor-gutter-toggle {
-    position: static;
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
-    flex-shrink: 0;
-    box-shadow: none;
-  }
-  .editor-mobile-gutter .editor-gutter-toggle[data-side="details"] { margin-inline-start: auto; }
-  .editor-mobile-gutter .editor-requirements-badge { inset-inline-end: 0; }
-  .editor-mobile-panels .editor-frame-panel {
-    position: absolute;
-    inset: 100% var(--space-3) auto;
-    z-index: 20;
-    width: auto;
-    max-height: min(32rem, calc(var(--bn-vv-height, 100dvh) - 4rem));
     padding: 0;
-    pointer-events: auto;
   }
-  .editor-mobile-panels :is(.editor-frame-outline, .editor-frame-details) { max-height: inherit; }
-  .editor-mobile-panels .editor-floating-heading { padding-inline: var(--space-4); min-height: 3.5rem; }
-  .editor-mobile-panels .editor-publication-details { display: block; }
+  .app[data-mobile-editor] .topbar {
+    position: sticky;
+    top: 0;
+  }
+  .app[data-mobile-editor] .topbar::after { display: none; }
+  .mobile-editor {
+    --editor-content-padding: var(--space-4);
+    --editor-text-inset: var(--space-4);
+    overflow-anchor: none;
+  }
+  .mobile-editor-navigation {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+    gap: var(--space-4);
+    padding-inline: var(--space-4);
+    background: var(--background);
+  }
+  .mobile-editor-navigation > [role="tab"] { min-height: 44px; }
+  .mobile-editor-requirements {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    padding-inline: var(--space-1);
+    border-radius: 999px;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .mobile-editor :is(.mobile-editor-writing, .mobile-editor-page) { margin: 0; }
+  /* One native toolbar row belongs to the page, outside the editable document.
+     Reserve it at all times so keyboard opening never inserts canvas space. */
+  .mobile-editor-writing { padding-block-end: calc(3.5rem + env(safe-area-inset-bottom, 0px)); }
+  .mobile-editor [role="tabpanel"][hidden] { display: none; }
+  .mobile-editor-page {
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+  .mobile-editor .editor-publication-details { display: block; }
+  .mobile-editor .course-builder-panel { scroll-margin-block-start: 0; }
+  .app.bn-scroll-container {
+    scroll-padding-block-start: var(--app-bar-height, 0px);
+  }
   @media (max-width: 767px) {
     .topbar { gap: var(--space-2); padding-inline: var(--space-3); }
     .app-editor-header, .editor-app-actions { gap: var(--space-2); }
@@ -506,7 +502,6 @@
   .editor[data-scroll-layout="workspace"] :is(.editor-frame-outline, .editor-frame-details) {
     max-height: 100%;
   }
-  .editor[data-scroll-layout="workspace"] .editor-frame[data-cards="true"] .editor-frame-canvas { flex: 1 1 0; }
   .editor[data-scroll-layout="workspace"] .editor-frame-canvas:has(.writing-root),
   .editor[data-scroll-layout="workspace"] .course-builder-panel:has(.writing-root) { display: flex; flex-direction: column; }
   .editor[data-scroll-layout="workspace"] .course-builder-panel:has(.writing-root) { flex: 1 1 0; min-height: 0; }
