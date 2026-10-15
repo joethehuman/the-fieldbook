@@ -415,7 +415,7 @@ export default function Fieldbook() {
             .map((u) => (
               <NavigationButton
                 variant="outline"
-                className="min-h-18 [&>span]:w-full [&>span]:justify-start [&>span]:gap-3"
+                className="min-h-14 min-[801px]:min-h-18 [&>span]:w-full [&>span]:justify-start [&>span]:gap-3"
                 key={u.id}
                 aria-disabled={!data}
                 onClick={data ? () => login(u.id) : undefined}
