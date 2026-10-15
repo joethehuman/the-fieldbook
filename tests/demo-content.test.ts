@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DEMO_PROFILE_IDS } from "../lib/demo-session";
+import {
+  assignedLearningCards,
+  curriculumProgress,
+} from "../lib/learning-cards";
+import { requiredSequence } from "../lib/learning";
+import { isComplete } from "../lib/types";
 import { seedContent } from "../lib/seed";
 import { freshWorkspace } from "../lib/store";
 import { orderedDocs } from "../lib/docs-navigation";
@@ -55,11 +62,8 @@ test("Docs traverse direct articles and subsections without missing or repeating
   );
   assert.equal(docs.length, 25);
   assert.equal(new Set(docs.map((d) => d.id)).size, 25);
-  assert.equal(docs[0].title, "Your First Week in Hooli Sales");
-  assert.equal(
-    docs.at(-1)!.title,
-    "Requesting an Executive Briefing with Gavin",
-  );
+  assert.equal(docs[0].title, "Your First Week at Hooli");
+  assert.equal(docs.at(-1)!.title, "Booking Time with Gavin");
 });
 
 test("every authored content link resolves to the intended published demo kind", () => {
@@ -112,4 +116,39 @@ test("every course opens with a trailer and its quiz can be passed and failed", 
     data.content.find((c) => c.id === "course-8")!.requirePassing,
     false,
   );
+});
+
+test("each selectable profile has a distinct mix of curricula and standalone For you courses", () => {
+  const data = freshWorkspace();
+  const mixes = new Set<string>();
+  for (const id of DEMO_PROFILE_IDS) {
+    const user = data.users.find((person) => person.id === id)!;
+    const progress = data.progress[id];
+    const cards = assignedLearningCards(
+      requiredSequence(data.content, user, data.groups),
+      data.curricula!,
+      user,
+      data.groups,
+    ).filter((item) =>
+      item.kind === "course"
+        ? !isComplete(item.course, progress)
+        : !curriculumProgress(item.courses, progress).complete,
+    );
+    const curricula = cards.filter((item) => item.kind === "curriculum");
+    const standalone = cards.filter((item) => item.kind === "course");
+    assert.ok(curricula.length > 0, user.name);
+    assert.ok(standalone.length >= 1 && standalone.length <= 2, user.name);
+    const represented = new Set(
+      curricula.flatMap((item) => item.courses.map((course) => course.id)),
+    );
+    for (const item of standalone)
+      assert.ok(!represented.has(item.course.id), user.name);
+    mixes.add(
+      standalone
+        .map((item) => item.course.id)
+        .sort()
+        .join(","),
+    );
+  }
+  assert.equal(mixes.size, DEMO_PROFILE_IDS.length);
 });

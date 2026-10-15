@@ -3,7 +3,7 @@ import { article, D, docLink as link, courseLink } from "./shared";
 export const demoDocs = [
   article(
     D.firstWeek,
-    "Your First Week in Hooli Sales",
+    "Your First Week at Hooli",
     "Find your territory, your tools, and the person who knows why your territory changed.",
     `
 Welcome to Hooli. You have joined a company capable of putting a founder's signature on enterprise hardware. Your first week should feel modestly less ambitious.
@@ -40,7 +40,7 @@ Nelson Bighetti's career demonstrates that job titles can move quickly here. For
 
   article(
     D.systems,
-    "Finding the System That Contains the Other System",
+    "Finding the Right Hooli System",
     "A map of Hooli's working tools, including the tool used to explain the tools.",
     `
 Hooli has an application for nearly every task. Some were built internally. Some arrived through acquisitions. A few are still learning that the acquisition happened.
@@ -116,7 +116,7 @@ Before the forecast call, review ${link("forecast", "the forecast definitions")}
 
   article(
     D.discovery,
-    "Your First Customer Conversation",
+    "Your First Customer Call",
     "Learn why the buyer took the meeting before explaining why Hooli should own the category.",
     `
 The first call should establish whether a useful next step exists. It is not an audition for Gavin's keynote, even if you have learned where he pauses for applause.
@@ -152,7 +152,7 @@ Record that in ${link("crm", "HooliForce")}, including the owner and date. If th
 
   article(
     D.availability,
-    "What We Sell, What We Demo, What Gavin Announced",
+    "What We Actually Sell",
     "Product status for customer conversations that may eventually be replayed to Product.",
     `
 Hooli's portfolio has room for established products, controlled evaluations and ambitious statements made near a large screen. These are different availability states.
@@ -186,7 +186,7 @@ Before a launch, use ${link("launch", "the launch playbook")}. Before a performa
 
   article(
     D.compression,
-    "Understanding Middle-out Without Crediting the Competition",
+    "Middle-out: The Hooli Version",
     "The technical explanation is straightforward. The institutional feelings require more care.",
     `
 Middle-out is the breakthrough associated with Richard Hendricks and Pied Piper. Hooli's desire for a different origin story does not alter that sentence.
@@ -300,7 +300,7 @@ Gavin gets the closing remarks. The customer gets a working next step.`,
 
   article(
     D.discount,
-    "Discounting Without Disrupting Our Margin",
+    "Discounting Without Regret",
     "A concession needs a reason, an approver and something more durable than quarter-end energy.",
     `
 Hooli pricing reflects the value of our products, the cost of supporting our customers, and several meetings that Finance would prefer not to repeat.
@@ -363,7 +363,7 @@ Practice the conversation in ${courseLink(14, "Pricing and Negotiation at Hooli"
 
   article(
     D.fields,
-    "HooliForce FAQ: Is This Field Required?",
+    "HooliForce: Is This Required?",
     "Usually for a reason. Occasionally because someone once asked Gavin a question.",
     `
 HooliForce contains fields that support customer work, fields that support reporting, and a field called Strategic Resonance that Revenue Operations is still negotiating to remove.
@@ -397,7 +397,7 @@ You may not rename an unwanted field “Gavin's Vision” to discourage further 
 
   article(
     D.forecast,
-    "Forecasting: Commit Is Not a Feeling",
+    "Commit Is Not a Feeling",
     "A shared language for numbers that will be discussed with increasing volume.",
     `
 The forecast is our current view of what will close in the period. It should change when the evidence changes. It should not change because the meeting now includes a more senior person.
@@ -434,7 +434,7 @@ For commercial blockers, use ${link("discount", "the discounting guide")}. For i
 
   article(
     D.finance,
-    "Finance for People Who Say ARR a Lot",
+    "Finance, Minus the Optimism",
     "Bookings, recurring revenue, cash and commission may refer to the same deal. They are still different numbers.",
     `
 Finance welcomes commercial ambition. It also requests that we stop calling every amount on a slide ARR.
@@ -471,7 +471,7 @@ Send discrepancies to Sales Compensation with the deal ID, plan period and calcu
 
   article(
     D.handoff,
-    "Closed Won. Now Tell Customer Success.",
+    "Closed Won. Now What?",
     "The signature ends the buying process. It does not upload your memory into the implementation team.",
     `
 A Closed Won deal needs a handoff before the customer has to explain what Sales promised. This is especially important when Sales used the word seamless.
@@ -509,7 +509,7 @@ Jack Barker's triangles make Sales and Engineering look adjacent. A good handoff
 
   article(
     D.landscape,
-    "The Competitive Landscape, According to Hooli",
+    "The Competitive Landscape",
     "Know whether the logo belongs to a rival, an investor, a customer or a very successful T-shirt.",
     `
 Not every company Gavin dislikes competes with the product you are selling. Establish what the buyer is comparing before requesting a new red column in the competitive matrix.
@@ -545,7 +545,7 @@ Our objective is to help the buyer compare real choices. Collecting every Silico
 
   article(
     D.piedPiper,
-    "Pied Piper: Small Company, Inconvenient Algorithm",
+    "Pied Piper: Small but Inconvenient",
     "Take the technology seriously. Keep the institutional feelings out of the evaluation.",
     `
 Pied Piper is a compression company, a new internet company, or a reminder that the account plan needs updating. Confirm which conversation you are having before opening the deck.
@@ -634,7 +634,7 @@ Close with the next fact to verify, its owner and a date. Use ${link("landscape"
 
   article(
     D.endframe,
-    "Endframe: From Competitive Threat to Strategic Capability",
+    "Endframe: We Bought the Threat",
     "An acquisition changes the account narrative faster than it changes the slide archive.",
     `
 Endframe competed in compression before Hooli acquired it. That makes it part of our product history, not a permanent independent rival to select whenever a deal becomes awkward.
@@ -669,7 +669,7 @@ We welcome our acquired colleagues. We particularly welcome them when they point
 
   article(
     D.security,
-    "Security Basics: Don’t Paste That Here",
+    "Don’t Paste That Here",
     "Protect the account, verify the request and report the mistake before it becomes an all-hands example.",
     `
 An urgent message from Gavin may be a real urgent message from Gavin. That does not make it an approved way to request your password.
@@ -699,7 +699,7 @@ Complete ${courseLink(10, "the security refresher")} and read ${link("data", "cu
 
   article(
     D.data,
-    "Customer Data: Fewer Copies, Fewer Problems",
+    "Customer Data: Fewer Copies",
     "A representative test does not require the customer's entire company in your Downloads folder.",
     `
 Request only the information needed to qualify or evaluate the use case. The phrase “send us a sample” should describe an agreed sample, its purpose and its destination.
@@ -771,7 +771,7 @@ Practice with ${courseLink(9, "Responsible AI, Pending Review")}. The course is 
 
   article(
     D.values,
-    "Our Values: The Conjoined Triangles of Success",
+    "The Conjoined Triangles",
     "A practical interpretation of a framework whose geometry has already received executive approval.",
     `
 Jack Barker's Conjoined Triangles of Success bring Engineering and Manufacturing together with Sales and Growth through compromise.
@@ -808,7 +808,7 @@ Gavin may still commission the campaign. If asked to participate, bring a specif
 
   article(
     D.coaching,
-    "Sales Coaching Without Another Dashboard",
+    "Coaching Without a Dashboard",
     "Review the work, identify one change and resist assigning a score to the person's entire existence.",
     `
 A dashboard can tell you a deal is stalled. It cannot tell you whether the seller misunderstood the buyer, missed a handoff or is waiting for an answer from the person reviewing the dashboard.
@@ -976,7 +976,7 @@ Please reflect on this before Friday's all-hands. I have added forty minutes to 
 
   article(
     D.executive,
-    "Requesting an Executive Briefing with Gavin",
+    "Booking Time with Gavin",
     "Bring a customer decision, a prepared team and a slide order that can withstand executive interest.",
     `
 An executive briefing should help a customer make a significant decision. It should not be the first moment the account team discovers what decision that is.
