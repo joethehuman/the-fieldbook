@@ -83,13 +83,6 @@
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.writing-toolbar-controls {
-  display: flex;
-  flex-wrap: wrap;
-  min-width: 0;
-  align-items: center;
-  gap: var(--space-1);
-}
 .writing-source-panel {
   display: flex;
   flex-direction: column;
@@ -264,48 +257,9 @@
     min-height: 44px;
   }
 }
-.editor-mobile-navigation {
-  flex: none;
-}
-.editor-mobile-navigation .detail-navigation-label {
-  display: none;
-}
-.editor-mobile-navigation .detail-navigation-short-label {
-  display: inline;
-}
-.editor-mobile-navigation [data-slot="button"] {
-  width: 56px;
-  min-width: 56px;
-  height: 44px;
-  min-height: 44px;
-  padding: 0;
-  gap: 4px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.editor-mobile-toolbar
-  :is(.editor-controls-surface, .writing-toolbar-controls) {
-  flex-wrap: nowrap;
-  gap: 0;
-}
-.editor-mobile-toolbar
-  :is(.editor-panel-toggle, .writing-toolbar-controls [data-slot="button"]) {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-}
-.editor-frame[data-mobile] .writing-command-label {
-  display: none;
-}
-.editor-frame[data-mobile]
-  :is(.writing-document-heading, .fieldbook-blocknote .bn-editor) {
-  padding-inline-end: var(--space-4);
-}
-.editor-frame[data-mobile] .writing-surface {
-  overflow: visible;
-}
+/* Mobile titles and writing share the same small page gutter. */
+.editor-frame[data-mobile] .writing-surface { overflow: visible; }
+.editor-frame[data-mobile] .writing-viewport { scrollbar-gutter: auto; }
 @media (prefers-reduced-motion: reduce) {
   .fieldbook-blocknote * {
     scroll-behavior: auto;
@@ -367,16 +321,15 @@
 .editor .writing-view-header {
   display: none;
 }
-/* BlockNote's supported viewport container owns mobile keyboard geometry. */
-.app[data-mobile-editor].bn-scroll-container {
-  inset: auto;
-  min-height: 0;
-}
-.app[data-mobile-editor].bn-scroll-container .main-shell {
-  min-height: 100%;
-}
-.bn-mobile-formatting-toolbar {
+/* Inset only the native toolbar's presentation. BlockNote still owns its
+   viewport transform, horizontal scrolling, touch handling and popovers. */
+body:has(.app[data-mobile-editor]) .bn-mobile-formatting-toolbar {
+  padding-inline: 16px;
+  box-sizing: border-box;
   z-index: 50;
+}
+body:has(.app[data-mobile-editor]) .bn-mobile-formatting-toolbar .bn-toolbar {
+  max-width: 100%;
 }
 /* Native blocks retain geometry. The theme and explicitly configured controls
    keep Fieldbook colors and the supported menu/table refinements. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ListTree, SlidersHorizontal, X } from "lucide-react";
 import { MarkdownDownloadButton } from "./markdown-download";
 import { Button } from "../ui/button";
@@ -8,10 +8,6 @@ import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
 import { useEditorCardsLayout } from "./use-editor-cards-layout";
-
-export const EditorMobileOverlayContext = createContext<HTMLElement | null>(null);
-export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
-export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
 
 export type DetailsReveal = { request: number; field?: string };
 
@@ -59,12 +55,7 @@ export function EditorFrame({
 }) {
   const phone = useEditorCardsLayout();
   const frame = useRef<HTMLElement>(null);
-  const controls = useRef<HTMLDivElement>(null);
-  const toolbarSlot = useRef<HTMLDivElement>(null);
-  const toolbar = useRef<HTMLDivElement>(null);
-  const [writingActionsHost, setWritingActionsHost] = useState<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
-  const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const hasNavigation = !!navigation;
   const [panels, setPanels] = useState({ outline: false, details: false });
   const panelState = useRef(panels);
@@ -110,7 +101,7 @@ export function EditorFrame({
     if (!phone || !panels.outline && !panels.details) return;
     const dismiss = (event: PointerEvent) => {
       const target = event.target;
-      if (!(target instanceof Element) || target.closest('.editor-mobile-toolbar, [data-radix-popper-content-wrapper], [data-slot="dialog-content"]')) return;
+      if (!(target instanceof Element) || target.closest('.editor-mobile-gutter, [data-radix-popper-content-wrapper], [data-slot="dialog-content"]')) return;
       setPanels({ outline: false, details: false });
     };
     document.addEventListener("pointerdown", dismiss);
@@ -134,8 +125,6 @@ export function EditorFrame({
   const detailsToggle = useRef<HTMLButtonElement>(null);
   const outlineId = useId();
   const detailsId = useId();
-  const dismissPanels = useCallback(() => setPanels({ outline: false, details: false }), []);
-  const compactControls = useMemo(() => phone ? { panelsOpen: panels.outline || panels.details, dismissPanels } : null, [phone, panels.outline, panels.details, dismissPanels]);
   const defaultsApplied = useRef(false);
   const previousClearance = useRef({ outline: false, details: false });
   const hasOutline = !!outline;
@@ -279,7 +268,7 @@ export function EditorFrame({
     </div>
   </EditorDetailsGroup>;
   const panelControls = (
-      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} role={phone ? "group" : undefined} aria-label={phone ? "Editor controls" : undefined}>
+      <div className="editor-frame-controls" data-cards={phone || undefined} role={phone ? "group" : undefined} aria-label={phone ? "Editor controls" : undefined}>
       <div className="editor-controls-surface">
         {outline && (
           <Button ref={outlineToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${phone ? "relative p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute size-11 rounded-full"}`} data-side="outline"
@@ -290,7 +279,6 @@ export function EditorFrame({
             {panels.outline ? <X aria-hidden="true" /> : <ListTree aria-hidden="true" />}
           </Button>
         )}
-        {phone && <div className="editor-writing-actions-host" ref={setWritingActionsHost} />}
         <Button ref={detailsToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${phone ? "relative p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute size-11 rounded-full"}`} data-side="details"
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
@@ -332,26 +320,17 @@ export function EditorFrame({
         </div>}
   </>;
   return (
-    <EditorCompactControlsContext.Provider value={compactControls}>
-    <EditorWritingActionsContext.Provider value={writingActionsHost}>
-    <EditorMobileOverlayContext.Provider value={overlayHost}>
     <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-mobile={phone || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
       {!phone && panelControls}
-      {phone && <div ref={toolbarSlot} className="editor-mobile-toolbar-slot"><div ref={toolbar} className="editor-mobile-toolbar">
-        {navigation && <div className="editor-mobile-navigation">{navigation}</div>}
+      {phone && <div className="editor-mobile-gutter">
         {panelControls}
-        <div ref={setOverlayHost} className="editor-mobile-overlays">
-          <div className="editor-mobile-panels">{panelSurfaces}</div>
-        </div>
-      </div></div>}
+        <div className="editor-mobile-panels">{panelSurfaces}</div>
+      </div>}
       <div className="editor-frame-body">
         {!phone && panelSurfaces}
         <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!phone && navigation && <div className="editor-canvas-navigation">{navigation}</div>}{children}</div>
       </div>
     </section>
-    </EditorMobileOverlayContext.Provider>
-    </EditorWritingActionsContext.Provider>
-    </EditorCompactControlsContext.Provider>
   );
 }
 

@@ -8,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { BlockNoteView } from "@blocknote/shadcn";
 import {
   useCreateBlockNote,
@@ -42,7 +41,6 @@ import {
   insertOrUpdateBlockForSlashMenu,
 } from "@blocknote/core";
 import {
-  SuggestionMenu,
   FilePanelExtension,
   getDefaultSlashMenuItems,
   SideMenuExtension,
@@ -50,8 +48,6 @@ import {
 import { syntaxHighlighter } from "@blocknote/code-block";
 import {
   Plus,
-  Undo,
-  Redo,
   Link as LinkIcon,
   Type,
   Heading1,
@@ -70,7 +66,6 @@ import {
   Video,
   type LucideIcon,
 } from "lucide-react";
-import { Button } from "../ui/button";
 import { Alert } from "../ui/alert";
 import { createWritingSchema, writingDictionary } from "./blocknote-schema";
 import { WritingTableHandle } from "./blocknote-table-handle";
@@ -87,7 +82,7 @@ import {
   WritingIntroductionContext,
   WritingTitleEnterContext,
 } from "./writing-title";
-import { EditorWritingActionsContext } from "./editor-frame";
+import { useEditorCardsLayout } from "./use-editor-cards-layout";
 import { useScrollFade } from "./use-scroll-fade";
 import type { WritingEditorProps } from "./writing-editor";
 
@@ -287,11 +282,10 @@ export default function WritingEditorEngine({
   onUpload,
   viewControls,
   label = "Content",
-  canvas,
 }: EditorProps) {
   const title = useContext(WritingTitleContext);
   const introduction = useContext(WritingIntroductionContext);
-  const actionsHost = useContext(EditorWritingActionsContext);
+  const mobile = useEditorCardsLayout();
   const latest = useRef({ onChange, onUpload });
   latest.current = { onChange, onUpload };
   const [error, setError] = useState("");
@@ -419,62 +413,6 @@ export default function WritingEditorEngine({
       setError(`Couldn’t save this edit: ${(reason as Error).message}`);
     }
   }
-  function command(action: () => void) {
-    interacted.current = true;
-    editor.focus();
-    action();
-    changed();
-  }
-  const controls = (
-    <div className="writing-toolbar-controls">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={disabled}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() =>
-          command(() =>
-            editor.getExtension(SuggestionMenu)?.openSuggestionMenu("/"),
-          )
-        }
-        aria-label="Commands"
-      >
-        <Plus aria-hidden="true" />
-        <span className="writing-command-label">Insert</span>
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        disabled={disabled}
-        aria-label="Undo"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() =>
-          command(() => {
-            editor.undo();
-          })
-        }
-      >
-        <Undo aria-hidden="true" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        disabled={disabled}
-        aria-label="Redo"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() =>
-          command(() => {
-            editor.redo();
-          })
-        }
-      >
-        <Redo aria-hidden="true" />
-      </Button>
-    </div>
-  );
   const enterBody = () => {
     const first = editor.document[0];
     const target = Array.isArray(first.content)
@@ -512,13 +450,8 @@ export default function WritingEditorEngine({
           {error}
         </Alert>
       )}
-      {canvas && actionsHost ? (
-        createPortal(controls, actionsHost)
-      ) : (
-        <div className="writing-view-header">
-          {controls}
-          {viewControls}
-        </div>
+      {viewControls && (
+        <div className="writing-view-header">{viewControls}</div>
       )}
       <div
         ref={fade.ref}
@@ -585,7 +518,9 @@ export default function WritingEditorEngine({
                 }}
               />
               <FormattingToolbarController
-                formattingToolbar={WritingFormattingToolbar}
+                formattingToolbar={
+                  mobile ? undefined : WritingFormattingToolbar
+                }
               />
               <WritingSideMenuController />
               <TableHandlesController tableHandle={WritingTableHandle} />
