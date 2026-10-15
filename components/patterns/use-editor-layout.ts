@@ -1,33 +1,32 @@
 "use client";
 
-import { useLayoutEffect, type RefObject } from "react";
+import { createContext, useContext, useLayoutEffect, type RefObject } from "react";
 import { compactLayoutQuery } from "./use-compact-layout";
 import { useEditorCardsLayout } from "./use-editor-cards-layout";
+
+// The shell renders its own class and data attribute together. An editor must
+// not imperatively amend a className that React replaces on later renders.
+export const EditorMobileScrollContext = createContext<((active: boolean) => void) | null>(null);
 
 /** CSS distributes the remaining space; measurement only chooses a usable layout. */
 export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
   const mobile = useEditorCardsLayout();
+  const setMobileScroll = useContext(EditorMobileScrollContext);
+  useLayoutEffect(() => {
+    setMobileScroll?.(mobile);
+    return () => setMobileScroll?.(false);
+  }, [mobile, setMobileScroll]);
   useLayoutEffect(() => {
     const editor = ref.current;
     const viewport = editor?.closest<HTMLElement>(".main-content");
     if (!editor || !viewport) return;
-    const app = editor.closest<HTMLElement>(".app");
     const compact = window.matchMedia(compactLayoutQuery);
     if (mobile) {
       // BlockNote owns keyboard geometry. Mobile has one native app scroller,
       // with no canvas sizing observers or viewport correction loops.
-      if (app) {
-        app.dataset.mobileEditor = "true";
-        app.classList.add("bn-scroll-container");
-      }
       editor.dataset.scrollLayout = "page";
       editor.removeAttribute("data-flowing-heading");
-      return () => {
-        if (app) {
-          delete app.dataset.mobileEditor;
-          app.classList.remove("bn-scroll-container");
-        }
-      };
+      return;
     }
     let request = 0;
     let initialized = false;
@@ -108,7 +107,6 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
       observer.disconnect();
       mutations.disconnect();
       compact.removeEventListener("change", schedule);
-      if (app) { delete app.dataset.mobileEditor; app.classList.remove("bn-scroll-container"); }
     };
   }, [ref, mobile]);
 }

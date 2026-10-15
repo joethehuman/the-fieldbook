@@ -35,6 +35,7 @@ import {
   type SideMenuProps,
   type FloatingUIOptions,
   useBlockNoteEditor,
+  useEditorFocus,
 } from "@blocknote/react";
 import {
   filterSuggestionItems,
@@ -85,8 +86,6 @@ import {
 import { useEditorCardsLayout } from "./use-editor-cards-layout";
 import { useScrollFade } from "./use-scroll-fade";
 import type { WritingEditorProps } from "./writing-editor";
-
-import "@blocknote/shadcn/style.css";
 
 type EditorProps = WritingEditorProps & {
   initialDocument: BlockDocument;
@@ -182,6 +181,8 @@ function WritingSideMenu(props: SideMenuProps) {
 }
 function WritingSideMenuController() {
   const editor = useBlockNoteEditor();
+  const mobile = useEditorCardsLayout();
+  const focused = useEditorFocus({ includeEditorUI: true });
   const floatingUIOptions = useMemo<FloatingUIOptions>(
     () => ({
       // Keep native block controls beneath the pinned title (12) and Back
@@ -202,6 +203,7 @@ function WritingSideMenuController() {
                     : undefined;
               if (
                 block?.type === "heading" &&
+                !mobile &&
                 reference instanceof HTMLElement
               ) {
                 const inline =
@@ -243,8 +245,11 @@ function WritingSideMenuController() {
         ],
       },
     }),
-    [editor],
+    [editor, mobile],
   );
+  // Safari can treat a hover-revealed control as the first tap. Wait for native
+  // focus on touch, then retain the full native block menu and dragging controls.
+  if (mobile && !focused) return null;
   return (
     <SideMenuController
       sideMenu={WritingSideMenu}

@@ -324,7 +324,7 @@
 /* Inset only the native toolbar's presentation. BlockNote still owns its
    viewport transform, horizontal scrolling, touch handling and popovers. */
 body:has(.app[data-mobile-editor]) .bn-mobile-formatting-toolbar {
-  padding-inline: 16px;
+  padding-inline: var(--editor-mobile-gutter);
   box-sizing: border-box;
   z-index: 50;
 }
@@ -661,6 +661,12 @@ body:has(.app[data-mobile-editor]) .bn-mobile-formatting-toolbar .bn-toolbar {
 }
 .bn-container.bn-shadcn .bn-side-menu .bn-button:active {
   background: var(--muted-hover);
+}
+/* Keep both native actions reachable inside the narrow mobile gutter. */
+body:has(.app[data-mobile-editor]) .bn-container.bn-shadcn .bn-side-menu {
+  --writing-side-control-size: 44px;
+  flex-direction: column;
+  height: auto;
 }
 /* A square grip keeps the rotated column handle the same size as the row handle. */
 .bn-shadcn .bn-table-handle {

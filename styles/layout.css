@@ -420,7 +420,7 @@
   /* One native BlockNote scroll container; the header and canvas stay in flow. */
   html:has(.app[data-mobile-editor]),
   body:has(.app[data-mobile-editor]) { overflow: visible; }
-  .app[data-mobile-editor] { --editor-mobile-gutter: 16px; }
+  body:has(.app[data-mobile-editor]) { --editor-mobile-gutter: 52px; }
   .app[data-mobile-editor] .main-shell {
     height: auto;
     min-height: 100%;
@@ -445,10 +445,7 @@
   }
   .editor-frame[data-mobile] .editor-frame-body { display: block; }
   .editor-frame[data-mobile] .editor-frame-canvas { overflow: visible; }
-  .editor-mobile-gutter {
-    position: relative;
-    margin-inline: var(--editor-mobile-gutter);
-  }
+  .editor-mobile-gutter { position: relative; }
   .editor-mobile-gutter .editor-frame-controls {
     position: static;
     height: auto;
@@ -459,8 +456,9 @@
     align-items: center;
     justify-content: space-between;
     min-height: 44px;
+    padding-inline: calc((var(--editor-mobile-gutter) - 44px) / 2);
   }
-  .editor-mobile-gutter .editor-panel-toggle {
+  .editor-mobile-gutter .editor-gutter-toggle {
     position: static;
     width: 44px;
     height: 44px;
@@ -468,12 +466,13 @@
     flex-shrink: 0;
     box-shadow: none;
   }
-  .editor-mobile-gutter .editor-panel-toggle[data-side="details"] { margin-inline-start: auto; }
+  .editor-mobile-gutter .editor-gutter-toggle[data-side="details"] { margin-inline-start: auto; }
+  .editor-mobile-gutter .editor-requirements-badge { inset-inline-end: 0; }
   .editor-mobile-panels .editor-frame-panel {
     position: absolute;
-    inset: 100% 0 auto;
+    inset: 100% var(--space-3) auto;
     z-index: 20;
-    width: 100%;
+    width: auto;
     max-height: min(32rem, calc(var(--bn-vv-height, 100dvh) - 4rem));
     padding: 0;
     pointer-events: auto;

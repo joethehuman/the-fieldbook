@@ -271,7 +271,7 @@ export function EditorFrame({
       <div className="editor-frame-controls" data-cards={phone || undefined} role={phone ? "group" : undefined} aria-label={phone ? "Editor controls" : undefined}>
       <div className="editor-controls-surface">
         {outline && (
-          <Button ref={outlineToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${phone ? "relative p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute size-11 rounded-full"}`} data-side="outline"
+          <Button ref={outlineToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={phone ? "editor-gutter-toggle relative size-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "editor-panel-toggle absolute size-11 rounded-full"} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
             onMouseDown={(event) => { if (phone) event.preventDefault(); }}
@@ -279,7 +279,7 @@ export function EditorFrame({
             {panels.outline ? <X aria-hidden="true" /> : <ListTree aria-hidden="true" />}
           </Button>
         )}
-        <Button ref={detailsToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${phone ? "relative p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute size-11 rounded-full"}`} data-side="details"
+        <Button ref={detailsToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={phone ? "editor-gutter-toggle relative size-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "editor-panel-toggle absolute size-11 rounded-full"} data-side="details"
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}

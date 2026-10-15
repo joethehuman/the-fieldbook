@@ -27,6 +27,8 @@ import {
 } from "./writing-title";
 import { useScrollFade } from "./use-scroll-fade";
 import { revealEditorTarget } from "./reveal-editor-target";
+// The scroll-container styles must exist even during loading/source recovery.
+import "@blocknote/shadcn/style.css";
 import "../../styles/writing-editor.css";
 
 // Next's loading component does not receive the lazy editor's props.
