@@ -32,7 +32,7 @@ Fieldbook bundles the unmodified `@blocknote/core`, `@blocknote/react`, `@blockn
 
 ## Code highlighting
 
-Fieldbook uses [Highlight.js](https://github.com/highlightjs/highlight.js) for automatic language detection and reader syntax highlighting. It retains its BSD 3-Clause license; the complete [copyright notice and license](../public/licenses/highlightjs-bsd-3-clause.txt) ship with both apps at `/licenses/highlightjs-bsd-3-clause.txt`. BlockNote code highlighting uses its open-source Shiki integration. Preserve these dependency licenses when redistributing bundled software.
+Fieldbook uses [Highlight.js](https://github.com/highlightjs/highlight.js) for automatic language detection and reader syntax highlighting. It retains its BSD 3-Clause license; the complete [copyright notice and license](../public/licenses/highlightjs-bsd-3-clause.txt) ship with both apps at `/licenses/highlightjs-bsd-3-clause.txt`. BlockNote code highlighting uses Shiki. Its MIT copyright notice and license ship with both apps at [`/licenses/shiki-mit.txt`](../public/licenses/shiki-mit.txt). Preserve these dependency licenses when redistributing bundled software.
 
 ## Vercel AI SDK dependencies
 

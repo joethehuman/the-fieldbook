@@ -756,9 +756,7 @@
     height: 100%;
     object-fit: cover;
   }
-  .course-cover-editor,
-  .doc-section-create,
-  .markdown-editor {
+  .doc-section-create {
     display: grid;
     gap: var(--space-3);
   }

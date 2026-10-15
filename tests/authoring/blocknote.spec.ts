@@ -79,6 +79,105 @@ async function setup(
   return { editor, read };
 }
 
+for (const kind of ["doc", "course"] as const) {
+  test(`${kind}: obscured block controls cannot cover the pinned title or Back`, async ({
+    page,
+  }, info) => {
+    test.skip(
+      info.project.use.hasTouch === true ||
+        Number(info.project.use.viewport?.width) < 1024,
+      "Compact layouts use flowing titles instead of this desktop pinned-title composition.",
+    );
+    const { editor } = await setup(
+      page,
+      info.project.name.startsWith("production"),
+      kind,
+      "A long paragraph with useful context. ".repeat(45) +
+        "\n\n" +
+        Array.from(
+          { length: 30 },
+          (_, i) => `Following paragraph ${i + 1}.`,
+        ).join("\n\n"),
+      true,
+    );
+    const paragraph = editor.locator('[data-content-type="paragraph"]').first();
+    const viewport = page.locator(".writing-viewport");
+    const title = page.locator(".writing-document-heading");
+    const hoverBody = async () => {
+      const p = (await paragraph.boundingBox())!,
+        h = (await title.boundingBox())!;
+      await page.mouse.move(p.x + 40, Math.max(p.y + 12, h.y + h.height + 12));
+      await expect(page.locator(".bn-side-menu")).toBeAttached();
+    };
+    await hoverBody();
+    for (let i = 0; i < 2; i++) {
+      const p = (await paragraph.boundingBox())!,
+        h = (await title.boundingBox())!;
+      await viewport.evaluate(
+        (node, delta) => {
+          node.scrollTop += delta;
+        },
+        p.y - h.y - h.height + 48,
+      );
+      await page.evaluate(
+        () =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          ),
+      );
+    }
+    await expect
+      .poll(() => viewport.evaluate((node) => node.scrollTop))
+      .toBeGreaterThan(0);
+    await hoverBody();
+    const coveredBy = () =>
+      page.locator(".bn-side-menu").evaluate((e) => {
+        const r = e.getBoundingClientRect();
+        return document
+          .elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+          ?.closest(".writing-document-heading, .editor-canvas-navigation")
+          ?.className;
+      });
+    await expect.poll(coveredBy).toBe("writing-document-heading");
+    const p = (await paragraph.boundingBox())!;
+    const back = (await page
+      .locator(".editor-canvas-navigation")
+      .boundingBox())!;
+    await viewport.evaluate(
+      (node, delta) => {
+        node.scrollTop += delta;
+      },
+      p.y - back.y - 10,
+    );
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    await hoverBody();
+    await expect.poll(coveredBy).toBe("editor-canvas-navigation");
+    await viewport.evaluate((node) => {
+      node.scrollTop = 0;
+    });
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    await hoverBody();
+    await page
+      .getByRole("button", { name: "Open block menu", exact: true })
+      .click();
+    await expect(
+      page.getByRole("menuitem", { name: "Delete", exact: true }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(editor).toContainText("A long paragraph with useful context.");
+  });
+}
+
 test("themed heading handles align with the first line at every supported level", async ({
   page,
 }, info) => {
@@ -184,7 +283,9 @@ for (const level of [1, 2, 3]) {
     await editor.locator(".bn-trailing-block").click();
     await page.keyboard.type(`/collapsible heading ${level}`);
     await page
-      .getByRole("option", { name: new RegExp(`^Collapsible heading ${level} `) })
+      .getByRole("option", {
+        name: new RegExp(`^Collapsible heading ${level} `),
+      })
       .click();
     const heading = editor.locator(
       '.bn-toggle-slot > [data-content-type="heading"]',
@@ -230,9 +331,13 @@ for (const level of [1, 2, 3]) {
     await toggle.click();
     await page.keyboard.press("Enter");
     await page.keyboard.type("Child content.");
-    await expect(editor.getByText("Child content.", { exact: true })).toBeVisible();
+    await expect(
+      editor.getByText("Child content.", { exact: true }),
+    ).toBeVisible();
     await toggle.click();
-    await expect(editor.getByText("Child content.", { exact: true })).toBeHidden();
+    await expect(
+      editor.getByText("Child content.", { exact: true }),
+    ).toBeHidden();
     await waitForDraftSaved(page);
     const saved = (await read()).bodyDocument!.blocks.find(
       (block) => block.type === "heading",
@@ -795,14 +900,21 @@ test("code header preserves native editing and saved formatting", async ({
     return {
       color: style.color,
       background: getComputedStyle(element).backgroundColor,
-      headerBottom: element.querySelector(".writing-code-header")!.getBoundingClientRect().bottom,
+      headerBottom: element
+        .querySelector(".writing-code-header")!
+        .getBoundingClientRect().bottom,
       codeTop: element.querySelector("pre")!.getBoundingClientRect().top,
     };
   });
   expect(geometry.color).not.toBe(geometry.background);
   expect(geometry.headerBottom).toBeLessThanOrEqual(geometry.codeTop);
-  await source.click({ position: { x: 3, y: 8 } });
-  for (const _ of "const value = 1;") await page.keyboard.press("ArrowRight");
+  // Select the native line and collapse to its end: pixel click offsets and
+  // the End key differ between desktop and touch WebKit.
+  await source.click({ clickCount: 3 });
+  await expect
+    .poll(() => page.evaluate(() => getSelection()?.toString().trim()))
+    .toBe("const value = 1;");
+  await page.keyboard.press("ArrowRight");
   await page.keyboard.type(" // edited");
   await expect(source).toContainText("const value = 1; // edited");
   await page.keyboard.press("Enter");
@@ -901,7 +1013,9 @@ test("code header menu opens without moving a scrolled canvas", async ({
 });
 
 for (const initialCode of ["", "example_code"]) {
-  test(`code header keeps the caret below ${initialCode ? "populated" : "empty"} code after menu use`, async ({ page }, info) => {
+  test(`code header keeps the caret below ${initialCode ? "populated" : "empty"} code after menu use`, async ({
+    page,
+  }, info) => {
     const { editor, read } = await setup(
       page,
       info.project.name.startsWith("production"),
@@ -914,14 +1028,20 @@ for (const initialCode of ["", "example_code"]) {
     const codeId = await code.locator("xpath=..").getAttribute("data-id");
     await editor.locator(".bn-trailing-block").click();
     await page.keyboard.type("After code.");
-    const caretBlock = () => editor.evaluate(() => {
-      const node = getSelection()?.anchorNode;
-      const element = node?.nodeType === 1 ? node as Element : node?.parentElement;
-      return element?.closest("[data-content-type]")?.getAttribute("data-content-type");
-    });
+    const caretBlock = () =>
+      editor.evaluate(() => {
+        const node = getSelection()?.anchorNode;
+        const element =
+          node?.nodeType === 1 ? (node as Element) : node?.parentElement;
+        return element
+          ?.closest("[data-content-type]")
+          ?.getAttribute("data-content-type");
+      });
     expect(await caretBlock()).toBe("paragraph");
     await picker.click();
-    await expect(page.getByRole("menu", { name: "Code language" })).toBeVisible();
+    await expect(
+      page.getByRole("menu", { name: "Code language" }),
+    ).toBeVisible();
     await expect(editor).toBeFocused();
     await page.getByRole("menuitem", { name: "Python", exact: true }).click();
     await expect(page.getByRole("menu")).toBeHidden();
@@ -929,24 +1049,30 @@ for (const initialCode of ["", "example_code"]) {
     await expect(editor).toBeFocused();
     expect(await caretBlock()).toBe("paragraph");
     await page.keyboard.type(" Still below.");
-    await expect(editor.locator('[data-content-type="paragraph"]').last())
-      .toHaveText("After code. Still below.");
+    await expect(
+      editor.locator('[data-content-type="paragraph"]').last(),
+    ).toHaveText("After code. Still below.");
     await expect(code.locator("pre code")).toHaveText(initialCode);
     // The header supports native keyboard menu navigation as well as pointer use.
     await picker.focus();
     await page.keyboard.press("ArrowDown");
-    await expect(page.getByRole("menu", { name: "Code language" })).toBeVisible();
+    await expect(
+      page.getByRole("menu", { name: "Code language" }),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toBeHidden();
     await expect(editor).toBeFocused();
     expect(await caretBlock()).toBe("paragraph");
     await waitForDraftSaved(page);
-    const saved = (await read()).bodyDocument!.blocks.find(b => b.type === "codeBlock")!;
+    const saved = (await read()).bodyDocument!.blocks.find(
+      (b) => b.type === "codeBlock",
+    )!;
     expect(saved.id).toBe(codeId);
     expect(saved.props.language).toBe("python");
     await page.reload();
-    await expect(editor.locator('[data-content-type="paragraph"]').last())
-      .toHaveText("After code. Still below.");
+    await expect(
+      editor.locator('[data-content-type="paragraph"]').last(),
+    ).toHaveText("After code. Still below.");
     expect((await downloadMarkdown(page)).body).toContain("```python");
   });
 }
@@ -1180,4 +1306,73 @@ test("Return from the title provides a writing line before media without replaci
   );
   await page.reload();
   await expect(editor).toContainText("Before the media.");
+});
+
+test("native rich paste retains its paragraph suffix and strips executable HTML", async ({
+  page,
+}, info) => {
+  const { editor, read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    "Keep the suffix.",
+    true,
+  );
+  const paragraph = editor.locator('[data-content-type="paragraph"]').first();
+  await paragraph.click({ clickCount: 3 });
+  await page.keyboard.press("ArrowLeft");
+  await editor.evaluate((node) => {
+    const data = new DataTransfer();
+    data.setData(
+      "text/html",
+      '<p>Opening context.</p><h2>Imported heading</h2><p><strong>Useful context</strong><script>window.untrustedPaste = true</script><a href="javascript:alert(1)">Unsafe link</a></p>',
+    );
+    data.setData("text/plain", "Opening context.\nImported heading\nUseful context Unsafe link");
+    node.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: data,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await expect(
+    editor.getByRole("heading", { name: "Imported heading", exact: true }),
+  ).toBeVisible();
+  await expect(editor).toContainText("Keep the suffix.");
+  await expect(
+    editor.locator('script, [onclick], a[href^="javascript:"]'),
+  ).toHaveCount(0);
+  expect(await page.evaluate(() => "untrustedPaste" in window)).toBe(false);
+  await waitForDraftSaved(page);
+  const saved = await read();
+  expect(saved.body).toContain("## Imported heading");
+  expect(saved.body).toContain("Keep the suffix.");
+  expect(saved.body).not.toContain("javascript:");
+  await editor.press("ControlOrMeta+z");
+  await expect(editor).toHaveText("Keep the suffix.");
+});
+
+test("mobile writing controls never submit or publish the surrounding editor form", async ({ page }, info) => {
+  test.skip(info.project.use.hasTouch !== true, "The app toolbar appears for touch editing");
+  const { editor } = await setup(page, info.project.name.startsWith("production"), "doc", "Published text.", true);
+  await editor.locator('[data-content-type="paragraph"]').first().click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" A private draft.");
+  await waitForDraftSaved(page);
+  await editor.evaluate(node => {
+    node.closest("form")!.addEventListener("submit", () => {
+      document.documentElement.dataset.editorFormSubmits = String(Number(document.documentElement.dataset.editorFormSubmits || 0) + 1);
+    });
+  });
+  await page.getByRole("button", { name: "Commands", exact: true }).tap();
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Undo", exact: true }).tap();
+  await expect(editor).not.toContainText("A private draft.");
+  await page.getByRole("button", { name: "Redo", exact: true }).tap();
+  await expect(editor).toContainText("A private draft.");
+  expect(await page.locator("html").getAttribute("data-editor-form-submits")).toBeNull();
+  const published = await page.evaluate(() => JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!).publishedContent[0]);
+  expect(published.body).toBe("Published text.");
 });

@@ -1,8 +1,13 @@
+import { recordSegment } from "../../lib/record-url";
 import { test, expect } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { setupAuthoringProvider } from "./provider-fixture";
-import { openContentSettings, closeContentSettings } from "./editor-helpers";
+import {
+  openContentSettings,
+  closeContentSettings,
+  waitForDraftSaved,
+} from "./editor-helpers";
 
 for (const publishedRule of [false, true, undefined]) {
   test(`published completion rule ${publishedRule ?? "legacy"} permits corrections and requires a new version only for rule changes`, async ({
@@ -67,6 +72,14 @@ for (const publishedRule of [false, true, undefined]) {
     expect((await read()).version).toBe(course.version);
     expect((await read()).requirePassing ?? true).toBe(publishedRule ?? true);
 
+    // Wait for the client to acknowledge publication and its canonical URL;
+    // the server response alone can precede the router's replacement.
+    await waitForDraftSaved(page);
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname ===
+        `/admin/content/${recordSegment(course.id, course.title)}/edit`,
+    );
     // Reload so the real lightweight server projection supplies the baseline.
     await page.reload();
     await openContentSettings(page);

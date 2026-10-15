@@ -7,7 +7,7 @@ import {
   importMarkdownDocument,
   preserveBlockDocumentWrite,
 } from "../lib/block-document";
-import { readTableWidths, writeTableWidths } from "../lib/writing-table";
+import { readTableWidths, writeTableWidths } from "../lib/markdown-table-metadata";
 import { contentSignature } from "../lib/demo-publication";
 import { seedContent } from "../lib/seed";
 

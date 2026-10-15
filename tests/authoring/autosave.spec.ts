@@ -342,7 +342,11 @@ test("an assigned course stages a new version through autosaves and consumes it 
   await page.getByRole("textbox", { name: "Lesson content", exact: true }).fill("A small inline lesson correction.");
   await expect
     .poll(async () => (await read()).lessons[0].body)
-    .toBe("A small inline lesson correction.");
+    .toContain("A small inline lesson correction.");
+  // The native block draft folds legacy video metadata into its Markdown
+  // projection. A prose correction must preserve that media until Publish.
+  expect((await read()).lessons[0].body).toContain(before.lessons[0].videoUrl);
+  expect((await read()).lessons[0].videoUrl).toBeUndefined();
   expect((await read()).version).toBe(before.version);
   expect((await read()).assignments).toEqual(before.assignments);
   expect((await read(true)).lessons[0].body).toBe(before.lessons[0].body);

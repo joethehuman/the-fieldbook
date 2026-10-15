@@ -3,7 +3,7 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import remarkStringify from "remark-stringify";
-import { readTableWidths, writeTableWidths } from "./writing-table";
+import { readTableWidths, writeTableWidths } from "./markdown-table-metadata";
 import { normalizeContentLink, isSafeContentLink } from "./content-links";
 import { videoSource } from "./video";
 import { isInlineVideo } from "./inline-video";

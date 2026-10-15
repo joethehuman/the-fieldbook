@@ -10,7 +10,7 @@ Choose the release you want to run and read its configuration, migration and dep
 
 ## Block documents and editor compatibility
 
-The editor stores optional versioned `bodyDocument` blocks within the existing draft and published JSON records. The application generates the existing Markdown `body` field from those blocks for search and export, so this format needs no database migration or bulk conversion. Existing Markdown records remain readable. Opening an editor does not convert or publish a record; a substantive edit saves blocks in the draft only.
+The editor stores optional versioned `bodyDocument` blocks within the existing content and privacy-policy draft/published JSON records. The application generates the existing Markdown `body` field from those blocks for search and export, so this format needs no database migration or bulk conversion. Existing Markdown records remain readable. Opening an editor does not convert or publish a record; a substantive edit saves blocks in the draft only.
 
 Keep a database backup before upgrading. Versions that understand only Markdown cannot safely edit block documents: they may discard block IDs, table properties or other structured information. Rollbacks must preserve the structured records, and editing must resume on a compatible application version. MCP clients should preserve `bodyDocument` for metadata changes and update its blocks for prose changes; contradictory Markdown-only edits are rejected. The reader uses stored blocks when present and Markdown for legacy records. Markdown download preserves supported text and media links but is not a complete backup of the native block document.
 

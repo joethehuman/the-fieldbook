@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Markdown from "../components/Markdown";
-import { writeTableWidths } from "../lib/writing-table";
+import { writeTableWidths } from "../lib/markdown-table-metadata";
 
 test("published Markdown uses saved column measures without showing metadata", () => {
   const body = "| Short | Long prose |\n| --- | --- |\n| A | This paragraph can wrap inside its cell. |";

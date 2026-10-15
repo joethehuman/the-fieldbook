@@ -9,7 +9,7 @@ import { contentLinkTarget, normalizeContentLink, type ContentLinkContext } from
 import { isInlineVideo } from "@/lib/inline-video";
 import { CourseVideo } from "./patterns/course-video";
 import { Button } from "./ui/button";
-import { readTableWidths, remarkTopLevelTableIndices } from "@/lib/writing-table";
+import { readTableWidths, remarkTopLevelTableIndices } from "@/lib/markdown-table-metadata";
 import { CodeBlock } from "./patterns/code-block";
 
 export default function Markdown({

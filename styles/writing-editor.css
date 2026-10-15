@@ -85,6 +85,8 @@
 }
 .writing-toolbar-controls {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   gap: var(--space-1);
 }
@@ -339,6 +341,9 @@
   line-height: 2.25rem;
 }
 .editor[data-scroll-layout="page"] .writing-document-heading {
+  top: var(--editor-navigation-height, 0px);
+}
+.editor .course-quiz-canvas > .writing-document-heading {
   top: var(--editor-navigation-height, 0px);
 }
 .editor-frame[data-mobile] .writing-document-heading,

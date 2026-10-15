@@ -14,27 +14,47 @@ async function section(page: Page, name: string) {
   if (await picker.isVisible()) {
     await picker.click();
     const option = page.getByRole("option", { name, exact: true });
-    const viewport = page.locator('[data-slot="select-content"] [data-radix-select-viewport]');
+    const viewport = page.locator(
+      '[data-slot="select-content"] [data-radix-select-viewport]',
+    );
     await expect(viewport).toBeVisible();
-    const optionIsReachable = () => option.evaluate((element) => {
-      const box = element.getBoundingClientRect();
-      const viewport = element.closest('[data-radix-select-viewport]')!.getBoundingClientRect();
-      const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-      return box.top >= viewport.top && box.bottom <= viewport.bottom && !!hit && element.contains(hit);
-    });
+    const optionIsReachable = () =>
+      option.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const viewport = element
+          .closest("[data-radix-select-viewport]")!
+          .getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          box.x + box.width / 2,
+          box.y + box.height / 2,
+        );
+        return (
+          box.top >= viewport.top &&
+          box.bottom <= viewport.bottom &&
+          !!hit &&
+          element.contains(hit)
+        );
+      });
     // WebKit's automatic click scrolling can target a different clipped option.
     // Scroll the popup normally and wait for the intended option's painted hit area.
-    for (let step = 0; step < 5 && !await optionIsReachable(); step++) {
+    for (let step = 0; step < 5 && !(await optionIsReachable()); step++) {
       const bounds = (await viewport.boundingBox())!;
-      await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+      await page.mouse.move(
+        bounds.x + bounds.width / 2,
+        bounds.y + bounds.height / 2,
+      );
       const before = await viewport.evaluate((element) => element.scrollTop);
       const distance = await option.evaluate((element) => {
         const box = element.getBoundingClientRect();
-        const viewport = element.closest('[data-radix-select-viewport]')!.getBoundingClientRect();
+        const viewport = element
+          .closest("[data-radix-select-viewport]")!
+          .getBoundingClientRect();
         return box.y + box.height / 2 - viewport.y - viewport.height / 2;
       });
       await page.mouse.wheel(0, distance);
-      await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).not.toBe(before);
+      await expect
+        .poll(() => viewport.evaluate((element) => element.scrollTop))
+        .not.toBe(before);
     }
     await expect.poll(optionIsReachable).toBe(true);
     await option.click();
@@ -246,8 +266,11 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   const editor = page.getByRole("region", {
     name: "Privacy policy draft editor",
   });
-  const commands = editor.getByRole("button", { name: /^Commands:/ });
-  const menu = page.getByRole("menu", { name: /^Insert content/ });
+  const commands = editor.getByRole("button", {
+    name: "Commands",
+    exact: true,
+  });
+  const menu = page.getByRole("listbox");
   const policyText = editor.getByRole("textbox", {
     name: "Privacy policy draft",
     exact: true,
@@ -257,32 +280,37 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   await commands.focus();
   await page.keyboard.press("Enter");
   await expect(
-    menu.getByRole("menuitem", { name: "Normal Text", exact: true }),
-  ).toBeFocused();
+    menu.getByRole("option", { name: /^Heading 1 / }),
+  ).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowDown");
   await expect(
-    menu.getByRole("menuitem", { name: "Heading 1", exact: true }),
-  ).toBeFocused();
+    menu.getByRole("option", { name: /^Heading 2 / }),
+  ).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Privacy policy heading");
-  await expect(policyText.locator(":scope > h1")).toHaveText(
-    "Privacy policy heading",
-  );
+  await expect(policyText.locator("h1")).toHaveText("Privacy policy heading");
   await expect(policyText).toBeFocused();
   await page.keyboard.press("ControlOrMeta+z");
   await expect(policyText).toHaveText("");
   await page.keyboard.press("ControlOrMeta+z");
-  await expect(policyText.locator(":scope > h1")).toHaveCount(0);
-  await expect(policyText.locator(":scope > p")).toHaveCount(1);
+  await expect(policyText.locator("h1")).toHaveCount(0);
+  await expect(
+    policyText.locator('[data-content-type="paragraph"]'),
+  ).toHaveCount(1);
   await commands.focus();
   await page.keyboard.press("Enter");
   await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  await expect(commands).toBeFocused();
+  await expect(policyText).toBeFocused();
   // The first edit initializes the optional privacy settings object even after Undo.
-  await page.getByRole("button", { name: "Discard changes", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Save settings", exact: true })).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("settings-privacy.png"),

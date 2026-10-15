@@ -281,12 +281,6 @@ export function WritingEditor({
                     canvas={canvas}
                     label={label}
                     viewControls={viewControls}
-                    onUnsupported={() => {
-                      setIssue(
-                        "This formatting isn’t supported by the visual editor. Continue editing in Markdown below.",
-                      );
-                      setMode("source");
-                    }}
                   />
                 </EditorBoundary>
               )}

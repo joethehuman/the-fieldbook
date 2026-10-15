@@ -209,12 +209,17 @@ test("section expansion reveals direct Docs and subsections together while child
     const titleBox = title.getBoundingClientRect();
     const detail = row.querySelector('[data-slot="reorder-detail"]')!.getBoundingClientRect();
     const firstLineCenter = titleBox.top + parseFloat(getComputedStyle(title).lineHeight) / 2;
+    const textRange = document.createRange();
+    textRange.selectNodeContents(title);
+    const titleLines = [...textRange.getClientRects()].filter(box => box.width && box.height);
     return {
       checkboxOffset: Math.abs(checkbox.top + checkbox.height / 2 - firstLineCenter),
       iconOffset: Math.abs(icon.top + icon.height / 2 - firstLineCenter),
       checkboxTitleOffset: Math.abs(checkbox.top + checkbox.height / 2 - titleBox.top - titleBox.height / 2),
       iconTitleOffset: Math.abs(icon.top + icon.height / 2 - titleBox.top - titleBox.height / 2),
       inlineMetadata: detail.left > titleBox.right && Math.abs(detail.top + detail.height / 2 - firstLineCenter) < 1,
+      metadataClear: titleLines.every(box => detail.right <= box.left + 1 || detail.left >= box.right - 1 || detail.bottom <= box.top + 1 || detail.top >= box.bottom - 1),
+      detailFits: detail.bottom <= row.getBoundingClientRect().bottom + 1,
       height: row.getBoundingClientRect().height,
       overflow: row.scrollWidth - row.clientWidth,
     };
@@ -223,8 +228,11 @@ test("section expansion reveals direct Docs and subsections together while child
     expect(info.project.name === "phone" ? row.checkboxTitleOffset : row.checkboxOffset).toBeLessThan(1);
     expect(info.project.name === "phone" ? row.iconTitleOffset : row.iconOffset).toBeLessThan(1);
     if (info.project.name !== "phone") {
-      expect(row.inlineMetadata).toBe(true);
-      expect(row.height).toBeLessThanOrEqual(54);
+      // Labels and counts wrap to the next line when the actual Admin column
+      // is narrow; viewport names do not determine that available width.
+      expect(row.metadataClear).toBe(true);
+      if (row.inlineMetadata) expect(row.height).toBeLessThanOrEqual(54);
+      expect(row.detailFits).toBe(true);
     }
     expect(row.overflow).toBe(0);
   }
@@ -279,8 +287,13 @@ test("document move actions stage, discard and save the reader order without cha
   ).toBeGreaterThanOrEqual(12);
   const title = await header.locator("strong").boundingBox(),
     count = await header.locator("small").boundingBox();
-  expect(count!.x).toBeGreaterThan(title!.x + title!.width);
-  expect(Math.abs(title!.y + title!.height / 2 - count!.y - count!.height / 2)).toBeLessThan(1);
+  if (count!.y >= title!.y + title!.height - 1) {
+    expect(count!.x).toBeGreaterThanOrEqual(headerBox!.x);
+    expect(count!.x + count!.width).toBeLessThanOrEqual(headerBox!.x + headerBox!.width);
+  } else {
+    expect(count!.x).toBeGreaterThan(title!.x + title!.width);
+    expect(Math.abs(title!.y + title!.height / 2 - count!.y - count!.height / 2)).toBeLessThan(1);
+  }
   await page.screenshot({ path: info.outputPath("docs-navigation-toolbar.png") });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click();
@@ -954,6 +967,10 @@ test("pending save bar opens and closes smoothly without a dormant gap, and resp
   }))).toBe(false);
 
   await page.getByRole("button", { name: "Actions for Start", exact: true }).click();
+  const initialCardStyle = await page.locator("#settings-docs").evaluate(node => ({
+    border: getComputedStyle(node).borderTopWidth,
+    radius: getComputedStyle(node).borderTopLeftRadius,
+  }));
   const opening = await pendingTransitionHeights(page.getByRole("menuitem", { name: "Move down", exact: true }));
   expect(opening[0]).toBe(0);
   const expanded = opening.at(-1)!;
@@ -975,8 +992,8 @@ test("pending save bar opens and closes smoothly without a dormant gap, and resp
   expect(closing.at(-1)).toBe(0);
   expect(closing.some((height) => height > 1 && height < expanded - 1)).toBe(true);
   await expect(bar).toBeHidden();
-  await expect(card).toHaveCSS("border-top-width", "1px");
-  await expect(card).not.toHaveCSS("border-top-left-radius", "0px");
+  await expect(card).toHaveCSS("border-top-width", initialCardStyle.border);
+  await expect(card).toHaveCSS("border-top-left-radius", initialCardStyle.radius);
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: "Actions for Start", exact: true }).click();

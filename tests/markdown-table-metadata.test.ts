@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readTableWidths, writeTableWidths } from "../lib/writing-table";
+import { readTableWidths, writeTableWidths } from "../lib/markdown-table-metadata";
 
 test("table width metadata survives a Markdown round trip and leaves old tables automatic", () => {
   const markdown = "Intro.\n\n| Topic | Detail |\n| --- | --- |\n| One | A paragraph |";

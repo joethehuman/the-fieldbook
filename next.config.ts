@@ -24,8 +24,8 @@ const config: NextConfig = {
   images: { unoptimized: true },
   webpack(webpackConfig) {
     const cache = webpackConfig.cache;
-    // Patched packages keep their upstream version. Include the locked patch
-    // hashes so persistent builds cannot reuse an older dependency body.
+    // Include locked dependency contents so persistent builds cannot reuse
+    // the previous editor dependency graph.
     if (cache && typeof cache === "object" && cache.type === "filesystem") {
       cache.version = `${cache.version || ""}|dependencies:${dependencies}`;
     }

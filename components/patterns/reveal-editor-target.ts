@@ -104,10 +104,10 @@ export function revealEditorTarget(target: HTMLElement, {
     const style = getComputedStyle(target);
     const header = parseFloat(style.getPropertyValue("--editor-header-height")) || 0;
     const controls = parseFloat(style.getPropertyValue("--editor-controls-height")) || 0;
-    const toolbar = target.closest(".writing-surface")?.querySelector<HTMLElement>(".mdxeditor-toolbar, .writing-view-header")?.getBoundingClientRect().height || 0;
+    const toolbar = target.closest(".writing-surface")?.querySelector<HTMLElement>(".writing-view-header")?.getBoundingClientRect().height || 0;
     const inCanvas = !!target.closest(".editor-frame-canvas");
     const inControls = !!target.closest(".editor-frame-controls");
-    const inToolbar = !!target.closest(".mdxeditor-toolbar, .writing-view-header");
+    const inToolbar = !!target.closest(".writing-view-header");
     const inPanel = !!target.closest(".editor-frame-details, .editor-frame-outline");
     const wholeSurface = target.matches(".writing-surface");
     const canvas = target.closest<HTMLElement>(".editor-frame-canvas");

@@ -829,23 +829,23 @@ test("shared settings library and connection states work in the server app", asy
   ).toHaveAccessibleDescription(
     "Provide an email address, an HTTPS contact page, or both.",
   );
-  const commands = page.getByRole("button", { name: /^Commands:/ });
+  const commands = page.getByRole("button", { name: "Commands", exact: true });
   await commands.scrollIntoViewIfNeeded();
   await commands.focus();
   await expect(commands).toBeFocused();
   await page.keyboard.press("Enter");
-  const menu = page.getByRole("menu", { name: /^Insert content/ });
+  const menu = page.getByRole("listbox");
   await expect(menu).toBeVisible();
   await expect(
-    menu.getByRole("menuitem", { name: "Normal Text", exact: true }),
-  ).toBeFocused();
+    menu.getByRole("option", { name: /^Heading 1 / }),
+  ).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowDown");
   await expect(
-    menu.getByRole("menuitem", { name: "Heading 1", exact: true }),
-  ).toBeFocused();
+    menu.getByRole("option", { name: /^Heading 2 / }),
+  ).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  await expect(commands).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "Privacy policy draft", exact: true })).toBeFocused();
   await bounds(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({

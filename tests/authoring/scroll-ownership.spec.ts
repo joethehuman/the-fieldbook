@@ -262,7 +262,7 @@ test("complete editor fits at its starting position and each overflowing pane re
   await page.screenshot({ path: info.outputPath("editor-start-complete-details.png") });
 
   await replaceWritingText(page, Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1}. Long writing content.`).join("\n\n"));
-  await contained(page, page.locator(".writing-scroll-area"), [title, controls, page.locator(".mdxeditor-toolbar")]);
+  await contained(page, page.locator(".writing-scroll-area"), [title, controls]);
   const instance = await writing.elementHandle();
   await page.getByRole("button", { name: /^Outline/ }).click();
   expect(await instance!.evaluate((el) => el.isConnected)).toBe(true);

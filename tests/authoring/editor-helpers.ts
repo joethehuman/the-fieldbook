@@ -68,7 +68,11 @@ export async function expectMarkdown(page: Page, expected: string | RegExp) {
 /** Write paragraphs through the visual editor instead of the removed source view. */
 export async function replaceWritingText(page: Page, text: string) {
   const editor = page.locator('.writing-content[contenteditable="true"]');
-  await editor.fill("");
+  await editor.click();
+  // Native Select All first selects this block, then the entire document.
+  await editor.press("ControlOrMeta+a");
+  await editor.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
   const paragraphs = text.split("\n\n");
   for (let i = 0; i < paragraphs.length; i++) {
     if (i) await page.keyboard.press("Enter");
@@ -76,15 +80,32 @@ export async function replaceWritingText(page: Page, text: string) {
   }
 }
 
-
 /** Desktop has a canvas Back action; compact editors use the existing account menu. */
 export async function returnToContent(page: Page) {
-  const back = page.getByRole("button", { name: "Back to content", exact: true });
-  if (await back.isVisible()) { await back.click(); return; }
-  const account = page.getByRole("button", { name: "Account menu", exact: true });
-  if (!await account.isVisible()) await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+  const back = page.getByRole("button", {
+    name: "Back to content",
+    exact: true,
+  });
+  if (await back.isVisible()) {
+    await back.click();
+    return;
+  }
+  const account = page.getByRole("button", {
+    name: "Account menu",
+    exact: true,
+  });
+  if (!(await account.isVisible()))
+    await page
+      .getByRole("button", { name: "Open navigation", exact: true })
+      .click();
   await account.click();
-  const content = page.getByRole("menuitem", { name: "Manage content", exact: true });
+  const content = page.getByRole("menuitem", {
+    name: "Manage content",
+    exact: true,
+  });
   if (await content.isVisible()) await content.click();
-  else await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
+  else
+    await page
+      .getByRole("menuitem", { name: "Manage organization", exact: true })
+      .click();
 }

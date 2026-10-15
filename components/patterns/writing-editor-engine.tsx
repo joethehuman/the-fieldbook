@@ -95,7 +95,6 @@ import "@blocknote/shadcn/style.css";
 
 type EditorProps = WritingEditorProps & {
   initialDocument: BlockDocument;
-  onUnsupported: (message: string) => void;
   viewControls?: ReactNode;
 };
 const commandOrder = [
@@ -318,6 +317,26 @@ export default function WritingEditorEngine({
       },
     },
     tables: { headers: true },
+    pasteHandler: ({ event, editor, defaultPasteHandler }) => {
+      // A file-only clipboard is not code. Keep native text/VS Code paste,
+      // but do not insert a media block from an image copied into code.
+      const inCode = editor.getTextCursorPosition().block.type === "codeBlock";
+      if (
+        inCode &&
+        event.clipboardData?.files.length &&
+        !event.clipboardData.getData("text/plain")
+      )
+        return true;
+      if (
+        !latest.current.onUpload &&
+        event.clipboardData?.files.length &&
+        !inCode
+      ) {
+        setError("Uploads are unavailable in this view.");
+        return true;
+      }
+      return defaultPasteHandler();
+    },
     uploadFile: onUpload
       ? async (file) => {
           if (!latest.current.onUpload)
@@ -333,7 +352,7 @@ export default function WritingEditorEngine({
   });
   const lastValue = useRef(value);
   const lastDoc = useRef(JSON.stringify(bodyDocument));
-  const lastSaved = useRef(JSON.stringify(initialDocument.blocks));
+  const lastSaved = useRef(JSON.stringify(editor.document));
   const pendingEchoes = useRef<{ value: string; document: string }[]>([]);
   const fade = useScrollFade<HTMLDivElement>();
   useEffect(() => {
@@ -409,6 +428,7 @@ export default function WritingEditorEngine({
   const controls = (
     <div className="writing-toolbar-controls">
       <Button
+        type="button"
         variant="ghost"
         size="sm"
         disabled={disabled}
@@ -424,6 +444,7 @@ export default function WritingEditorEngine({
         <span className="writing-command-label">Insert</span>
       </Button>
       <Button
+        type="button"
         variant="ghost"
         size="icon"
         disabled={disabled}
@@ -438,6 +459,7 @@ export default function WritingEditorEngine({
         <Undo aria-hidden="true" />
       </Button>
       <Button
+        type="button"
         variant="ghost"
         size="icon"
         disabled={disabled}
