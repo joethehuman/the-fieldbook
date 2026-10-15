@@ -79,6 +79,97 @@ async function setup(
   return { editor, read };
 }
 
+test("themed heading handles align with the first line at every supported level", async ({
+  page,
+}, info) => {
+  const { editor } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    "Text above.\n\n# Heading one\n\nText below.\n\n## Heading two\n\n### Heading three\n\n#### Heading four\n\n##### Heading five\n\n###### Heading six",
+    true,
+  );
+  for (const heading of await editor.getByRole("heading").all()) {
+    await heading.hover();
+    const handle = page.getByRole("button", {
+      name: "Open block menu",
+      exact: true,
+    });
+    await expect(handle).toBeVisible();
+    const firstLine = await heading.evaluate((e) => {
+      const r = e.getBoundingClientRect();
+      return r.top + parseFloat(getComputedStyle(e).lineHeight) / 2;
+    });
+    await expect
+      .poll(async () => {
+        const r = (await handle.boundingBox())!;
+        return Math.abs(r.y + r.height / 2 - firstLine);
+      })
+      .toBeLessThan(1);
+  }
+});
+
+test("native menu rows align and use compact indicators while retaining header actions", async ({
+  page,
+}, info) => {
+  const { editor, read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    gripTable,
+    true,
+  );
+  await editor.getByRole("columnheader", { name: "One", exact: true }).hover();
+  await page
+    .getByRole("button", { name: "Open block menu", exact: true })
+    .click();
+  const menu = page.getByRole("menu").first();
+  const rows = menu.locator('[role="menuitem"], [role="menuitemcheckbox"]');
+  const layout = await rows.evaluateAll((es) =>
+    es.map((e) => {
+      const r = e.getBoundingClientRect(),
+        s = getComputedStyle(e);
+      return {
+        text: e.textContent,
+        x: r.x + parseFloat(s.paddingLeft),
+        height: r.height,
+        icons: [...e.querySelectorAll("svg")].map(
+          (icon) => icon.getBoundingClientRect().width,
+        ),
+      };
+    }),
+  );
+  expect(layout.map((row) => row.text)).toEqual([
+    "Delete",
+    "Colors",
+    "Header row",
+    "Header column",
+  ]);
+  expect(new Set(layout.map((row) => row.x)).size).toBe(1);
+  expect(new Set(layout.map((row) => row.height)).size).toBe(1);
+  expect(layout.flatMap((row) => row.icons).every((size) => size === 16)).toBe(
+    true,
+  );
+  const header = menu.getByRole("menuitemcheckbox", {
+    name: "Header column",
+    exact: true,
+  });
+  await header.click();
+  await page.keyboard.press("Escape");
+  await waitForDraftSaved(page);
+  expect(
+    (await read()).bodyDocument!.blocks.find((b) => b.type === "table")!
+      .content,
+  ).toMatchObject({ headerCols: 1 });
+  await editor.getByRole("columnheader", { name: "One", exact: true }).hover();
+  await page
+    .getByRole("button", { name: "Open block menu", exact: true })
+    .click();
+  await expect(header).toHaveAttribute("aria-checked", "true");
+  await expect(header.locator("svg")).toHaveCSS("width", "16px");
+  await page.keyboard.press("Escape");
+});
+
 for (const level of [1, 2, 3]) {
   test(`native collapsible heading ${level} keeps its empty and typed line stable`, async ({
     page,

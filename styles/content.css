@@ -86,17 +86,18 @@
     margin-top: var(--space-8);
   }
   .markdown h1 {
-    font-size: 1.875rem;
+    font-size: var(--type-authored-heading-1);
+    line-height: var(--type-authored-heading-1-leading);
   }
   .markdown h2 {
-    font-size: 1.5rem;
-    line-height: 1.35;
+    font-size: var(--type-authored-heading-2);
+    line-height: var(--type-authored-heading-2-leading);
     letter-spacing: -0.035em;
     margin-top: var(--space-12);
   }
   .markdown h3 {
-    font-size: 1.25rem;
-    line-height: 1.4;
+    font-size: var(--type-authored-heading-3);
+    line-height: var(--type-authored-heading-3-leading);
     letter-spacing: -0.025em;
   }
   .course-player .course-lesson > h2 {

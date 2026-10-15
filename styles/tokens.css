@@ -90,6 +90,14 @@
   --type-copy-leading: 1.375rem;
   --type-page: 2rem;
   --type-page-leading: 2.5rem;
+  --type-authored-heading-1: 1.875rem;
+  --type-authored-heading-1-leading: 2.5rem;
+  --type-authored-heading-2: 1.5rem;
+  --type-authored-heading-2-leading: 1.35;
+  --type-authored-heading-3: 1.25rem;
+  --type-authored-heading-3-leading: 1.4;
+  --type-authored-heading-4: 1rem;
+  --type-authored-heading-4-leading: 1.5;
   --weight-copy: 400;
   --weight-label: 400;
   --weight-medium: var(--weight-label);

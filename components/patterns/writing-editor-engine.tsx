@@ -34,6 +34,8 @@ import {
   TableHandlesController,
   FilePanelController,
   type SideMenuProps,
+  type FloatingUIOptions,
+  useBlockNoteEditor,
 } from "@blocknote/react";
 import {
   filterSuggestionItems,
@@ -43,6 +45,7 @@ import {
   SuggestionMenu,
   FilePanelExtension,
   getDefaultSlashMenuItems,
+  SideMenuExtension,
 } from "@blocknote/core/extensions";
 import { syntaxHighlighter } from "@blocknote/code-block";
 import {
@@ -183,6 +186,75 @@ function WritingDragHandleMenu() {
 function WritingSideMenu(props: SideMenuProps) {
   return <SideMenu {...props} dragHandleMenu={WritingDragHandleMenu} />;
 }
+function WritingSideMenuController() {
+  const editor = useBlockNoteEditor();
+  const floatingUIOptions = useMemo<FloatingUIOptions>(
+    () => ({
+      useFloatingOptions: {
+        middleware: [
+          {
+            name: "fieldbookTypography",
+            fn: ({ elements, rects, y }) => {
+              const block =
+                editor.getExtension(SideMenuExtension)?.store.state?.block;
+              const reference =
+                elements.reference instanceof HTMLElement
+                  ? elements.reference
+                  : "contextElement" in elements.reference
+                    ? elements.reference.contextElement
+                    : undefined;
+              if (
+                block?.type === "heading" &&
+                reference instanceof HTMLElement
+              ) {
+                const inline =
+                  reference.querySelector<HTMLElement>(".bn-inline-content");
+                if (inline) {
+                  // The public floating options let the native controller follow
+                  // our heading typography without changing block/toggle spacing.
+                  const lineHeight = parseFloat(
+                    getComputedStyle(inline).lineHeight,
+                  );
+                  return {
+                    y:
+                      rects.reference.y +
+                      inline.getBoundingClientRect().top -
+                      reference.getBoundingClientRect().top +
+                      lineHeight / 2 -
+                      rects.floating.height / 2,
+                  };
+                }
+              }
+              // Preserve BlockNote 0.56's offsets for non-heading blocks. Its
+              // exposed middleware option replaces (rather than appends to) them.
+              const emptyFile =
+                block &&
+                editor.schema.blockSpecs[
+                  block.type as keyof typeof editor.schema.blockSpecs
+                ]?.implementation.meta?.fileBlockAccept &&
+                !block.props.url;
+              const nativeOffset = emptyFile
+                ? 12
+                : block?.type === "file"
+                  ? 4
+                  : block?.type === "audio" || block?.type === "table"
+                    ? 15
+                    : 0;
+              return { y: y + nativeOffset };
+            },
+          },
+        ],
+      },
+    }),
+    [editor],
+  );
+  return (
+    <SideMenuController
+      sideMenu={WritingSideMenu}
+      floatingUIOptions={floatingUIOptions}
+    />
+  );
+}
 function WritingFormattingToolbar() {
   return (
     <FormattingToolbar>
@@ -223,10 +295,11 @@ export default function WritingEditorEngine({
   const [error, setError] = useState("");
   const applying = useRef(false);
   const interacted = useRef(false);
-  const { schema: writingSchema, registerLanguages, languages } = useMemo(
-    () => createWritingSchema(initialDocument),
-    [],
-  );
+  const {
+    schema: writingSchema,
+    registerLanguages,
+    languages,
+  } = useMemo(() => createWritingSchema(initialDocument), []);
   const editor = useCreateBlockNote({
     dictionary: writingDictionary,
     schema: writingSchema,
@@ -489,7 +562,7 @@ export default function WritingEditorEngine({
               <FormattingToolbarController
                 formattingToolbar={WritingFormattingToolbar}
               />
-              <SideMenuController sideMenu={WritingSideMenu} />
+              <WritingSideMenuController />
               <TableHandlesController tableHandle={WritingTableHandle} />
               <FilePanelController filePanel={WritingFilePanel} />
               <WritingCodeHeaders languages={languages} disabled={disabled} />

@@ -126,6 +126,60 @@
     var(--editor-content-padding, var(--space-6))
   );
 }
+/* Supported block attributes and native size variables theme both text and
+   placeholder. Leave heading padding and toggle-frame spacing native. */
+.fieldbook-blocknote [data-content-type="heading"] {
+  --level: var(--type-authored-heading-1);
+  --writing-heading-leading: var(--type-authored-heading-1-leading);
+  letter-spacing: -0.03em;
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="2"] {
+  --level: var(--type-authored-heading-2);
+  --writing-heading-leading: var(--type-authored-heading-2-leading);
+  letter-spacing: -0.035em;
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="3"] {
+  --level: var(--type-authored-heading-3);
+  --writing-heading-leading: var(--type-authored-heading-3-leading);
+  letter-spacing: -0.025em;
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="4"] {
+  --level: var(--type-authored-heading-4);
+  --writing-heading-leading: var(--type-authored-heading-4-leading);
+  letter-spacing: normal;
+}
+/* These uncommon imported levels retain the native size scale. */
+.fieldbook-blocknote
+  [data-content-type="heading"]:is([data-level="5"], [data-level="6"]) {
+  --writing-heading-leading: 1.5;
+  letter-spacing: normal;
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="5"] {
+  --level: 0.9em;
+}
+.fieldbook-blocknote [data-content-type="heading"][data-level="6"] {
+  --level: 0.8em;
+}
+.fieldbook-blocknote [data-prev-level="1"] {
+  --prev-level: var(--type-authored-heading-1);
+}
+.fieldbook-blocknote [data-prev-level="2"] {
+  --prev-level: var(--type-authored-heading-2);
+}
+.fieldbook-blocknote [data-prev-level="3"] {
+  --prev-level: var(--type-authored-heading-3);
+}
+.fieldbook-blocknote [data-prev-level="4"] {
+  --prev-level: var(--type-authored-heading-4);
+}
+.bn-root.fieldbook-blocknote
+  .bn-editor
+  .bn-block-outer
+  .bn-block
+  .bn-block-content[data-content-type="heading"] {
+  font-weight: var(--weight-heading);
+  line-height: var(--writing-heading-leading);
+}
 /* Isolate native heading metrics from application page-heading styles. */
 .fieldbook-blocknote .bn-inline-content:is(h1, h2, h3, h4, h5, h6) {
   font-weight: inherit;
@@ -151,7 +205,8 @@
   gap: var(--space-2);
   min-height: calc(var(--control-height-sm) + 2 * var(--space-2));
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid color-mix(in srgb, var(--background) 18%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--background) 18%, transparent);
   color: color-mix(in srgb, var(--background) 70%, transparent);
   font-family: var(--font-geist-sans), sans-serif;
 }
@@ -321,6 +376,7 @@
 /* Native blocks retain geometry. The theme and explicitly configured controls
    keep Fieldbook colors and the supported menu/table refinements. */
 .bn-root.bn-shadcn[data-color-scheme] {
+  font-family: var(--font-geist-sans), sans-serif;
   --bn-colors-editor-text: var(--foreground);
   --bn-colors-editor-background: var(--background);
   --bn-colors-menu-text: var(--popover-foreground);
@@ -354,10 +410,12 @@
 .bn-container.bn-shadcn {
   font-family: var(--font-geist-sans), sans-serif;
 }
-.bn-shadcn
+.bn-root.bn-shadcn
   :is(
     .bn-suggestion-menu,
     .bn-menu-dropdown,
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
     .bn-panel,
     .bn-toolbar,
     [data-slot="select-content"],
@@ -400,7 +458,7 @@
   [data-slot="tabs-list"]:has(> [data-slot="tabs-trigger"]:only-child) {
   display: none;
 }
-.bn-container.bn-shadcn .bn-suggestion-menu {
+.bn-root.bn-shadcn .bn-suggestion-menu {
   width: 24rem;
   max-width: calc(100vw - 2rem);
   max-height: min(
@@ -487,10 +545,27 @@
   background: var(--accent);
   color: var(--accent-foreground);
 }
-.bn-shadcn :is(.bn-menu-dropdown, [data-slot="select-content"]) {
+.bn-root.bn-shadcn
+  :is(
+    .bn-menu-dropdown,
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="select-content"]
+  ) {
   padding: 6px;
+  border: 1px solid var(--border);
+  font-family: var(--font-geist-sans), sans-serif;
+  overscroll-behavior: contain;
 }
-.bn-container.bn-shadcn .bn-select {
+.bn-root.bn-shadcn
+  :is(
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"]
+  ) {
+  min-width: min(12.5rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+}
+.bn-root.bn-shadcn .bn-select {
   width: max-content;
   min-width: min(20rem, calc(100vw - 2rem));
   max-width: calc(100vw - 2rem);
@@ -503,7 +578,7 @@
 .bn-shadcn .bn-select [data-slot="select-item"] {
   white-space: normal;
 }
-.bn-container.bn-shadcn .bn-color-picker-dropdown {
+.bn-root.bn-shadcn .bn-color-picker-dropdown {
   max-height: min(
     24rem,
     calc(var(--bn-vv-height, 100dvh) * 0.6),
@@ -511,11 +586,81 @@
   );
   overscroll-behavior: contain;
 }
-.bn-shadcn :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
-  min-height: 36px;
+/* Treat ordinary, submenu and checked rows as the same Fieldbook menu row.
+   Native ShadCN/Base UI still owns activation, focus, portals and selection. */
+.bn-root.bn-shadcn
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="select-item"]
+  ) {
+  min-height: var(--control-height);
   padding: var(--space-2) var(--space-3);
+  gap: var(--space-2);
   border-radius: var(--control-radius);
   font-size: var(--type-label);
+  font-weight: var(--weight-label);
+  line-height: var(--type-label-leading);
+}
+.bn-root.bn-shadcn
+  :is(
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="select-item"]
+  ) {
+  padding-inline-end: calc(var(--space-3) + 1rem + var(--space-2));
+}
+.bn-root.bn-shadcn
+  :is(
+    [data-slot="dropdown-menu-checkbox-item-indicator"],
+    [data-slot="dropdown-menu-radio-item-indicator"],
+    [data-slot="select-item"] > [data-selected]
+  ) {
+  right: var(--space-3);
+  width: 1rem;
+  height: 1rem;
+}
+/* The upstream SVG reset defeats Tailwind's inherited size utilities. Scope
+   this correction to menus; block/table grips keep their approved icon sizes. */
+.bn-root.bn-shadcn
+  :is(
+    .bn-menu-dropdown,
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="select-content"]
+  )
+  svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.bn-root.bn-shadcn
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="select-item"]
+  ):is([data-highlighted], [data-popup-open], :focus-visible) {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+.bn-root.bn-shadcn
+  :is([data-slot="dropdown-menu-label"], [data-slot="select-label"]) {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--muted-foreground);
+}
+.bn-root.bn-shadcn
+  .bn-toolbar
+  :is([data-slot="button"], [data-slot="toggle"], [data-slot="select-trigger"])
+  svg {
+  width: 1rem;
+  height: 1rem;
 }
 .bn-shadcn
   :is(
@@ -598,7 +743,14 @@
   .bn-container.bn-shadcn .bn-side-menu {
     --writing-side-control-size: max(2.75rem, var(--control-height-sm));
   }
-  .bn-shadcn :is([data-slot="dropdown-menu-item"], [data-slot="select-item"]) {
+  .bn-root.bn-shadcn
+    :is(
+      [data-slot="dropdown-menu-item"],
+      [data-slot="dropdown-menu-checkbox-item"],
+      [data-slot="dropdown-menu-radio-item"],
+      [data-slot="dropdown-menu-sub-trigger"],
+      [data-slot="select-item"]
+    ) {
     min-height: 44px;
   }
   .bn-shadcn .bn-toolbar :is([data-slot="button"], [data-slot="toggle"]) {
