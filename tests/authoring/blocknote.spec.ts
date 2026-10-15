@@ -1151,6 +1151,8 @@ test("structured reader retains formatting, collapsible children, table alignmen
     '## Heading\n\nA **bold** word and [a guide](https://example.com).\n\n| Left | Center |\n| --- | :---: |\n| A | B |\n\n```js\nconst exact = "copy me";\n```';
   const { read } = await setup(page, production, "doc", body, true);
   const item = await read();
+  // This fixture bypasses publication invalidation; give the reader its own cache key.
+  item.id = "00000000-0000-4000-8000-000000000111";
   const workspace = withPublishedSnapshots(freshWorkspace());
   const toggle = importMarkdownDocument("More details").blocks[0];
   toggle.type = "toggleListItem";
@@ -1168,7 +1170,7 @@ test("structured reader retains formatting, collapsible children, table alignmen
     );
     await page.reload();
   }
-  await page.goto(production ? `/docs/${id}` : `/#docs/${id}`);
+  await page.goto(production ? `/docs/${item.id}` : `/#docs/${item.id}`);
   await expect(
     page.locator(".markdown strong").filter({ hasText: "bold" }),
   ).toBeVisible();

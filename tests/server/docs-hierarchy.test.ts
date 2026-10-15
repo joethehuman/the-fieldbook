@@ -21,7 +21,7 @@ const legacy = {
   id,
   category: "Start",
   folder: "",
-  sectionId: undefined,
+  sectionId: undefined as string | undefined,
 };
 const section = { id: "legacy:Start:", name: "Start", legacyCategory: "Start" };
 

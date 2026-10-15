@@ -278,6 +278,9 @@ test("failed autosave preserves edits through search, canceled navigation and re
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep these edits",
   );
+  const searchTrigger = page.getByRole("button", { name: "Open search", exact: true });
+  const collapsedSearch = await searchTrigger.isVisible();
+  if (collapsedSearch) await searchTrigger.click();
   await page
     .getByRole("textbox", { name: "Search all content" })
     .fill("search");
@@ -295,7 +298,7 @@ test("failed autosave preserves edits through search, canceled navigation and re
     page.getByRole("region", { name: "Search results" }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("textbox", { name: "Search all content" }),
+    collapsedSearch ? searchTrigger : page.getByRole("textbox", { name: "Search all content" }),
   ).toBeFocused();
   await openNav(page);
   await page
@@ -386,6 +389,7 @@ test("failed save preserves downloadable text and does not show success", async 
       "data-scroll-layout",
       "workspace",
     );
+  const scrollLayout = await page.locator(".editor").getAttribute("data-scroll-layout");
   await failDraftWrites(page, production, control);
   await page.getByLabel("Title", { exact: true }).fill("Recover my draft");
   await page.keyboard.press("ControlOrMeta+s");
@@ -400,7 +404,7 @@ test("failed save preserves downloadable text and does not show success", async 
   ).toHaveText("Changes not saved");
   await expect(page.locator(".editor")).toHaveAttribute(
     "data-scroll-layout",
-    "workspace",
+    scrollLayout!,
   );
   await expect(page.locator('[data-slot="toast"]')).toHaveCount(0);
   await page
