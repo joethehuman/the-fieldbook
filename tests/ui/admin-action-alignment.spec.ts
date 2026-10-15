@@ -86,6 +86,7 @@ test("single-row deletion and recovery target only that item and keep the acknow
   const data = freshWorkspace();
   const item = data.content.find((c) => c.kind === "doc")!;
   await seed(page, data);
+  await page.getByRole("searchbox", { name: "Search content" }).fill(item.title);
   await menu(page, item.title);
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   let dialog = page.getByRole("dialog");

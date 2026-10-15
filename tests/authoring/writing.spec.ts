@@ -244,6 +244,14 @@ async function setup(
   return { read, writes: () => writes };
 }
 
+async function createCategory(page: Page, name: string) {
+  await page.getByRole("button", { name: "Create category", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Create category", exact: true });
+  await dialog.getByRole("textbox").fill(name);
+  await dialog.getByRole("button", { name: "Create category", exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
 test("Update category filters, creates, normalizes and survives draft saves", async ({
   page,
 }, info) => {
@@ -254,48 +262,34 @@ test("Update category filters, creates, normalizes and survives draft saves", as
     "brief",
   );
   await openContentSettings(page);
-  const input = page.getByRole("combobox", { name: "Category", exact: true });
-  const existing = await input.inputValue();
+  const category = page.getByRole("button", { name: "Category", exact: true });
+  const existing = (await read()).content[0].category;
+  await category.click();
+  const input = page.getByRole("combobox", { name: "Categories", exact: true });
   await input.fill(existing.toLowerCase());
-  await expect(
-    page.getByRole("option", { name: existing, exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("option", { name: existing, exact: true })).toBeVisible();
   await expect(page.getByRole("option", { name: /^Add/ })).toHaveCount(0);
   await input.press("ArrowDown");
   await input.press("Enter");
-  await expect(input).toHaveValue(existing);
-  await expect(input).toBeFocused();
-  await input.fill("  Customer stories  ");
-  await page
-    .getByRole("option", { name: "Add “Customer stories”", exact: true })
-    .click();
-  await expect(input).toHaveValue("Customer stories");
-  await expect
-    .poll(async () => (await read()).content[0].category)
-    .toBe("Customer stories");
+  await expect(category).toHaveText(existing);
+  await expect(category).toBeFocused();
+  await createCategory(page, "  Customer stories  ");
+  await expect(category).toHaveText("Customer stories");
+  await expect.poll(async () => (await read()).content[0].category).toBe("Customer stories");
   expect((await read()).publishedContent![0].category).toBe(existing);
-  await page
-    .getByRole("button", { name: "Show categories", exact: true })
-    .click();
-  await expect(
-    page.getByRole("option", { name: "Customer stories", exact: true }),
-  ).toBeVisible();
+  await category.click();
+  await expect(page.getByRole("option", { name: "Customer stories", exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath("category-dropdown.png"), fullPage: true });
   await input.press("Escape");
-  await expect(page.getByRole("listbox", { name: "Categories" })).toHaveCount(
-    0,
-  );
-  await page
-    .getByRole("button", { name: "Show categories", exact: true })
-    .click();
-  await expect(page.getByRole("listbox", { name: "Categories" })).toBeVisible();
-  await page.screenshot({
-    path: info.outputPath("category-dropdown.png"),
-    fullPage: true,
-  });
+  await expect(page.getByRole("listbox", { name: "Categories" })).toHaveCount(0);
+  await expect(category).toBeFocused();
+  await category.click();
   await input.press("Tab");
-  await expect(page.getByRole("listbox", { name: "Categories" })).toHaveCount(
-    0,
-  );
+  // The native popover loops focus within its single search control.
+  await expect(input).toBeFocused();
+  await expect(page.getByRole("listbox", { name: "Categories" })).toBeVisible();
+  await input.press("Escape");
+  await expect(page.getByRole("listbox", { name: "Categories" })).toHaveCount(0);
 });
 
 for (const kind of ["Doc", "Update"]) {
@@ -320,8 +314,8 @@ for (const kind of ["Doc", "Update"]) {
       });
     } else {
       await expect(
-        page.getByRole("combobox", { name: "Category", exact: true }),
-      ).not.toHaveValue("");
+        page.getByRole("button", { name: "Category", exact: true }),
+      ).not.toHaveText("Choose a category…");
     }
     await closeContentSettings(page);
     await returnToContent(page);
@@ -373,19 +367,10 @@ for (const kind of ["Doc", "Update"]) {
         page.getByRole("button", { name: "Section", exact: true }),
       ).toHaveText("New organization name");
     } else {
-      const control = page.getByRole("combobox", {
-        name: "Category",
-        exact: true,
-      });
+      const control = page.getByRole("button", { name: "Category", exact: true });
       await expect(control).toBeVisible();
-      await expect(control).toHaveValue("");
-      await control.fill("New organization name");
-      await page
-        .getByRole("option", {
-          name: "Add “New organization name”",
-          exact: true,
-        })
-        .click();
+      await expect(control).toHaveText("Choose a category…");
+      await createCategory(page, "New organization name");
     }
     await waitForDraftSaved(page);
     const saved = (await read()).content.find(
@@ -411,8 +396,8 @@ for (const kind of ["Doc", "Update"]) {
       ).toHaveText("New organization name");
     } else {
       await expect(
-        page.getByRole("combobox", { name: "Category", exact: true }),
-      ).toHaveValue("New organization name");
+        page.getByRole("button", { name: "Category", exact: true }),
+      ).toHaveText("New organization name");
     }
     await page.screenshot({
       path: info.outputPath(`new-${kind.toLowerCase()}-section.png`),

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import { DEMO_PROFILE_IDS } from "../lib/demo-session";
 import {
   assignedLearningCards,
@@ -8,8 +8,12 @@ import {
 import { requiredSequence } from "../lib/learning";
 import { isComplete } from "../lib/types";
 import { seedContent } from "../lib/seed";
-import { freshWorkspace } from "../lib/store";
-import { orderedDocs } from "../lib/docs-navigation";
+import { freshWorkspace, loadWorkspace, type Workspace } from "../lib/store";
+import {
+  availableDocSections,
+  createDocSection,
+  orderedDocs,
+} from "../lib/docs-navigation";
 import {
   gradeQuiz,
   optionIds,
@@ -18,6 +22,79 @@ import {
 } from "../lib/course-quiz";
 import { graphemeCount } from "../lib/card-art";
 import { videoSource } from "../lib/video";
+
+function cachedWorkspace(t: TestContext, data: Workspace) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const values = new Map([["fieldbook.workspace.v1", JSON.stringify(data)]]);
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
+  });
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, "localStorage", previous);
+    else delete (globalThis as { localStorage?: Storage }).localStorage;
+  });
+  return values;
+}
+
+test("fresh demo navigation has one configured section tree and accepts new sections", () => {
+  const data = freshWorkspace();
+  const sections = availableDocSections(
+    data.content.filter((item) => item.kind === "doc"),
+    data.settings!.docCategoryOrder,
+    data.settings!.docSections,
+  );
+  assert.equal(sections.length, data.settings!.docSections!.length);
+  assert.equal(
+    createDocSection(sections, "Additional reference").length,
+    sections.length + 1,
+  );
+});
+
+test("cached demo navigation repairs duplicate legacy roots without replacing authored content", (t) => {
+  const data = freshWorkspace();
+  data.settings!.docCategoryOrder = data
+    .settings!.docSections!.filter((section) => !section.parentId)
+    .map((section) => section.name);
+  const doc = data.content.find((item) => item.kind === "doc")!;
+  doc.title = "My edited title";
+  doc.body = "My saved text stays here.";
+  const sections = structuredClone(data.settings!.docSections);
+  const values = cachedWorkspace(t, data);
+  const loaded = loadWorkspace();
+  assert.deepEqual(loaded.settings!.docCategoryOrder, []);
+  assert.deepEqual(loaded.settings!.docSections, sections);
+  assert.equal(
+    loaded.content.find((item) => item.id === doc.id)!.body,
+    doc.body,
+  );
+  assert.equal(
+    loaded.content.find((item) => item.id === doc.id)!.title,
+    doc.title,
+  );
+  assert.deepEqual(
+    JSON.parse(values.get("fieldbook.workspace.v1")!).settings.docCategoryOrder,
+    [],
+  );
+});
+
+for (const scenario of ["legacy document", "unmatched category"] as const) {
+  test(`cached navigation preserves ${scenario} placement`, (t) => {
+    const data = freshWorkspace();
+    data.settings!.docCategoryOrder = data
+      .settings!.docSections!.filter((section) => !section.parentId)
+      .map((section) => section.name);
+    if (scenario === "legacy document")
+      delete data.content.find((item) => item.kind === "doc")!.sectionId;
+    else data.settings!.docCategoryOrder.push("Older reference section");
+    const order = [...data.settings!.docCategoryOrder];
+    cachedWorkspace(t, data);
+    assert.deepEqual(loadWorkspace().settings!.docCategoryOrder, order);
+  });
+}
 
 test("the revenue demo has complete content and deliberate card hooks", () => {
   const data = freshWorkspace();

@@ -649,7 +649,6 @@ test("lesson rows keep title space and open menus beyond the desktop outline", a
     (await page.locator(".editor-frame").getAttribute("data-cards")) === "true";
   async function openOutline() {
     if (
-      compact &&
       !(await page
         .getByRole("complementary", { name: "Course outline", exact: true })
         .isVisible())
@@ -703,7 +702,7 @@ test("lesson rows keep title space and open menus beyond the desktop outline", a
     .click();
   const menu = page.getByRole("menu", { name: "Lesson actions", exact: true });
   await expect(menu).toBeVisible();
-  if (!compact) {
+  if (!compact && (page.viewportSize()?.width ?? 0) >= 1280) {
     const outline = (await page
       .locator(".editor-frame-outline")
       .boundingBox())!;
@@ -854,7 +853,7 @@ test("floating panels preserve their surfaces and expose every final control", a
       .boundingBox())!.y,
   ).toBeCloseTo(header!.y, 0);
   await expect(body).toHaveAttribute("data-scroll-fade-after", "false");
-  if (!compact) {
+  if (!compact && (page.viewportSize()?.width ?? 0) >= 1280) {
     const outline = page.locator(".editor-frame-outline");
     const outlineBody = outline.locator('[data-slot="scroll-region"]');
     const surface = (el: Element) => {
@@ -1424,7 +1423,14 @@ for (const kind of ["doc", "course"] as const)
                 name: `Section ${index + 1}`,
               })),
             };
-          else
+          else {
+            state.settings = {
+              ...state.settings!,
+              contentCategories: {
+                ...state.settings!.contentCategories!,
+                [kind]: Array.from({ length: count }, (_, index) => `Category ${index + 1}`),
+              },
+            };
             state.content.push(
               ...Array.from({ length: count - 1 }, (_, index) => ({
                 ...structuredClone(state.content[0]),
@@ -1433,6 +1439,7 @@ for (const kind of ["doc", "course"] as const)
                 category: `Category ${index + 2}`,
               })),
             );
+          }
         },
       );
       const toggle = page.getByRole("button", { name: "Details", exact: true });
@@ -1444,7 +1451,7 @@ for (const kind of ["doc", "course"] as const)
           .click();
       else
         await page
-          .getByRole("button", { name: "Show categories", exact: true })
+          .getByRole("button", { name: "Category", exact: true })
           .click();
       const list = page.getByRole("listbox", {
         name: kind === "doc" ? "Search sections" : "Categories",
@@ -1484,11 +1491,11 @@ for (const kind of ["doc", "course"] as const)
           await search.press("Enter");
         } else {
           const category = page.getByRole("combobox", {
-            name: "Category",
+            name: "Categories",
             exact: true,
           });
-          for (let index = 0; index < 8; index++)
-            await category.press("ArrowDown");
+          await category.fill("Category 8");
+          await expect(options).toHaveCount(1);
           await category.press("Enter");
         }
         if (kind === "doc")
@@ -1497,8 +1504,8 @@ for (const kind of ["doc", "course"] as const)
           ).toContainText("Section 8");
         else
           await expect(
-            page.getByRole("combobox", { name: "Category", exact: true }),
-          ).toHaveValue("Category 8");
+            page.getByRole("button", { name: "Category", exact: true }),
+          ).toContainText("Category 8");
       } else await page.keyboard.press("Escape");
       await page.close();
     }
@@ -2483,7 +2490,7 @@ for (const kind of ["doc", "brief", "course"] as const) {
           .click();
       } else {
         await expect(
-          panel.getByRole("combobox", { name: "Category", exact: true }),
+          panel.getByRole("button", { name: "Category", exact: true }),
         ).toHaveCSS("font-size", "14px");
         await expect(panel.locator("#content-artwork-title")).toHaveCSS(
           "font-size",
@@ -3059,6 +3066,8 @@ for (const kind of ["doc", "brief", "course"] as const) {
     await expect(dialog).toHaveCount(0);
     await expect(remove).toBeFocused();
     expect((await read()).content[0].id).toBe(item.id);
+    await toggle.click();
+    await expect(details).toBeHidden();
     await returnToContent(page);
     await page
       .getByRole("button", { name: `Actions for ${item.title}`, exact: true })

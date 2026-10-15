@@ -183,6 +183,10 @@ test("existing categories, mixed types and one People menu", async ({
   });
   course.title = "Category fixture course";
   data.content = [...updates, course];
+  data.settings!.contentCategories = {
+    brief: ["Existing alpha", "Existing beta"],
+    course: [course.category],
+  };
   await page.addInitScript((workspace) => {
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));

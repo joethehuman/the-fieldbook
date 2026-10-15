@@ -24,7 +24,10 @@ test("admin entry and section changes avoid the full workspace", async ({
 }, info) => {
   await request.post(`${backend}/fixture`, {
     data: {
-      settings: { access: "private", logoUrl: "" },
+      settings: {
+        access: "private", logoUrl: "",
+        docSections: [{ id: original.sectionId!, name: original.category }],
+      },
       documents: [
         {
           id,
@@ -90,13 +93,13 @@ test("admin entry and section changes avoid the full workspace", async ({
   const saved = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === "/api/content" &&
-      response.request().method() === "POST" &&
-      response.status() === 200,
+      response.request().method() === "POST",
   );
   await page
     .getByRole("textbox", { name: "Title" })
     .fill("Revised administration article");
-  await saved;
+  const saveResponse = await saved;
+  expect(saveResponse.status(), await saveResponse.text()).toBe(200);
   await expect(page.locator(".editor-save-status [role=status]")).toHaveAttribute(
     "data-save-state", "saved",
   );

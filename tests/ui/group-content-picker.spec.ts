@@ -95,6 +95,7 @@ async function start(page: Page, kind: "courses" | "updates" = "courses") {
     name: "Administration section",
     exact: true,
   });
+  await expect(section.or(page.getByRole("tab", { name: "Groups", exact: true }))).toBeVisible();
   if (await section.isVisible()) {
     await section.click();
     await page

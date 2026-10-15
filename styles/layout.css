@@ -520,7 +520,11 @@
     .app-editor-header, .editor-app-actions { gap: var(--space-2); }
     .app-editor-header .editor-save-status { gap: var(--space-1); }
     .app-editor-header .detail-navigation-label { display: none; }
-    .editor-frame { --editor-content-padding: var(--space-4); }
+    .editor-frame {
+      --editor-content-padding: var(--space-4);
+      /* Retain the normal control gutter without enlarging it with text size. */
+      --editor-edge-clearance: 74px;
+    }
   }
   @media (prefers-reduced-motion: reduce) { .topbar::after, .editor-canvas-navigation::after, .editor-frame-panel { transition: none; } }
   /* Bound the whole task, including its natural-size title and recovery notices. */

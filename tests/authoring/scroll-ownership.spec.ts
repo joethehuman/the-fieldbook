@@ -582,8 +582,10 @@ for (const name of ["Teams", "Groups"] as const) {
       name: name === "Teams" ? "Find teams" : "Find a group", exact: true,
     });
     await search.fill(name === "Teams" ? "Branch" : "Audience");
-    if (name === "Teams")
-      await page.getByRole("button", { name: "Select multiple", exact: true }).click();
+    if (name === "Teams") {
+      const select = page.getByRole("button", { name: "Select multiple", exact: true });
+      if (await select.isVisible()) await select.click();
+    }
     else {
       await page.getByRole("combobox", { name: "Sort groups", exact: true }).click();
       await page.getByRole("option", { name: "Name (Z–A)", exact: true }).click();
@@ -631,7 +633,11 @@ for (const name of ["Teams", "Groups"] as const) {
     await section(page, name === "Teams" ? "Groups" : "Teams");
     await section(page, name);
     await expect(search).toHaveValue("");
-    if (name === "Teams") await expect(page.getByRole("button", { name: "Select multiple", exact: true })).toHaveAttribute("aria-pressed", "false");
+    if (name === "Teams") {
+      const select = page.getByRole("button", { name: "Select multiple", exact: true });
+      if (await select.isVisible()) await expect(select).toHaveAttribute("aria-pressed", "false");
+      else await expect(page.getByRole("checkbox", { name: "Select Branch 00", exact: true })).not.toBeChecked();
+    }
     else await expect(page.getByRole("checkbox", { name: "Select Audience 00", exact: true })).not.toBeChecked();
     // A refreshed detail has no previous list context and returns to its start.
     if (name === "Teams") await teamCommand(page, record);

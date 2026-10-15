@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
-import { contentPath } from "../../lib/navigation";
+import { adminHref } from "../../lib/admin-destination";
+import { contentPath, curriculumPath } from "../../lib/navigation";
 const backend = "http://127.0.0.1:3130";
 const docId = "00000000-0000-4000-8000-000000000041";
 const owner = "00000000-0000-4000-8000-000000000010";
@@ -64,6 +65,12 @@ async function account(page: Page, destination: string) {
   await page.getByRole("button", { name: "Account menu", exact: true }).click();
   await page.getByRole("menuitem", { name: destination, exact: true }).click();
 }
+async function openSearch(page: Page) {
+  const field = page.getByRole("textbox", { name: "Search all content", exact: true });
+  if (!(await field.isVisible()))
+    await page.getByRole("button", { name: "Open search", exact: true }).click();
+  return field;
+}
 test.beforeEach(async ({ page, request }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await request.post(`${backend}/fixture`, { data: fixture });
@@ -82,7 +89,7 @@ test.beforeEach(async ({ page, request }) => {
             publishedRevision: 1,
             contentDate: null,
             excerpt: doc.summary,
-            href: `/docs/${docId}`,
+            href: contentPath("doc", docId, doc.title),
             highlights: [],
           },
         ],
@@ -133,7 +140,7 @@ test("learner and management routes share chrome while keeping separate content 
   }
 });
 
-test("Admin, Team and reader keep one frame, search controller and account with fresh document navigation", async ({
+test("Admin reporting and reader keep one frame, search controller and account with fresh document navigation", async ({
   page,
   request,
 }, info) => {
@@ -143,7 +150,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
     if (request.isNavigationRequest()) documentRequests++;
     if (request.url().includes("/api/workspace")) workspaceReads++;
   });
-  await page.goto("/admin");
+  await page.goto(adminHref({ tab: "content" }));
   await expect(page.locator(".admin-layout")).toBeVisible();
   await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
   await page.evaluate(() => {
@@ -154,9 +161,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
       document.querySelector('[aria-label="Search all content"]'),
     ];
   });
-  await page
-    .getByRole("textbox", { name: "Search all content" })
-    .fill("reference");
+  await (await openSearch(page)).fill("reference");
   await expect(
     page.getByRole("region", { name: "Search results" }),
   ).toBeVisible();
@@ -170,12 +175,13 @@ test("Admin, Team and reader keep one frame, search controller and account with 
   ).toBeVisible();
   await expect(page.locator(".app")).toHaveClass(/learner-workspace/);
   await expect(
-    page.locator('.sidebar a[href="/docs/' + docId + '"]'),
+    page.locator(`.sidebar a[href="${contentPath("doc", docId, doc.title)}"]`),
   ).toHaveCount(1);
-  await account(page, "My team’s progress");
-  await expect(page).toHaveURL(/\/team$/);
+  await account(page, "Manage organization");
+  await adminSection(page, "Progress");
+  await expect(page).toHaveURL(/\/admin\/progress$/);
   await expect(
-    page.getByRole("heading", { name: "Team progress", exact: true }),
+    page.getByRole("heading", { name: "Progress", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".app")).not.toHaveClass(/learner-workspace/);
   await openNavigation(page);
@@ -184,7 +190,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
     page.getByRole("heading", { name: doc.title, exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator('.sidebar a[href="/docs/' + docId + '"]'),
+    page.locator(`.sidebar a[href="${contentPath("doc", docId, doc.title)}"]`),
   ).toHaveCount(1);
   await account(page, "Manage organization");
   await expect(page.locator(".admin-layout")).toBeVisible();
@@ -203,8 +209,9 @@ test("Admin, Team and reader keep one frame, search controller and account with 
     }),
   ).toBe(true);
   await expect(
-    page.getByRole("textbox", { name: "Search all content" }),
+    await openSearch(page),
   ).toHaveValue("reference");
+  await page.keyboard.press("Escape");
   await expect(page.locator(".sidebar")).toHaveCount(1);
   await expect(page.locator('[aria-label="Account menu"]')).toHaveCount(1);
   expect(documentRequests).toBe(1);
@@ -221,6 +228,22 @@ test("Admin, Team and reader keep one frame, search controller and account with 
     (await page.request.get("/api/admin/snapshot?scope=content")).status(),
   ).toBe(403);
   expect((await page.request.get("/admin")).status()).toBe(404);
+});
+
+test("manager reporting and reader share their frame through account navigation", async ({ page, request }) => {
+  await request.post(`${backend}/fixture`, { data: { ...fixture, role: "manager" } });
+  let documents = 0;
+  page.on("request", request => { if (request.isNavigationRequest()) documents++; });
+  await page.goto("/team");
+  await expect(page.getByRole("heading", { name: "Team progress", exact: true })).toBeVisible();
+  await page.evaluate(() => { (window as any).managerFrame = document.querySelector(".app"); });
+  await openNavigation(page);
+  await page.getByRole("link", { name: "Docs", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: doc.title, exact: true })).toBeVisible();
+  await account(page, "My team’s progress");
+  await expect(page.getByRole("heading", { name: "Team progress", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.querySelector(".app") === (window as any).managerFrame)).toBe(true);
+  expect(documents).toBe(1);
 });
 
 test("approved cold navigation shows pending while preserving the old body and modified anchors remain native", async ({
@@ -684,7 +707,7 @@ test("dirty Admin navigation and search results require approval before pending 
   page,
 }) => {
   await page.goto("/admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page.getByRole("link", { name: doc.title, exact: true }).click();
   await page
     .getByRole("textbox", { name: "Title", exact: true })
     .fill("Keep this draft");
@@ -706,9 +729,7 @@ test("dirty Admin navigation and search results require approval before pending 
     exact: true,
   });
   if (await close.isVisible()) await close.click();
-  await page
-    .getByRole("textbox", { name: "Search all content" })
-    .fill("reference");
+  await (await openSearch(page)).fill("reference");
   const results = page.getByRole("region", { name: "Search results" });
   await results
     .getByRole("link", { name: new RegExp(doc.title) })
@@ -716,12 +737,12 @@ test("dirty Admin navigation and search results require approval before pending 
     .click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Title", exact: true }),
-  ).toHaveValue("Keep this draft");
   await page
     .getByRole("textbox", { name: "Search all content" })
     .press("Escape");
+  await expect(
+    page.getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue("Keep this draft");
   await openNavigation(page);
   await page.getByRole("link", { name: "Docs", exact: true }).first().click();
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
@@ -755,7 +776,7 @@ test("leaf navigation refreshes added, renamed and removed Docs after direct Tea
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route(`**/docs/${secondId}**`, async (route) => {
+  await page.route(`**${contentPath("doc", secondId, second.title)}**`, async (route) => {
     await held;
     await route.continue();
   });
@@ -769,7 +790,7 @@ test("leaf navigation refreshes added, renamed and removed Docs after direct Tea
     page.getByRole("heading", { name: doc.title, exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator(`.sidebar a[href="/docs/${secondId}"]`),
+    page.locator(`.sidebar a[href$="${secondId.replaceAll("-", "")}"]`),
   ).toHaveCount(1);
   await request.post(`${backend}/fixture`, {
     data: {
@@ -782,7 +803,7 @@ test("leaf navigation refreshes added, renamed and removed Docs after direct Tea
     },
   });
   await openNavigation(page);
-  await page.locator(`.sidebar a[href="/docs/${secondId}"]`).click();
+  await page.locator(`.sidebar a[href$="${secondId.replaceAll("-", "")}"]`).click();
   release();
   await expect(
     page.getByRole("heading", {
@@ -790,14 +811,14 @@ test("leaf navigation refreshes added, renamed and removed Docs after direct Tea
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.locator(`.sidebar a[href="/docs/${docId}"]`)).toContainText(
+  await expect(page.locator(`.sidebar a[href$="${docId.replaceAll("-", "")}"]`)).toContainText(
     "Renamed first reference",
   );
-  await expect(page.locator(`.sidebar a[href="/docs/${newId}"]`)).toContainText(
+  await expect(page.locator(`.sidebar a[href$="${newId.replaceAll("-", "")}"]`)).toContainText(
     "Added reference",
   );
   await expect(
-    page.locator(`.sidebar a[href="/docs/${removedId}"]`),
+    page.locator(`.sidebar a[href$="${removedId.replaceAll("-", "")}"]`),
   ).toHaveCount(0);
   await expect(page.locator('main h1').first()).toHaveText(
     "Renamed second reference",
@@ -850,7 +871,7 @@ test("course progress refresh updates shell presentation while keeping its lesso
   await expect(page.locator(".sidebar .logo")).toContainText(
     "Refreshed installation",
   );
-  await expect(page).toHaveURL(new RegExp(`/courses/${courseId}$`));
+  await expect(page).toHaveURL(new RegExp(contentPath("course", courseId, course.title) + "$"));
 });
 
 test("dirty Identity settings protect Back and allow Forward to return to a clean form", async ({
@@ -859,6 +880,7 @@ test("dirty Identity settings protect Back and allow Forward to return to a clea
   await page.goto("/docs");
   await account(page, "Manage organization");
   await expect(page.locator(".admin-layout")).toBeVisible();
+  const landingURL = page.url();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
@@ -867,6 +889,7 @@ test("dirty Identity settings protect Back and allow Forward to return to a clea
     await picker.click();
     await page.getByRole("option", { name: "Identity", exact: true }).click();
   } else await page.getByRole("tab", { name: "Identity", exact: true }).click();
+  const settingsURL = page.url();
   await page
     .getByRole("textbox", { name: "Installation name", exact: true })
     .fill("Keep dirty settings");
@@ -877,14 +900,16 @@ test("dirty Identity settings protect Back and allow Forward to return to a clea
   ).toHaveValue("Keep dirty settings");
   await page.evaluate(() => history.back());
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
-  await expect(page).toHaveURL(/\/docs$/);
+  await expect(page).toHaveURL(landingURL);
   await page.evaluate(() => history.forward());
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(settingsURL);
   await expect(page.locator(".admin-layout")).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.evaluate(() => history.forward());
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(settingsURL);
   await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(landingURL);
+  await page.goBack();
   await expect(page).toHaveURL(/\/docs$/);
 });
 
@@ -900,7 +925,7 @@ async function adminSection(page: Page, name: string) {
   } else await page.getByRole("tab", { name, exact: true }).click();
 }
 
-test("approved dirty link removes its sentinel before Back twice and Forward", async ({
+test("approved dirty link removes its sentinel across Admin section history", async ({
   page,
 }) => {
   await page.goto("/updates");
@@ -911,9 +936,11 @@ test("approved dirty link removes its sentinel before Back twice and Forward", a
   ).toBeVisible();
   await account(page, "Manage organization");
   await adminSection(page, "Curricula");
+  const listURL = page.url();
   await page
     .getByRole("button", { name: "Create curriculum", exact: true })
     .click();
+  const creationURL = page.url();
   await page
     .getByRole("textbox", { name: "Name", exact: true })
     .fill("Unsaved curriculum");
@@ -930,13 +957,13 @@ test("approved dirty link removes its sentinel before Back twice and Forward", a
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page).toHaveURL(/\/docs$/);
   await page.evaluate(() => history.back());
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(creationURL);
   await expect(page.locator(".admin-layout")).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.evaluate(() => history.back());
-  await expect(page).toHaveURL(/\/docs$/);
+  await expect(page).toHaveURL(listURL);
   await page.evaluate(() => history.forward());
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(creationURL);
   await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/docs$/);
 });
@@ -1008,7 +1035,7 @@ test("clean to immediate re-dirty during queued cleanup rearms a fresh owned his
   await expect
     .poll(() => page.evaluate(() => history.state?.__fieldbookNavigation?.kind))
     .toBe("sentinel");
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(new RegExp(adminHref({ tab: "settings-identity" }) + "$"));
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   release();
   await expect(page.locator(".settings-panel")).toContainText(
@@ -1016,7 +1043,7 @@ test("clean to immediate re-dirty during queued cleanup rearms a fresh owned his
   );
   await page.evaluate(() => history.back());
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
-  await expect(page).toHaveURL(/\/docs$/);
+  await expect(page).toHaveURL(/\/admin\/content$/);
 });
 
 test("failed logout preserves the signed-in page and offers a retry", async ({
@@ -1033,11 +1060,11 @@ test("failed logout preserves the signed-in page and offers a retry", async ({
       .getByRole("alert")
       .filter({ hasText: "Could not sign out. Try again." }),
   ).toBeVisible();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/content$/);
   await expect(page.locator(".admin-layout")).toBeVisible();
 });
 
-test("saved settings keep a single Admin stop through Back and repeated Forward", async ({
+test("saved settings keep one Identity entry through Back and repeated Forward", async ({
   page,
   request,
 }) => {
@@ -1068,15 +1095,15 @@ test("saved settings keep a single Admin stop through Back and repeated Forward"
     .poll(() => page.evaluate(() => history.state?.__fieldbookNavigation?.kind))
     .toBe("base");
   await page.evaluate(() => history.back());
-  await expect(page).toHaveURL(/\/docs$/);
+  await expect(page).toHaveURL(/\/admin\/content$/);
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.evaluate(() => history.forward());
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(new RegExp(adminHref({ tab: "settings-identity" }) + "$"));
   await expect(page.locator(".admin-layout")).toBeVisible();
   await page.evaluate(() => history.forward());
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(new RegExp(adminHref({ tab: "settings-identity" }) + "$"));
   await page.evaluate(() => history.back());
-  await expect(page).toHaveURL(/\/docs$/);
+  await expect(page).toHaveURL(/\/admin\/content$/);
 });
 
 test("app navigation and search share phone and portrait tablet transitions", async ({ page }, info) => {
@@ -1116,9 +1143,15 @@ test("app navigation and search share phone and portrait tablet transitions", as
         await expect(sidebar).toBeHidden();
         await search.click();
         await expect(field).toBeFocused();
-        const panel = (await page.locator('[data-slot="search-panel"]').boundingBox())!;
-        expect(panel.x).toBeGreaterThanOrEqual(15);
-        expect(panel.x + panel.width).toBeLessThanOrEqual(width - 15);
+        const surface = page.locator('[data-slot="search-panel"]');
+        const panel = (await surface.boundingBox())!;
+        if ((await surface.getAttribute("data-mobile")) === "true") {
+          expect(panel.x).toBeCloseTo(0, 0);
+          expect(panel.width).toBeCloseTo(width, 0);
+        } else {
+          expect(panel.x).toBeGreaterThanOrEqual(15);
+          expect(panel.x + panel.width).toBeLessThanOrEqual(width - 15);
+        }
         await page.keyboard.press("Escape");
         await expect(search).toBeFocused();
         await navigation.click();
@@ -1267,7 +1300,7 @@ for (const section of ["updates", "courses", "curricula"] as const) {
     await page
       .getByRole("link", { name: "Open cold detail", exact: true })
       .click();
-    await expect(page).toHaveURL(new RegExp(path + "$"));
+    await expect(page).toHaveURL(new RegExp((section === "curricula" ? curriculumPath("narrow-curriculum", "Narrow curriculum") : contentPath(item.kind as "brief" | "course", item.id, item.title)) + "$"));
     await expect(page.locator('main h1').first()).toHaveText(
       section === "curricula" ? "Narrow curriculum" : item.title,
     );

@@ -92,7 +92,12 @@ async function setup(
           },
           { id: item.id, live },
         );
-  return { read, before: item, data };
+  return {
+    read,
+    before: installed ? item : await read(),
+    data: installed ? data : await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!) as Workspace),
+  };
 }
 
 test("Update corrections preserve freshness and the Publishing checkbox renews only the next explicit Publish", async ({ page }, info) => {
@@ -154,73 +159,82 @@ test("Update corrections preserve freshness and the Publishing checkbox renews o
   }
 });
 
-test("Docs, Updates and Courses quietly save incomplete drafts, revert to Published and explicitly publish current edits", async ({
-  page,
-}, info) => {
-  const installed = info.project.name.startsWith("production");
-  for (const kind of ["doc", "brief", "course"] as const) {
-    const context = await page
-      .context()
-      .browser()!
-      .newContext({ viewport: page.viewportSize()! });
-    const current = await context.newPage();
-    try {
-      const { read, before } = await setup(current, installed, kind);
-      await expect(
-        current.getByRole("button", { name: "Publish", exact: true }),
-      ).toBeDisabled();
-      await current.waitForTimeout(1100); // Observe the autosave debounce without editing.
-      expect((await read()).revision).toBe(1);
-      await current.getByLabel("Title", { exact: true }).fill("");
-      await expect.poll(async () => (await read()).title).toBe("");
-      expect((await read(true)).title).toBe(before.title);
-      await expect(current.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
-      const details = await openContentSettings(current);
-      await expect(current.getByRole("button", { name: "Draft recovery", exact: true })).toHaveCount(0);
-      await details.getByRole("button", { name: "Revert to published version", exact: true }).click();
-      await current.getByRole("button", { name: "Cancel", exact: true }).click();
-      await expect(current.getByLabel("Title", { exact: true })).toHaveValue("");
-      await details.getByRole("button", { name: "Revert to published version", exact: true }).click();
-      await current.getByRole("button", { name: "Confirm", exact: true }).click();
-      await expect.poll(async () => (await read()).title).toBe(before.title);
-      await expect(current.getByLabel("Title", { exact: true })).toHaveValue(before.title);
-      await expect(details.getByRole("button", { name: "Revert to published version", exact: true })).toBeDisabled();
-      expect((await read(true)).title).toBe(before.title);
-      expect((await read()).version).toBe(before.version);
-      if (kind === "course") expect((await read()).assignments).toEqual(before.assignments);
-      await current.screenshot({ path: info.outputPath(`published-revert-${kind}.png`) });
-      await current.getByLabel("Title", { exact: true }).fill("");
-      await expect.poll(async () => (await read()).title).toBe("");
-      await expect(details.getByRole("button", { name: "Add a title", exact: true })).toBeEnabled();
-      await current.getByLabel("Title", { exact: true }).fill(before.title);
-      await expect(
-        current.getByRole("button", { name: "Publish", exact: true }),
-      ).toBeDisabled();
-      await current
-        .getByLabel("Title", { exact: true })
-        .fill("Explicitly published latest title");
-      await current
-        .getByRole("button", { name: "Publish", exact: true })
-        .click();
-      await expect
-        .poll(async () => (await read(true)).title)
-        .toBe("Explicitly published latest title");
-      await expect(
-        current.getByRole("button", { name: "Publish", exact: true }),
-      ).toBeDisabled();
-      await expect(current.locator("form.editor")).toBeVisible();
-      expect((await read()).version).toBe(before.version);
-      if (kind === "course") {
-        expect((await read()).assignments).toEqual(before.assignments);
-        expect((await read()).lessons[0].videoUrl).toBe(
-          before.lessons[0].videoUrl,
-        );
-      }
-    } finally {
-      await context.close();
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: quietly saves incomplete drafts, reverts to Published and explicitly publishes current edits`, async ({
+    page: current,
+  }, info) => {
+    const installed = info.project.name.startsWith("production");
+    const { read, before } = await setup(current, installed, kind);
+    await expect(
+      current.getByRole("button", { name: "Publish", exact: true }),
+    ).toBeDisabled();
+    await current.waitForTimeout(1100); // Observe the autosave debounce without editing.
+    expect((await read()).revision).toBe(1);
+    await current.getByLabel("Title", { exact: true }).fill("");
+    await expect.poll(async () => (await read()).title).toBe("");
+    expect((await read(true)).title).toBe(before.title);
+    await expect(
+      current.getByRole("button", { name: "Publish", exact: true }),
+    ).toBeDisabled();
+    const details = await openContentSettings(current);
+    await expect(
+      current.getByRole("button", { name: "Draft recovery", exact: true }),
+    ).toHaveCount(0);
+    await details
+      .getByRole("button", { name: "Revert to published version", exact: true })
+      .click();
+    await current.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(current.getByLabel("Title", { exact: true })).toHaveValue("");
+    await details
+      .getByRole("button", { name: "Revert to published version", exact: true })
+      .click();
+    await current.getByRole("button", { name: "Confirm", exact: true }).click();
+    await expect.poll(async () => (await read()).title).toBe(before.title);
+    await expect(current.getByLabel("Title", { exact: true })).toHaveValue(
+      before.title,
+    );
+    await expect(
+      details.getByRole("button", {
+        name: "Revert to published version",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    expect((await read(true)).title).toBe(before.title);
+    expect((await read()).version).toBe(before.version);
+    if (kind === "course")
+      expect((await read()).assignments).toEqual(before.assignments);
+    await current.screenshot({
+      path: info.outputPath(`published-revert-${kind}.png`),
+    });
+    await current.getByLabel("Title", { exact: true }).fill("");
+    await expect.poll(async () => (await read()).title).toBe("");
+    await expect(
+      details.getByRole("button", { name: "Add a title", exact: true }),
+    ).toBeEnabled();
+    await current.getByLabel("Title", { exact: true }).fill(before.title);
+    await expect(
+      current.getByRole("button", { name: "Publish", exact: true }),
+    ).toBeDisabled();
+    await current
+      .getByLabel("Title", { exact: true })
+      .fill("Explicitly published latest title");
+    await current.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect
+      .poll(async () => (await read(true)).title)
+      .toBe("Explicitly published latest title");
+    await expect(
+      current.getByRole("button", { name: "Publish", exact: true }),
+    ).toBeDisabled();
+    await expect(current.locator("form.editor")).toBeVisible();
+    expect((await read()).version).toBe(before.version);
+    if (kind === "course") {
+      expect((await read()).assignments).toEqual(before.assignments);
+      expect((await read()).lessons[0].videoUrl).toBe(
+        before.lessons[0].videoUrl,
+      );
     }
-  }
-});
+  });
+}
 
 for (const lostResponse of [false, true])
   test(`retry saves newer open edits after ${lostResponse ? "a committed save with a lost response" : "a rejected save"}`, async ({ page }, info) => {
