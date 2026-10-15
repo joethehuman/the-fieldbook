@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { PGlite } from "@electric-sql/pglite";
 import {
   blockDocumentSchema,
+  blockDocumentSignature,
   canonicalBody,
   exportBlockMarkdown,
   importMarkdownDocument,
@@ -13,6 +15,50 @@ import { seedContent } from "../lib/seed";
 
 const source =
   '## Heading\n\nA **bold**, *italic*, ~~struck~~ paragraph with `code` and [a link](https://example.com).\n\n- One\n  - Nested\n- Two\n\n> A reminder.\n\n| Left | Right |\n| :--- | ---: |\n| A | B |\n\n```js\nconst message = "hello";\n```\n\n![A diagram](https://example.com/diagram.png)\n\n[Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\n---';
+test("saved block signatures ignore JSONB key order while preserving content and array order", async () => {
+  const document = importMarkdownDocument(source);
+  const before = structuredClone(document);
+  const database = new PGlite();
+  try {
+    const result = await database.query<{ document: typeof document }>(
+      "select $1::jsonb as document",
+      [JSON.stringify(document)],
+    );
+    const saved = result.rows[0].document;
+    assert.deepEqual(saved, document);
+    assert.notEqual(JSON.stringify(saved), JSON.stringify(document));
+    assert.equal(
+      blockDocumentSignature(saved),
+      blockDocumentSignature(document),
+    );
+    assert.deepEqual(document, before);
+    const changedStyle = structuredClone(saved);
+    changedStyle.blocks[0].props.backgroundColor = "yellow";
+    assert.notEqual(
+      blockDocumentSignature(changedStyle),
+      blockDocumentSignature(document),
+    );
+    const reorderedBlocks = structuredClone(saved);
+    reorderedBlocks.blocks.reverse();
+    assert.notEqual(
+      blockDocumentSignature(reorderedBlocks),
+      blockDocumentSignature(document),
+    );
+    const reorderedChildren = structuredClone(saved);
+    const list = reorderedChildren.blocks.find(
+      (block) => block.children.length,
+    )!;
+    list.children.push(
+      importMarkdownDocument("Another nested item.").blocks[0],
+    );
+    const nestedSignature = blockDocumentSignature(reorderedChildren);
+    list.children.reverse();
+    assert.notEqual(blockDocumentSignature(reorderedChildren), nestedSignature);
+  } finally {
+    await database.close();
+  }
+});
+
 test("all existing command content imports into versioned blocks and exports useful Markdown", () => {
   const doc = importMarkdownDocument(source),
     markdown = exportBlockMarkdown(doc);

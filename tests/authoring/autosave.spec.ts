@@ -1,10 +1,11 @@
-import { replaceWritingText } from "./editor-helpers";
+import { replaceWritingText, waitForDraftSaved } from "./editor-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { reconcileLearning } from "../../lib/learning-groups";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 import { openContentSettings } from "./editor-helpers";
+import type { Content } from "../../lib/types";
 
 async function setup(
   page: Page,
@@ -320,7 +321,8 @@ test("typing survives a slow draft response and Publish serializes the newest co
     name: "Doc content",
     exact: true,
   });
-  await writing.fill(
+  await replaceWritingText(
+    page,
     "The newest local Markdown survives the earlier response.",
   );
   await expect(writing).toBeEnabled();
@@ -341,6 +343,106 @@ test("typing survives a slow draft response and Publish serializes the newest co
   expect((await read(true)).title).toBe("Newest local title");
   expect(requests.map((request) => request.publish)).toEqual([false, true]);
 });
+
+for (const kind of ["doc", "brief", "course"] as const) {
+  for (const command of [
+    { name: "heading", query: "/", type: "heading" },
+    { name: "paragraph", query: "/normal", type: "paragraph" },
+    { name: "table", query: "/table", type: "table" },
+  ]) {
+    test(`${kind}: slash command ${command.name} survives a reordered autosave response`, async ({
+      page,
+    }, info) => {
+      test.skip(
+        !info.project.name.startsWith("production"),
+        "The installed save response is reordered by the database.",
+      );
+      const { read, before } = await setup(page, true, kind);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let prepared!: (saved: Content) => void;
+      const responseReady = new Promise<Content>((resolve) => {
+        prepared = resolve;
+      });
+      let intercepted = false;
+      await page.route("**/api/content", async (route) => {
+        if (route.request().method() !== "POST" || intercepted)
+          return route.fallback();
+        intercepted = true;
+        const response = await route.fetch();
+        expect(response.ok()).toBe(true);
+        const saved: Content = await response.json();
+        // JSONB can return the same document with a different object-key order.
+        const reordered: Content = JSON.parse(
+          JSON.stringify(saved, (_key, value) =>
+            value && typeof value === "object" && !Array.isArray(value)
+              ? Object.fromEntries(
+                  Object.entries(value).sort(([a], [b]) => a.localeCompare(b)),
+                )
+              : value,
+          ),
+        );
+        prepared(reordered);
+        await gate;
+        await route.fulfill({ response, json: reordered });
+      });
+      try {
+        await replaceWritingText(page, "");
+        await page.keyboard.type(command.query);
+        const editor = page.locator('.writing-content[contenteditable="true"]');
+        const menu = page.getByRole("listbox");
+        await expect(menu).toBeVisible();
+        const saved = await responseReady;
+        const body = kind === "course" ? saved.lessons[0] : saved;
+        expect(body.body).toContain(command.query);
+        expect(Object.keys(body.bodyDocument!)).toEqual([
+          "blocks",
+          "format",
+          "version",
+        ]);
+        release();
+        await waitForDraftSaved(page);
+        await expect(menu).toBeVisible();
+        await expect(editor).toBeFocused();
+        await page.keyboard.press("Enter");
+        const inserted = editor
+          .locator(`[data-content-type="${command.type}"]`)
+          .first();
+        await expect(inserted).toBeVisible();
+        await page.keyboard.type("Written after autosave");
+        await expect(inserted).toHaveText("Written after autosave");
+        await expect(editor).not.toContainText("/");
+        await waitForDraftSaved(page);
+        const draft = await read();
+        const document = (kind === "course" ? draft.lessons[0] : draft)
+          .bodyDocument;
+        expect(document.blocks).toHaveLength(kind === "course" ? 2 : 1);
+        expect(document.blocks.at(-1).type).toBe(command.type);
+        if (kind === "course") {
+          expect(document.blocks[0].type).toBe("video");
+          expect(document.blocks[0].props.url).toBe(before.lessons[0].videoUrl);
+        }
+        if (kind === "doc" && command.name === "heading") {
+          await page.screenshot({
+            path: info.outputPath("slash-autosave-after.png"),
+          });
+        }
+        expect(
+          (kind === "course" ? (await read(true)).lessons[0] : await read(true))
+            .body,
+        ).toBe(kind === "course" ? before.lessons[0].body : before.body);
+        await page.reload();
+        await editor.waitFor();
+        await expect(inserted).toHaveText("Written after autosave");
+        await expect(editor).not.toContainText("/");
+      } finally {
+        release();
+      }
+    });
+  }
+}
 
 test("an assigned course stages a new version through autosaves and consumes it only on Publish", async ({
   page,

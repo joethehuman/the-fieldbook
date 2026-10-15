@@ -151,6 +151,18 @@ export type BlockDocument = {
   version: 1;
   blocks: WritingBlock[];
 };
+
+/** Compare saved blocks independently of JSON object-key order; array order matters. */
+export function blockDocumentSignature(document: BlockDocument): string {
+  return JSON.stringify(document, (_key, value) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : value,
+  );
+}
+
 export const blockDocumentSchema: z.ZodType<BlockDocument> = z
   .object({
     format: z.literal("fieldbook-blocks"),
