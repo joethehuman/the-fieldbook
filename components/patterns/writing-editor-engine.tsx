@@ -190,6 +190,9 @@ function WritingSideMenuController() {
   const editor = useBlockNoteEditor();
   const floatingUIOptions = useMemo<FloatingUIOptions>(
     () => ({
+      // Keep native block controls beneath the pinned title (12) and Back
+      // navigation (13), so hidden block tops cannot paint over those surfaces.
+      elementProps: { style: { zIndex: 11 } },
       useFloatingOptions: {
         middleware: [
           {
