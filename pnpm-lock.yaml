@@ -9,6 +9,11 @@ overrides:
   source-map-js: 1.2.2
   compression: 1.8.2
 
+patchedDependencies:
+  '@blocknote/shadcn@0.56.0':
+    hash: 53f65c6867b8bfe8ca2eda12b90e2c0dd0ba083dc979751e07aa6916a647d37e
+    path: patches/@blocknote__shadcn@0.56.0.patch
+
 importers:
 
   .:
@@ -30,7 +35,7 @@ importers:
         version: 0.56.0(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(highlight.js@11.11.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(yjs@13.6.33)
       '@blocknote/shadcn':
         specifier: 0.56.0
-        version: 0.56.0(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(highlight.js@11.11.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)(yjs@13.6.33)
+        version: 0.56.0(patch_hash=53f65c6867b8bfe8ca2eda12b90e2c0dd0ba083dc979751e07aa6916a647d37e)(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(highlight.js@11.11.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)(yjs@13.6.33)
       '@modelcontextprotocol/sdk':
         specifier: ^1.31.0
         version: 1.31.0(zod@4.6.5)
@@ -202,7 +207,7 @@ importers:
         version: 0.56.0(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(highlight.js@11.11.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(yjs@13.6.33)
       '@blocknote/shadcn':
         specifier: 0.56.0
-        version: 0.56.0(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(highlight.js@11.11.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)(yjs@13.6.33)
+        version: 0.56.0(patch_hash=53f65c6867b8bfe8ca2eda12b90e2c0dd0ba083dc979751e07aa6916a647d37e)(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(highlight.js@11.11.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)(yjs@13.6.33)
       '@modelcontextprotocol/sdk':
         specifier: ^1.31.0
         version: 1.31.0(zod@4.6.5)
@@ -3390,7 +3395,7 @@ snapshots:
       - y-protocols
       - yjs
 
-  '@blocknote/shadcn@0.56.0(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(highlight.js@11.11.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)(yjs@13.6.33)':
+  '@blocknote/shadcn@0.56.0(patch_hash=53f65c6867b8bfe8ca2eda12b90e2c0dd0ba083dc979751e07aa6916a647d37e)(@floating-ui/dom@1.8.0)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(highlight.js@11.11.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)(yjs@13.6.33)':
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@blocknote/core': 0.56.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(highlight.js@11.11.1)(yjs@13.6.33)
