@@ -154,11 +154,13 @@
     border-color: var(--border);
   }
   .markdown-table {
+    position: relative;
     overflow-x: auto;
   }
   .markdown-table-wrap {
     position: relative;
     min-width: 0;
+    container-type: inline-size;
   }
   .table-edge-fade::before,
   .table-edge-fade::after {
@@ -180,14 +182,17 @@
     background: linear-gradient(to right, transparent, var(--background));
   }
   .markdown-table [data-slot="table"] {
-    width: max-content;
+    width: auto;
+    max-width: 100%;
     table-layout: auto;
   }
   .markdown-table :is(th, td) {
-    min-width: 11rem;
+    /* Two default columns still fit when the reading area narrows. */
+    min-width: min(11rem, 45cqw);
   }
   .markdown-table .authored-table-sized {
     table-layout: fixed;
+    max-width: none;
   }
   .markdown-table .authored-table-sized :is(th, td) {
     min-width: 0;
