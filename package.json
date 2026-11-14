@@ -92,7 +92,10 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "patchedDependencies": {
+      "@blocknote/shadcn@0.56.0": "patches/@blocknote__shadcn@0.56.0.patch"
+    }
   },
   "packageManager": "pnpm@10.17.1",
   "engines": {

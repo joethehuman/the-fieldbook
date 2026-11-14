@@ -63,7 +63,7 @@ Use the shared workspace shell across learner, management and authoring routes. 
 
 Choose layouts according to available space and input capabilities. A narrow mouse-driven window retains desktop editing. Use the existing layout hooks and matching CSS rules rather than introducing competing breakpoints.
 
-Keep scroll ownership explicit. The workspace normally owns page scrolling; bounded lists and desktop writing surfaces may have their own scroll areas. Preserve vertical scroll chaining, contain wide tables horizontally, and keep controls reachable on short screens. Avoid global overflow locks and competing wheel, focus or viewport correction mechanisms. Use the shared scroll-fade treatment only where content actually overflows.
+Keep scroll ownership explicit. The workspace normally owns page scrolling; bounded lists and desktop writing surfaces may have their own scroll areas. Preserve vertical scroll chaining, contain wide tables horizontally, and keep controls reachable on short screens. Authored tables wrap text within the reading area by default; short tables stay compact. Preserve explicitly resized columns and allow horizontal scrolling when those widths or the number of columns need more space. Avoid global overflow locks and competing wheel, focus or viewport correction mechanisms. Use the shared scroll-fade treatment only where content actually overflows.
 
 ## Shared authoring
 

@@ -514,6 +514,132 @@ test("media commands share the native file panel and persist their URLs", async 
   ).toHaveCount(0);
 });
 
+test("table resizing preserves width through column changes, undo and reload", async ({
+  page,
+}, info) => {
+  test.skip(
+    Number(info.project.use.viewport?.width) < 1024,
+    "This pointer-resize scenario uses a desktop canvas.",
+  );
+  const { editor, read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "doc",
+    gripTable.replace(
+      "| A | B | C |",
+      "| A | B | A few sentences give readers enough context to understand the decision. This text should wrap within its resized column while the table remains free to grow beyond the canvas. |",
+    ),
+    true,
+  );
+  const table = editor.getByRole("table");
+  const scroller = editor.locator(".tableWrapper");
+  const widths = async () => {
+    const content = (await read()).bodyDocument!.blocks.find(
+      (block) => block.type === "table",
+    )!.content;
+    if (!content || Array.isArray(content))
+      throw new Error("Expected a saved table");
+    return content.columnWidths?.map((width) => width ?? null) ?? [];
+  };
+  const expectGeometry = async (expected: (number | null)[]) => {
+    await expect.poll(widths).toEqual(expected);
+    const geometry = await table.evaluate((node) => {
+      const t = node as HTMLTableElement;
+      return {
+        width: t.getBoundingClientRect().width,
+        columns: [...t.rows[0].cells].map(
+          (cell) => cell.getBoundingClientRect().width,
+        ),
+      };
+    });
+    const minimum = expected.reduce<number>(
+      (sum, width) => sum + (width ?? 120),
+      0,
+    );
+    if (expected.every((width) => width !== null)) {
+      expected.forEach((width, index) => {
+        expect(Math.abs(geometry.columns[index] - width!)).toBeLessThanOrEqual(
+          1,
+        );
+      });
+      expect(Math.abs(geometry.width - minimum)).toBeLessThanOrEqual(2);
+    } else {
+      // Automatic columns retain native content sizing; the minimum must still allow overflow.
+      expect(geometry.width).toBeGreaterThanOrEqual(minimum - 1);
+    }
+    return geometry;
+  };
+  const resize = async (index: number, targetWidth: number) => {
+    const cell = table.getByRole("row").first().locator("th, td").nth(index);
+    await cell.scrollIntoViewIfNeeded();
+    const box = (await cell.boundingBox())!;
+    const current = (await widths())[index] ?? Math.round(box.width);
+    const x = box.x + box.width - 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await expect(editor).toHaveClass(/resize-cursor/);
+    await page.mouse.down();
+    await page.mouse.move(x + targetWidth - current, y, { steps: 10 });
+    await page.mouse.up();
+    await expect.poll(async () => (await widths())[index]).toBe(targetWidth);
+  };
+  const columnAction = async (index: number, action: string) => {
+    const cell = table.getByRole("row").first().locator("th, td").nth(index);
+    await cell.scrollIntoViewIfNeeded();
+    await cell.hover();
+    await page
+      .getByRole("button", { name: "Column actions", exact: true })
+      .click();
+    await page.getByRole("menuitem", { name: action, exact: true }).click();
+    await expect(page.getByRole("menu")).toBeHidden();
+  };
+
+  await resize(0, 350);
+  await resize(1, 350);
+  await expectGeometry([350, 350, null]);
+  // Sizing the last automatic column must retain overflow, not shrink the table.
+  await resize(2, 350);
+  await expectGeometry([350, 350, 350]);
+  const lines = await table
+    .getByRole("cell", { name: /A few sentences give readers/ })
+    .evaluate((cell) => {
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      return new Set(
+        [...range.getClientRects()].map((rect) => Math.round(rect.top)),
+      ).size;
+    });
+  expect(lines).toBeGreaterThan(1);
+  expect(
+    await scroller.evaluate((node) => node.scrollWidth > node.clientWidth),
+  ).toBe(true);
+
+  await columnAction(2, "Add column right");
+  await expectGeometry([350, 350, 350, null]);
+  await resize(3, 300);
+  await expectGeometry([350, 350, 350, 300]);
+  await waitForDraftSaved(page);
+  await page.reload();
+  await expect(table).toBeVisible();
+  await expectGeometry([350, 350, 350, 300]);
+
+  // Begin a fresh history after reload, then undo an actual resize and removal.
+  await resize(3, 420);
+  await expectGeometry([350, 350, 350, 420]);
+  await editor.focus();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expectGeometry([350, 350, 350, 300]);
+  await columnAction(3, "Delete column");
+  await expectGeometry([350, 350, 350]);
+  await editor.focus();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expectGeometry([350, 350, 350, 300]);
+  await waitForDraftSaved(page);
+  await page.reload();
+  await expect(table).toBeVisible();
+  await expectGeometry([350, 350, 350, 300]);
+});
+
 test("table grips wait for a completed click and retain keyboard and touch activation", async ({
   page,
 }, info) => {

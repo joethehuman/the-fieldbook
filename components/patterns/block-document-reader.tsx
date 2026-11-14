@@ -236,11 +236,8 @@ export function BlockDocumentReader({
         );
       } else if (b.type === "table" && b.content && !Array.isArray(b.content)) {
         const table = b.content;
-        const widths = table.columnWidths?.every((w) => typeof w === "number")
-          ? (table.columnWidths as number[])
-          : undefined;
         element = (
-          <ScrollableMarkdownTable widths={widths}>
+          <ScrollableMarkdownTable widths={table.columnWidths}>
             <TableBody>
               {table.rows.map((row, rowIndex) => (
                 <TableRow key={rowIndex}>

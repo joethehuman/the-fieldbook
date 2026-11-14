@@ -22,15 +22,32 @@ export function Table({
     />
   );
 }
-/** Authored columns use validated pixel measures in the reading region. */
-export function AuthoredTable({ children, widths }: { children: React.ReactNode; widths?: number[] }) {
-  return <Table
-    className={widths ? "authored-table-sized" : undefined}
-    style={{ width: widths ? `${widths.reduce((sum, width) => sum + width, 0)}px` : "max-content" }}
-  >
-    {widths && <colgroup>{widths.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>}
-    {children}
-  </Table>;
+export type AuthoredTableWidths = readonly (number | null | undefined)[];
+
+/** Preserve resized columns; unsized neighbours use the reader's 11rem default. */
+export function AuthoredTable({
+  children,
+  widths,
+}: {
+  children: React.ReactNode;
+  widths?: AuthoredTableWidths;
+}) {
+  const columns = widths?.some((width) => typeof width === "number")
+    ? widths.map((width) => width ?? 176)
+    : undefined;
+  return (
+    <Table
+      className={columns ? "authored-table-sized" : "w-auto"}
+      style={columns ? { width: `${columns.reduce((sum, width) => sum + width, 0)}px` } : undefined}
+    >
+      {columns && (
+        <colgroup>
+          {columns.map((width, index) => <col key={index} style={{ width }} />)}
+        </colgroup>
+      )}
+      {children}
+    </Table>
+  );
 }
 export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   return (
