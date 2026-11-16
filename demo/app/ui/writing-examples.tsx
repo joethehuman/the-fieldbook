@@ -75,6 +75,44 @@ function FailureMessageExamples() {
   );
 }
 
+const proseTable =
+  "| Topic | Details |\n| --- | --- |\n| Example | A few sentences explain the decision and give readers enough context to act. The text wraps within the reading area, so the row grows taller as needed. Readers can follow the explanation without scrolling sideways. |\n| Reference | https://example.com/" +
+  "a-long-reference-without-spaces".repeat(5) + " |";
+
+function AuthoredTableExamples() {
+  const partial = importMarkdownDocument(proseTable);
+  const content = partial.blocks[0].content;
+  if (content && !Array.isArray(content)) content.columnWidths = [240, null];
+  return (
+    <Card id="authored-tables" aria-label="Authored table examples">
+      <div className="grid min-w-0 gap-6">
+        <h3>Reading tables</h3>
+        <p>Long text wraps. Resized columns keep their widths, and wide tables scroll within the reading area.</p>
+        <div role="group" aria-label="Wrapping table example" className="markdown min-w-0 max-w-[var(--reading-width)]">
+          <h4>Long text and links</h4>
+          <Markdown>{proseTable}</Markdown>
+        </div>
+        <div role="group" aria-label="Compact table example" className="markdown min-w-0 max-w-[var(--reading-width)]">
+          <h4>Short content stays compact</h4>
+          <Markdown>{"| Name | Status |\n| --- | --- |\n| Guide | Ready |"}</Markdown>
+        </div>
+        <div role="group" aria-label="Partially resized table example" className="markdown min-w-0 max-w-[var(--reading-width)]">
+          <h4>One resized column</h4>
+          <Markdown document={partial}>{proseTable}</Markdown>
+        </div>
+        <div role="group" aria-label="Resized table example" className="markdown min-w-0 max-w-[var(--reading-width)]">
+          <h4>Both columns resized</h4>
+          <Markdown>{"<!-- fieldbook-table-widths:v1 [[192,384]] -->\n\n" + proseTable}</Markdown>
+        </div>
+        <div role="group" aria-label="Wide table example" className="markdown min-w-0 max-w-[var(--reading-width)]">
+          <h4>Many columns</h4>
+          <Markdown>{"| Topic | Owner | Status | Priority | Due | Next step |\n| --- | --- | --- | --- | --- | --- |\n| Guide | Support | Draft | Normal | Friday | Review |"}</Markdown>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function WritingExamples() {
   const [body, setBody] = useState(
     "## A clear place to write\n\n- [x] Review the lesson\n- [ ] Try a knowledge check\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.\n\n| Area | Owner | Next step |\n| :--- | :--- | :--- |\n| **Documentation** | Enablement | Confirm the source |\n| | | |\n| Customer follow-up | Account team | Keep the next decision and its context visible |\n\n```text\nA code block with its own actions.\n```\n\n![A landscape illustration](https://example.com/landscape.png)\n\n[Video](https://www.youtube.com/watch?v=69V__a49xtw)\n\n---\n\nTriple-click this paragraph to select it and open the formatting menu.",
@@ -139,6 +177,7 @@ export function WritingExamples() {
         <h3>Structured reading</h3>
         <Markdown document={bodyDocument}>{body}</Markdown>
       </Card>
+      <AuthoredTableExamples />
       <Card aria-label="Media upload feedback">
         <div className="grid gap-4">
           <h3>Media upload feedback</h3>

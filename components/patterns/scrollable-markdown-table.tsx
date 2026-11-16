@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AuthoredTable } from "../ui/table";
+import { AuthoredTable, type AuthoredTableWidths } from "../ui/table";
 
 /** Keeps wide reading tables scrollable without moving the surrounding prose. */
-export function ScrollableMarkdownTable({ children, widths }: { children: ReactNode; widths?: number[] }) {
+export function ScrollableMarkdownTable({
+  children,
+  widths,
+}: {
+  children: ReactNode;
+  widths?: AuthoredTableWidths;
+}) {
   const region = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ left: false, right: false });
 

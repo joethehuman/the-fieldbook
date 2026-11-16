@@ -16,12 +16,12 @@ test("published Markdown uses saved column measures without showing metadata", (
   assert.match(html, /This paragraph can wrap inside its cell/);
 });
 
-test("existing tables retain automatic layout", () => {
+test("existing tables do not acquire saved column widths", () => {
   const html = renderToStaticMarkup(createElement(Markdown, {
     children: "| One | Two |\n| --- | --- |\n| A | B |",
   }));
   assert.doesNotMatch(html, /authored-table-sized|<colgroup>/);
-  assert.match(html, /style="width:max-content"/);
+  assert.doesNotMatch(html, /style="width:/);
 });
 
 test("saved widths follow top-level tables without sizing a quoted table", () => {
@@ -32,6 +32,7 @@ test("saved widths follow top-level tables without sizing a quoted table", () =>
     children: writeTableWidths(body, [[192, 288], [240, 320]]),
   }));
   assert.equal((html.match(/<colgroup>/g) || []).length, 2);
-  assert.match(html, /<blockquote>[\s\S]*?style="width:max-content"[\s\S]*?<\/blockquote>/);
+  const quoted = html.match(/<blockquote>[\s\S]*?<\/blockquote>/)![0];
+  assert.doesNotMatch(quoted, /authored-table-sized|<colgroup>/);
   assert.match(html, /<colgroup><col style="width:192px"\/><col style="width:288px"\/><\/colgroup>[\s\S]*<colgroup><col style="width:240px"\/><col style="width:320px"\/><\/colgroup>/);
 });
